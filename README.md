@@ -13,4 +13,26 @@ What we did is we modified the frontend to also support:
 * sending the data as JSON to this backend
 * loading and displaying data from the backend, e.g., to support editing existing data or reduce the amount of work required to fill in the diary for many days.
 
+## Development Setup
+
+```bash
+git clone https://github.com/dfsp-spirit/o-timeusediary-backend
+cd o-timeusediary-backend
+
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv sync --dev
+
+# Run tests to verify setup
+pytest
+```
+
+Then run the backend:
+
+```bash
+uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000
+```
+
+Now connect via curl, e.g., `curl http://localhost:8000/entries/`, or setup and run the frontend: see the [frontend repo](https://github.com/dfsp-spirit/o-timeusediary/tree/mpiae_adapt), and make sure you use the `mpiae_adapt` branch.
 
