@@ -221,7 +221,7 @@ async def submit_timeline_data(
     # Check if entry already exists for this participant+study+index combination
     existing_entry = session.exec(
         select(TimeuseEntry).where(
-            TimeuseEntry.participant_id == entry_data.metadata.participant.pid,
+            TimeuseEntry.participant_id == entry_data.entry_metadata.participant.pid,
             TimeuseEntry.study_id == study.id,
             TimeuseEntry.daily_entry_index == daily_entry_index
         )
@@ -230,15 +230,15 @@ async def submit_timeline_data(
     if existing_entry:
         raise HTTPException(
             status_code=400,
-            detail=f"Entry already exists for participant {entry_data.metadata.participant.pid}, study {study_name_short}, index {daily_entry_index}"
+            detail=f"Entry already exists for participant {entry_data.entry_metadata.participant.pid}, study {study_name_short}, index {daily_entry_index}"
         )
 
     # Create main entry
     db_entry = TimeuseEntry(
-        participant_id=entry_data.metadata.participant.pid,
+        participant_id=entry_data.entry_metadata.participant.pid,
         study_id=study.id,
         daily_entry_index=daily_entry_index,
-        metadata_json=entry_data.metadata.dict(),
+        entry_metadata_json=entry_data.entry_metadata.dict(),
         raw_data=entry_data.dict()
     )
 
@@ -264,7 +264,7 @@ async def submit_timeline_data(
         daily_entry_index=db_entry.daily_entry_index,
         submitted_at=db_entry.submitted_at,
         activities=entry_data.activities,
-        metadata=entry_data.metadata,
+        entry_metadata=entry_data.entry_metadata,
         raw_data=db_entry.raw_data,
         study=StudyRead.from_orm(study),
         entry_name=entry_name_obj.entry_name

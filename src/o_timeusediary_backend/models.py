@@ -5,34 +5,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from pydantic import model_validator, ConfigDict
 import uuid
 
-# Utility functions for case conversion
-def to_camel(string: str) -> str:
-    """Convert snake_case to camelCase"""
-    words = string.split('_')
-    return words[0] + ''.join(word.capitalize() for word in words[1:])
-
-def to_snake(string: str) -> str:
-    """Convert camelCase to snake_case"""
-    return ''.join(['_' + c.lower() if c.isupper() else c for c in string]).lstrip('_')
-
-# Base model for input (camelCase → snake_case)
-class CamelInputModel(SQLModel):
-    """Accepts camelCase input and converts to snake_case internally"""
-    model_config = ConfigDict(
-        alias_generator=to_snake,
-        populate_by_name=True,
-        extra='forbid'
-    )
-
-# Base model for output (snake_case → camelCase)
-class CamelOutputModel(SQLModel):
-    """Converts snake_case internally to camelCase output"""
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        from_attributes=True
-    )
-
 # Study table (internal models - no case conversion needed)
 class StudyBase(SQLModel):
     name: str = Field(index=True, unique=True)
@@ -70,7 +42,7 @@ class StudyRead(StudyBase):
     id: int
     entry_names: List[StudyEntryNameRead]
 
-# Activity models
+# Table model for activities (database - snake_case)
 class TimelineActivityBase(SQLModel):
     timeline_key: str = Field(index=True)
     activity: str = Field(index=True)
@@ -86,9 +58,45 @@ class TimelineActivityBase(SQLModel):
     end_minutes: int = Field(ge=0, le=1440)
     mode: str = Field(index=True)
     count: int = Field(ge=1)
-    activity_id: str = Field(index=True)
+    frontend_activity_id: str = Field(index=True)
 
-    model_config = ConfigDict(extra='forbid')
+class TimelineActivity(TimelineActivityBase, table=True):
+    id: Optional[str] = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        primary_key=True
+    )
+    timeuse_entry_id: str = Field(foreign_key="timeuseentry.id", index=True)
+    selections: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB)
+    )
+    available_options: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB)
+    )
+
+class TimelineActivityCreate(SQLModel):
+    timeline_key: str
+    activity: str
+    category: str
+    start_time: str
+    end_time: str
+    block_length: int
+    color: str
+    parent_activity: str
+    is_custom_input: bool
+    original_selection: str
+    start_minutes: int
+    end_minutes: int
+    mode: str
+    selections: Optional[Dict[str, Any]] = None
+    available_options: Optional[Dict[str, Any]] = Field(default=None)
+    count: int
+    frontend_activity_id: str
+
+    model_config = ConfigDict(
+        extra='forbid'
+    )
 
     @model_validator(mode='after')
     def validate_count_based_on_mode(self):
@@ -118,37 +126,18 @@ class TimelineActivityBase(SQLModel):
             raise ValueError('available_options must be provided for multiple-choice activities')
         return self
 
-# Table model for activities
-class TimelineActivity(TimelineActivityBase, table=True):
-    id: Optional[str] = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        primary_key=True
-    )
-    timeuse_entry_id: str = Field(foreign_key="timeuseentry.id", index=True)
-    selections: Optional[Dict[str, Any]] = Field(
-        default=None,
-        sa_column=Column(JSONB)
-    )
-    available_options: Optional[Dict[str, Any]] = Field(
-        default=None,
-        sa_column=Column(JSONB)
-    )
-
-# Input models (accept camelCase)
-class TimelineActivityCreate(CamelInputModel, TimelineActivityBase):
-    selections: Optional[Dict[str, Any]] = None
-    available_options: Optional[Dict[str, Any]] = None
-
-class StudyMetadata(CamelInputModel):
+class StudyMetadata(SQLModel):
     study_name: str = Field(..., min_length=1)
     daily_entry_index: int = Field(..., ge=0)
 
-class ParticipantMetadata(CamelInputModel):
+
+class ParticipantMetadata(SQLModel):
     pid: str = Field(..., min_length=1)
 
-class TimelineMetadata(CamelInputModel):
+class TimelineMetadata(SQLModel):
     study: StudyMetadata
     participant: ParticipantMetadata
+
 
     @model_validator(mode='after')
     def validate_required_metadata(self):
@@ -156,9 +145,13 @@ class TimelineMetadata(CamelInputModel):
             raise ValueError('Study and participant metadata are required')
         return self
 
-class TimeuseEntryCreate(CamelInputModel):
+class TimeuseEntryCreate(SQLModel):
     activities: List[TimelineActivityCreate] = Field(..., min_items=1)
     entry_metadata: TimelineMetadata
+
+    model_config = ConfigDict(
+        extra='forbid'
+    )
 
     @model_validator(mode='after')
     def validate_activities_non_empty(self):
@@ -174,23 +167,49 @@ class TimeuseEntryCreate(CamelInputModel):
     def daily_entry_index(self) -> int:
         return self.entry_metadata.study.daily_entry_index
 
-# Output models (return camelCase)
-class TimelineActivityResponse(CamelOutputModel, TimelineActivityBase):
+class TimelineActivityResponse(SQLModel):
+    timeline_key: str
+    activity: str
+    category: str
+    start_time: str
+    end_time: str
+    block_length: int
+    color: str
+    parent_activity: str
+    is_custom_input: bool
+    original_selection: str
+    start_minutes: int
+    end_minutes: int
+    mode: str
     selections: Optional[Dict[str, Any]] = None
-    available_options: Optional[Dict[str, Any]] = None
+    available_options: Optional[Dict[str, Any]] = Field(default=None)
+    count: int
+    frontend_activity_id: str
 
-class StudyMetadataResponse(CamelOutputModel):
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+class StudyMetadataResponse(SQLModel):
     study_name: str
     daily_entry_index: int
 
-class ParticipantMetadataResponse(CamelOutputModel):
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+class ParticipantMetadataResponse(SQLModel):
     pid: str
 
-class TimelineMetadataResponse(CamelOutputModel):
+    model_config = ConfigDict(from_attributes=True)
+
+class TimelineMetadataResponse(SQLModel):
     study: StudyMetadataResponse
     participant: ParticipantMetadataResponse
 
-class TimeuseEntryRead(CamelOutputModel):
+    model_config = ConfigDict(from_attributes=True)
+
+class TimeuseEntryRead(SQLModel):
     id: str
     participant_id: str
     study_id: int
@@ -198,9 +217,13 @@ class TimeuseEntryRead(CamelOutputModel):
     submitted_at: datetime
     activities: List[TimelineActivityResponse]
     entry_metadata: TimelineMetadataResponse
-    raw_data: Optional[Dict[str, Any]] = None
+    raw_data: Optional[Dict[str, Any]] = Field(default=None)
     study: StudyRead
     entry_name: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 # Main entry models (internal)
 class TimeuseEntryBase(SQLModel):
