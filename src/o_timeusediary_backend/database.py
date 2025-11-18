@@ -3,8 +3,8 @@ from sqlmodel import SQLModel, create_engine, Session, select
 from typing import Generator
 from .models import Study, StudyEntryName
 
-DATABASE_URL = "postgresql://username:password@localhost:5432/yourdb"
-engine = create_engine(DATABASE_URL)
+from .settings import settings
+engine = create_engine(settings.database_url)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

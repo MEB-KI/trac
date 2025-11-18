@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from fastapi.exceptions import RequestValidationError
 import logging
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime, timedelta
 import csv
 import json
@@ -14,6 +14,9 @@ import io
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from urllib.parse import urlparse
+
+
+
 
 from .logging_config import setup_logging
 setup_logging()
@@ -179,12 +182,8 @@ def health_check(session: Session = Depends(get_session)):
     return {"status": "healthy", "entries_count": len(count)}
 
 
-# main.py
-from fastapi import FastAPI, Depends, HTTPException
-from sqlmodel import Session, select
-from typing import List, Tuple
 
-app = FastAPI()
+
 
 @app.post("/timeline/submit", response_model=TimeuseEntryRead)
 async def submit_timeline_data(

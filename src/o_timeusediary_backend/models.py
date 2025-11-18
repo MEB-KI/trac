@@ -2,11 +2,38 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlmodel import SQLModel, Field, Column, Relationship
 from sqlalchemy.dialects.postgresql import JSONB
-from pydantic import validator, root_validator, model_validator, ConfigDict
-from typing import Optional, Dict, Any, Literal
+from pydantic import model_validator, ConfigDict
 import uuid
 
-# Study table
+# Utility functions for case conversion
+def to_camel(string: str) -> str:
+    """Convert snake_case to camelCase"""
+    words = string.split('_')
+    return words[0] + ''.join(word.capitalize() for word in words[1:])
+
+def to_snake(string: str) -> str:
+    """Convert camelCase to snake_case"""
+    return ''.join(['_' + c.lower() if c.isupper() else c for c in string]).lstrip('_')
+
+# Base model for input (camelCase → snake_case)
+class CamelInputModel(SQLModel):
+    """Accepts camelCase input and converts to snake_case internally"""
+    model_config = ConfigDict(
+        alias_generator=to_snake,
+        populate_by_name=True,
+        extra='forbid'
+    )
+
+# Base model for output (snake_case → camelCase)
+class CamelOutputModel(SQLModel):
+    """Converts snake_case internally to camelCase output"""
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True
+    )
+
+# Study table (internal models - no case conversion needed)
 class StudyBase(SQLModel):
     name: str = Field(index=True, unique=True)
     name_short: str = Field(index=True, unique=True)
@@ -18,8 +45,8 @@ class Study(StudyBase, table=True):
 
 # Study entry names mapping table
 class StudyEntryNameBase(SQLModel):
-    entry_index: int = Field(ge=0)  # 0-based index
-    entry_name: str  # "monday", "tuesday", "default", etc.
+    entry_index: int = Field(ge=0)
+    entry_name: str
 
 class StudyEntryName(StudyEntryNameBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -43,7 +70,7 @@ class StudyRead(StudyBase):
     id: int
     entry_names: List[StudyEntryNameRead]
 
-
+# Activity models
 class TimelineActivityBase(SQLModel):
     timeline_key: str = Field(index=True)
     activity: str = Field(index=True)
@@ -58,13 +85,10 @@ class TimelineActivityBase(SQLModel):
     start_minutes: int = Field(ge=0, le=1440)
     end_minutes: int = Field(ge=0, le=1440)
     mode: str = Field(index=True)
-    selections: Optional[Dict[str, Any]] = None
-    available_options: Optional[Dict[str, Any]] = None
     count: int = Field(ge=1)
     activity_id: str = Field(index=True)
 
-    # Pydantic v2 model config
-    model_config = ConfigDict(extra='forbid')  # Optional: reject extra fields
+    model_config = ConfigDict(extra='forbid')
 
     @model_validator(mode='after')
     def validate_count_based_on_mode(self):
@@ -110,29 +134,79 @@ class TimelineActivity(TimelineActivityBase, table=True):
         sa_column=Column(JSONB)
     )
 
-# Metadata validation models (updated with daily_entry_index)
-class StudyMetadata(SQLModel):
-    study_name: str = Field(..., min_length=1)
-    daily_entry_index: int = Field(..., ge=0)  # Required, must be >= 0
+# Input models (accept camelCase)
+class TimelineActivityCreate(CamelInputModel, TimelineActivityBase):
+    selections: Optional[Dict[str, Any]] = None
+    available_options: Optional[Dict[str, Any]] = None
 
-class ParticipantMetadata(SQLModel):
+class StudyMetadata(CamelInputModel):
+    study_name: str = Field(..., min_length=1)
+    daily_entry_index: int = Field(..., ge=0)
+
+class ParticipantMetadata(CamelInputModel):
     pid: str = Field(..., min_length=1)
 
-class TimelineMetadata(SQLModel):
+class TimelineMetadata(CamelInputModel):
     study: StudyMetadata
     participant: ParticipantMetadata
 
-    @validator('study', 'participant')
-    def validate_required_metadata(cls, v):
-        if not v:
+    @model_validator(mode='after')
+    def validate_required_metadata(self):
+        if not self.study or not self.participant:
             raise ValueError('Study and participant metadata are required')
-        return v
+        return self
 
-# Main entry models with study and entry index validation
+class TimeuseEntryCreate(CamelInputModel):
+    activities: List[TimelineActivityCreate] = Field(..., min_items=1)
+    entry_metadata: TimelineMetadata
+
+    @model_validator(mode='after')
+    def validate_activities_non_empty(self):
+        if not self.activities:
+            raise ValueError('At least one activity must be provided')
+        return self
+
+    @property
+    def study_name_short(self) -> str:
+        return self.entry_metadata.study.study_name
+
+    @property
+    def daily_entry_index(self) -> int:
+        return self.entry_metadata.study.daily_entry_index
+
+# Output models (return camelCase)
+class TimelineActivityResponse(CamelOutputModel, TimelineActivityBase):
+    selections: Optional[Dict[str, Any]] = None
+    available_options: Optional[Dict[str, Any]] = None
+
+class StudyMetadataResponse(CamelOutputModel):
+    study_name: str
+    daily_entry_index: int
+
+class ParticipantMetadataResponse(CamelOutputModel):
+    pid: str
+
+class TimelineMetadataResponse(CamelOutputModel):
+    study: StudyMetadataResponse
+    participant: ParticipantMetadataResponse
+
+class TimeuseEntryRead(CamelOutputModel):
+    id: str
+    participant_id: str
+    study_id: int
+    daily_entry_index: int
+    submitted_at: datetime
+    activities: List[TimelineActivityResponse]
+    entry_metadata: TimelineMetadataResponse
+    raw_data: Optional[Dict[str, Any]] = None
+    study: StudyRead
+    entry_name: str
+
+# Main entry models (internal)
 class TimeuseEntryBase(SQLModel):
     participant_id: str = Field(index=True)
     study_id: int = Field(foreign_key="study.id", index=True)
-    daily_entry_index: int = Field(ge=0, index=True)  # Store which entry this is (0, 1, 2, ...)
+    daily_entry_index: int = Field(ge=0, index=True)
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
 
 class TimeuseEntry(TimeuseEntryBase, table=True):
@@ -140,51 +214,20 @@ class TimeuseEntry(TimeuseEntryBase, table=True):
         default_factory=lambda: str(uuid.uuid4()),
         primary_key=True
     )
-
     raw_data: Optional[Dict[str, Any]] = Field(
         default=None,
         sa_column=Column(JSONB)
     )
-
-    metadata_json: Optional[Dict[str, Any]] = Field(
+    entry_metadata_json: Optional[Dict[str, Any]] = Field(
         default=None,
         sa_column=Column(JSONB)
     )
 
-    # Add unique constraint to prevent duplicate entries for same participant+study+index
     class Config:
         unique_together = [("participant_id", "study_id", "daily_entry_index")]
-
-# API Models with study and entry index validation
-class TimelineActivityCreate(TimelineActivityBase):
-    pass
-
-class TimeuseEntryCreate(SQLModel):
-    activities: List[TimelineActivityCreate] = Field(..., min_items=1)
-
-    @validator('activities')
-    def validate_activities_non_empty(cls, v):
-        if not v:
-            raise ValueError('At least one activity must be provided')
-        return v
-
-    @property
-    def study_name_short(self) -> str:
-        return self.metadata.study.study_name
-
-    @property
-    def daily_entry_index(self) -> int:
-        return self.metadata.study.daily_entry_index
-
-class TimeuseEntryRead(TimeuseEntryBase):
-    id: str
-    activities: List[TimelineActivityCreate]
-    raw_data: Optional[Dict[str, Any]] = None
-    study: StudyRead
-    entry_name: str  # The actual name from StudyEntryName
 
 class TimeuseEntryUpdate(SQLModel):
     participant_id: Optional[str] = None
     study_id: Optional[int] = None
     daily_entry_index: Optional[int] = None
-    metadata_json: Optional[Dict[str, Any]] = None
+    entry_metadata_json: Optional[Dict[str, Any]] = None
