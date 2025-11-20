@@ -23,7 +23,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 from . settings import settings
-from .models import TimeuseEntry, TimeuseEntryCreate, TimeuseEntryRead, StudyEntryName, Study, StudyRead, StudyCreate, StudyEntryNameCreate, StudyEntryNameRead, TimelineActivity
+from .models import TimeuseEntry, TimeuseEntryCreate, TimeuseEntryRead, StudyEntryName, Study, StudyRead, StudyCreate, StudyEntryNameCreate, StudyEntryNameRead, TimelineActivity, TimelineMetadataResponse, StudyMetadataResponse, ParticipantMetadataResponse, TimelineActivityResponse
 from .database import get_session, create_db_and_tables
 
 
