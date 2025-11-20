@@ -348,6 +348,7 @@ async def add_study_entry_name(
     session.refresh(db_entry_name)
     return db_entry_name
 
+
 @app.get("/studies/{study_id}/entry_names", response_model=List[StudyEntryNameRead])
 async def get_study_entry_names(study_id: int, session: Session = Depends(get_session)):
     study = session.get(Study, study_id)
@@ -358,3 +359,130 @@ async def get_study_entry_names(study_id: int, session: Session = Depends(get_se
         select(StudyEntryName).where(StudyEntryName.study_id == study_id)
     ).all()
     return entry_names
+
+
+@app.get("/timeline/entries", response_model=List[TimeuseEntryRead])
+async def get_timeline_entries(
+    participant_id: str = Query(..., description="Participant ID"),
+    study_name_short: str = Query(..., description="Study short name"),
+    daily_entry_index: int = Query(..., description="Daily entry index"),
+    session: Session = Depends(get_session)
+):
+    """
+    Retrieve all timeline entries for a specific participant, study, and daily entry index.
+    All three parameters are required to prevent enumeration of all data.
+    Hit it with something like: /timeline/entries?participant_id=user123&study_name_short=default&daily_entry_index=0
+    """
+    # Validate that the study exists
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+
+    if not study:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study '{study_name_short}' not found. Valid studies: {get_available_studies(session)}"
+        )
+
+    # Validate that the daily_entry_index exists for this study
+    entry_name_obj = session.exec(
+        select(StudyEntryName).where(
+            StudyEntryName.study_id == study.id,
+            StudyEntryName.entry_index == daily_entry_index
+        )
+    ).first()
+
+    if not entry_name_obj:
+        valid_indices = get_valid_entry_indices(session, study.id)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Daily entry index {daily_entry_index} not found for study '{study_name_short}'. Valid indices: {valid_indices}"
+        )
+
+    # Query for matching entries
+    entries = session.exec(
+        select(TimeuseEntry).where(
+            TimeuseEntry.participant_id == participant_id,
+            TimeuseEntry.study_id == study.id,
+            TimeuseEntry.daily_entry_index == daily_entry_index
+        )
+    ).all()
+
+    # Convert to response models with study and entry name details
+    result = []
+    for entry in entries:
+        # Get the activities for this entry
+        activities = session.exec(
+            select(TimelineActivity).where(
+                TimelineActivity.timeuse_entry_id == entry.id
+            )
+        ).all()
+
+        # Convert TimelineActivity to TimelineActivityResponse
+        activity_responses = []
+        for activity in activities:
+            activity_responses.append(TimelineActivityResponse(
+                timeline_key=activity.timeline_key,
+                activity=activity.activity,
+                category=activity.category,
+                start_time=activity.start_time,
+                end_time=activity.end_time,
+                block_length=activity.block_length,
+                color=activity.color,
+                parent_activity=activity.parent_activity,
+                is_custom_input=activity.is_custom_input,
+                original_selection=activity.original_selection,
+                start_minutes=activity.start_minutes,
+                end_minutes=activity.end_minutes,
+                mode=activity.mode,
+                selections=activity.selections,
+                available_options=activity.available_options,
+                count=activity.count,
+                frontend_activity_id=activity.frontend_activity_id
+            ))
+
+        # Convert entry_metadata_json back to TimelineMetadataResponse
+        if entry.entry_metadata_json:
+            entry_metadata = TimelineMetadataResponse(
+                study=StudyMetadataResponse(
+                    study_name=entry.entry_metadata_json.get("study", {}).get("study_name", ""),
+                    daily_entry_index=entry.entry_metadata_json.get("study", {}).get("daily_entry_index", 0)
+                ),
+                participant=ParticipantMetadataResponse(
+                    pid=entry.entry_metadata_json.get("participant", {}).get("pid", "")
+                )
+            )
+        else:
+            # Fallback if entry_metadata_json is None
+            entry_metadata = TimelineMetadataResponse(
+                study=StudyMetadataResponse(study_name="", daily_entry_index=0),
+                participant=ParticipantMetadataResponse(pid="")
+            )
+
+        # Get the full study details for the response
+        study_read = StudyRead(
+            id=study.id,
+            name=study.name,
+            name_short=study.name_short,
+            description=study.description,
+            entry_names=[StudyEntryNameRead(
+                id=en.id,
+                entry_index=en.entry_index,
+                entry_name=en.entry_name
+            ) for en in study.entry_names]
+        )
+
+        result.append(TimeuseEntryRead(
+            id=entry.id,
+            participant_id=entry.participant_id,
+            study_id=entry.study_id,
+            daily_entry_index=entry.daily_entry_index,
+            submitted_at=entry.submitted_at,
+            activities=activity_responses,
+            entry_metadata=entry_metadata,
+            raw_data=entry.raw_data,
+            study=study_read,
+            entry_name=entry_name_obj.entry_name
+        ))
+
+    return result

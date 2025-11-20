@@ -1,7 +1,7 @@
 # database.py
 from sqlmodel import SQLModel, create_engine, Session, select, delete
 from typing import Generator
-from .models import Study, StudyEntryName
+from .models import Study, StudyEntryName, TimeuseEntry
 from .settings import settings
 from .studies_config import load_studies_config
 import logging
@@ -14,6 +14,34 @@ engine = create_engine(settings.database_url)
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
     create_default_studies(settings.studies_config_path)
+    report_on_db_contents()
+
+def report_on_db_contents():
+    """Report on existing studies and their entry names in the database"""
+    logger.info("Reporting on database contents:")
+    with Session(engine) as session:
+        studies = session.exec(select(Study)).all()
+        if not studies:
+            logger.info("No studies found in the database.")
+            return
+
+        for study in studies:
+            logger.info(f"Study: {study.name} (short: {study.name_short}, id: {study.id})")
+            entry_names = session.exec(
+                select(StudyEntryName).where(StudyEntryName.study_id == study.id)
+            ).all()
+            for entry in entry_names:
+                logger.info(f" - Entry: {entry.entry_name} (Index: {entry.entry_index})")
+
+        time_use_entries = session.exec(select(TimeuseEntry)).all()
+        logger.info(f"Total time use entries in database: {len(time_use_entries)}")
+
+        # report for each time_use_entry the fields participant_id, study_id, study_name_short, daily_entry_index
+        for entry in time_use_entries:
+            study = session.get(Study, entry.study_id)
+            study_name_short = study.name_short if study else "Unknown"
+            logger.info(f"Entry: participant_id={entry.participant_id}, study_id={entry.study_id}, study_name_short={study_name_short}, daily_entry_index={entry.daily_entry_index}")
+
 
 
 def create_default_studies(config_path: str):
@@ -23,6 +51,8 @@ def create_default_studies(config_path: str):
     except FileNotFoundError:
         logger.warning("No studies configuration file found. Using default fallback.")
         config = get_fallback_config()
+
+    logger.info(f"Checking whether studies need to be created based on config file at '{config_path}'")
 
     with Session(engine) as session:
         for study_config in config.studies:
@@ -52,13 +82,7 @@ def create_default_studies(config_path: str):
 
                 logger.info(f"Created study: {study_config.name}")
             else:
-                logger.info(f"Study already exists: {study_config.name}")
-                # Print the existing study's entry names
-                existing_entries = session.exec(
-                    select(StudyEntryName).where(StudyEntryName.study_id == existing_study.id)
-                ).all()
-                for entry in existing_entries:
-                    logger.info(f" - Entry: {entry.entry_name} (Index: {entry.entry_index})")
+                logger.info(f"Study already exists: '{study_config.name_short}' with long name: '{study_config.name}'")
 
         session.commit()
 
