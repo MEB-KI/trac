@@ -39,9 +39,6 @@ async def lifespan(app: FastAPI):
     logger.info("Running on_startup tasks...")
     create_db_and_tables(settings.print_db_contents_on_startup)
 
-    logger.info("Validating activities JSON file...")
-    validate_activities_json_file(settings.activities_json_path)
-
     # Shutdown
     logger.info("TUD Backend shutting down")
 

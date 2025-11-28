@@ -12,7 +12,7 @@ class Participant(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    study_associations: List["StudyParticipant"] = Relationship(back_populates="participant")
+    study_associations: List["StudyParticipantLink"] = Relationship(back_populates="participant")
     submissions: List["Submission"] = Relationship(back_populates="participant")
 
 class Study(SQLModel, table=True):
@@ -33,9 +33,9 @@ class Study(SQLModel, table=True):
     # Relationships
     submissions: List["Submission"] = Relationship(back_populates="study")
     activity_configs: List["StudyActivityConfig"] = Relationship(back_populates="study")
-    participant_associations: List["StudyParticipant"] = Relationship(back_populates="study")
+    participant_associations: List["StudyParticipantLink"] = Relationship(back_populates="study")
 
-class StudyParticipant(SQLModel, table=True):
+class StudyParticipantLink(SQLModel, table=True):
     """Link table for study-participant associations"""
     __tablename__ = "study_participants"
 
@@ -66,9 +66,9 @@ class Submission(SQLModel, table=True):
     # Relationships
     study: Study = Relationship(back_populates="submissions")
     participant: Participant = Relationship(back_populates="submissions")
-    timeline_entries: List["TimelineEntry"] = Relationship(back_populates="submission")
+    timeline_entries: List["Activity"] = Relationship(back_populates="submission")
 
-class TimelineEntry(SQLModel, table=True):
+class Activity(SQLModel, table=True):
     __tablename__ = "timeline_entries"
 
     id: Optional[int] = Field(default=None, primary_key=True)

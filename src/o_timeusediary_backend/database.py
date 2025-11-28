@@ -184,7 +184,7 @@ def report_on_db_contents():
 
 
 
-def create_config_file_studies(config_path: str):
+def create_config_file_studies(config_path: str, validate_json: bool = True):
     """Create studies from configuration file"""
 
     config = load_studies_config(config_path)    # will raise exception if invalid, which is fine: that file is required
@@ -193,6 +193,11 @@ def create_config_file_studies(config_path: str):
 
     with Session(engine) as session:
         for study_config in config.studies:
+
+            if validate_json:
+                logger.info(f"Validating activities JSON file for study '{study_config.name_short}' at path '{study_config.activities_json_file}'")
+                validate_activities_json_file(study_config.activities_json_file)
+
             # Check if study already exists
             existing_study = session.exec(
                 select(Study).where(Study.name_short == study_config.name_short)
