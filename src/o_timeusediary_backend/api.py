@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 from . settings import settings
 from .models import TimeuseEntry, TimeuseEntryCreate, TimeuseEntryRead, StudyEntryName, Study, StudyRead, StudyCreate, StudyEntryNameCreate, StudyEntryNameRead, TimelineActivity, TimelineMetadataResponse, StudyMetadataResponse, ParticipantMetadataResponse, TimelineActivityResponse
-from .database import get_session, create_db_and_tables
+from .database import get_session, create_db_and_tables, validate_activities_json_file
+
 
 
 
@@ -38,7 +39,9 @@ async def lifespan(app: FastAPI):
     logger.info("Running on_startup tasks...")
     create_db_and_tables(settings.print_db_contents_on_startup)
 
-    yield
+    logger.info("Validating activities JSON file...")
+    validate_activities_json_file(settings.activities_json_path)
+
     # Shutdown
     logger.info("TUD Backend shutting down")
 

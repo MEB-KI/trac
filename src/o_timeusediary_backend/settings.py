@@ -10,7 +10,8 @@ class TUDBackendSettings:
     def __init__(self):
         # Backend-specific settings
         self.debug = True if os.getenv("TUD_DEBUG", "false").lower() == "true" else False
-        self.studies_config_path: str = os.getenv("TUD_STUDIES_CONFIG_PATH", "studies_config.json")
+        self.studies_config_path: str = os.getenv("TUD_STUDIES_CONFIG_PATH", "studies_config.json") # Backend file with studies configuration
+        self.activities_json_path: str = os.getenv("TUD_ACTIVITIES_JSON_PATH", "activities.json")  # Shared activities configuration file used by frontend and backend.
         self.print_db_contents_on_startup = True if os.getenv("TUD_REPORT_DB_CONTENTS_ON_STARTUP", "false").lower() == "true" else False
 
     # Environment-dependent settings as properties
