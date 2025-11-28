@@ -308,6 +308,7 @@ def submit_activities(
             )
         ).first()
         if not study_participant:
+            logger.info(f"Unauthorized participant '{participant_id}' attempted to submit to study '{study_name_short}'")
             raise HTTPException(
                 status_code=403,
                 detail=f"Participant '{participant_id}' not authorized for this study"
@@ -347,6 +348,7 @@ def submit_activities(
         )
     ).first()
     if not day_label:
+        logger.info(f"Day label '{day_label_name}' not found for study '{study_name_short}'")
         raise HTTPException(
             status_code=404,
             detail=f"Day label '{day_label_name}' not found for study '{study_name_short}'"
@@ -364,6 +366,7 @@ def submit_activities(
         # Validate timeline exists
         timeline = timeline_map.get(activity_item.timeline_key)
         if not timeline:
+            logger.info(f"Unknown timeline '{activity_item.timeline_key}' for study '{study_name_short}'")
             raise HTTPException(
                 status_code=400,
                 detail=f"Unknown timeline '{activity_item.timeline_key}' for study '{study_name_short}'"
@@ -394,6 +397,7 @@ def submit_activities(
         # Handle multiple-choice activity
         elif activity_item.mode == "multiple-choice":
             if not activity_item.codes:
+                logger.info(f"Multiple-choice activity missing 'codes' for timeline '{activity_item.timeline_key}'")
                 raise HTTPException(
                     status_code=400,
                     detail=f"Multiple-choice activity missing 'codes' for timeline '{activity_item.timeline_key}'"
@@ -416,6 +420,7 @@ def submit_activities(
                 created_activities.append(activity)
 
         else:
+            logger.info(f"Unknown activity mode '{activity_item.mode}' for study '{study_name_short}'")
             raise HTTPException(
                 status_code=400,
                 detail=f"Unknown activity mode '{activity_item.mode}'"
