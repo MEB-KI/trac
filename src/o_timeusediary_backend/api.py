@@ -36,7 +36,10 @@ from .api_deps.activities import (
 from fastapi.responses import HTMLResponse
 from datetime import datetime
 from sqlalchemy import func
-
+import csv
+import json
+from io import StringIO
+from typing import Optional
 
 
 security = HTTPBasic()
@@ -556,6 +559,9 @@ async def admin_overview(
     Admin overview page showing database contents.
     Shows studies, participants, timelines, and activities.
     """
+
+    logger.info(f"Admin '{current_admin}' accessed the admin overview page.")
+
     # Get all studies with their relationships
     studies = session.exec(
         select(Study).order_by(Study.created_at.desc())
@@ -726,3 +732,185 @@ async def admin_overview(
             "current_time": datetime.utcnow()
         }
     )
+
+@app.get("/admin/export/{study_name_short}/activities")
+async def export_study_activities(
+    request: Request,
+    study_name_short: str,
+    format: Optional[str] = Query("csv", description="Output format: 'csv' or 'json'"),
+    include_metadata: Optional[bool] = Query(True, description="Include metadata columns"),
+    include_path: Optional[bool] = Query(True, description="Include activity path columns"),
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session)
+):
+    """
+    Export activities for a specific study in CSV or JSON format.
+    Defaults to CSV format for scientific analysis.
+    """
+
+    logger.info(f"Admin '{current_admin}' requested export of activities for study '{study_name_short}' in format '{format}'")
+
+    # Validate study exists
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+
+    if not study:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study '{study_name_short}' not found"
+        )
+
+    # Get all activities for this study with related data
+    activities = session.exec(
+        select(
+            Activity,
+            Participant,
+            DayLabel,
+            Timeline
+        )
+        .join(Participant, Activity.participant_id == Participant.id)
+        .join(DayLabel, Activity.day_label_id == DayLabel.id)
+        .join(Timeline, Activity.timeline_id == Timeline.id)
+        .where(Activity.study_id == study.id)
+        .order_by(Activity.participant_id, Activity.day_label_id, Activity.start_minutes)
+    ).all()
+
+    if not activities:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No activities found for study '{study_name_short}'"
+        )
+
+    # Prepare the data with dereferenced fields
+    export_data = []
+    for activity, participant, day_label, timeline in activities:
+        # Format time range
+        start_hour = activity.start_minutes // 60
+        start_minute = activity.start_minutes % 60
+        end_hour = activity.end_minutes // 60
+        end_minute = activity.end_minutes % 60
+
+        duration_minutes = activity.end_minutes - activity.start_minutes
+        duration_hours = duration_minutes / 60.0
+
+        # Base data that everyone wants
+        record = {
+            # Core activity data
+            "activity_id": activity.id,
+            "activity_code": activity.activity_code,
+            "activity_name": activity.activity_name,
+            "start_time": f"{start_hour:02d}:{start_minute:02d}",
+            "end_time": f"{end_hour:02d}:{end_minute:02d}",
+            "start_minutes": activity.start_minutes,
+            "end_minutes": activity.end_minutes,
+            "duration_minutes": duration_minutes,
+            "duration_hours": round(duration_hours, 2),
+
+            # Context data
+            "participant_id": participant.id,
+            "day_label": day_label.name,
+            "timeline_name": timeline.name,
+            "timeline_display_name": timeline.display_name,
+            "timeline_mode": timeline.mode,
+
+            # Study info
+            "study_name": study.name,
+            "study_name_short": study.name_short,
+            "study_id": study.id,
+        }
+
+        # Add parent activity info if available
+        if activity.parent_activity_code:
+            record["parent_activity_code"] = activity.parent_activity_code
+        else:
+            record["parent_activity_code"] = ""
+
+        # Add metadata if requested
+        if include_metadata:
+            record.update({
+                "created_at": activity.created_at.isoformat(),
+                "data_collection_start": study.data_collection_start.isoformat(),
+                "data_collection_end": study.data_collection_end.isoformat(),
+                "participant_created_at": participant.created_at.isoformat(),
+                "timeline_description": timeline.description or "",
+                "timeline_min_coverage": timeline.min_coverage or "",
+            })
+
+        # Add activity path components if requested
+        if include_path:
+            # Parse the activity_path_frontend to get structured components
+            path_parts = {}
+            if activity.activity_path_frontend:
+                parts = activity.activity_path_frontend.split(" > ")
+                for part in parts:
+                    if ":" in part:
+                        key, value = part.split(":", 1)
+                        path_parts[f"path_{key}"] = value
+
+            record.update({
+                "activity_path_full": activity.activity_path_frontend,
+                **path_parts
+            })
+
+        export_data.append(record)
+
+    # Generate filename with timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"{study_name_short}_activities_{timestamp}"
+
+    if format.lower() == "json":
+        return export_json(export_data, filename)
+    else:
+        return export_csv(export_data, filename, include_metadata, include_path)
+
+
+def export_csv(data: list, filename: str, include_metadata: bool, include_path: bool) -> Response:
+    """
+    Export data as CSV with proper headers.
+    """
+    if not data:
+        raise HTTPException(status_code=404, detail="No data to export")
+
+    # Create CSV in memory
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+
+    # Write header and data
+    writer.writeheader()
+    for row in data:
+        writer.writerow(row)
+
+    # Prepare response
+    content = output.getvalue()
+    response = Response(content=content, media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}.csv"
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+
+    return response
+
+
+def export_json(data: list, filename: str) -> Response:
+    """
+    Export data as JSON with pretty formatting.
+    """
+    if not data:
+        raise HTTPException(status_code=404, detail="No data to export")
+
+    # Create JSON response
+    response_data = {
+        "metadata": {
+            "export_timestamp": datetime.utcnow().isoformat(),
+            "total_records": len(data),
+            "format": "json",
+            "version": "1.0"
+        },
+        "data": data
+    }
+
+    content = json.dumps(response_data, indent=2, default=str)
+    response = Response(content=content, media_type="application/json")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}.json"
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+
+    return response
