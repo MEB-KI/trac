@@ -349,20 +349,20 @@ def submit_activities(
     if not study:
         raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
 
-    now = utc_now()
-    if now < study.data_collection_start:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Study '{study.name_short}' has not started yet. "
-                    f"Data collection starts on {study.data_collection_start.isoformat()}."
-        )
+    #now = utc_now()
+    #if now < study.data_collection_start:
+    #    raise HTTPException(
+    #        status_code=403,
+    #        detail=f"Study '{study.name_short}' has not started yet. "
+    #                f"Data collection starts on {study.data_collection_start.isoformat()}."
+    #    )
 
-    if now > study.data_collection_end:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Study '{study.name_short}' has ended. "
-                    f"Data collection ended on {study.data_collection_end.isoformat()}."
-        )
+    #if now > study.data_collection_end:
+    #    raise HTTPException(
+    #        status_code=403,
+    #        detail=f"Study '{study.name_short}' has ended. "
+    #                f"Data collection ended on {study.data_collection_end.isoformat()}."
+    #    )
 
     # Get all valid activity codes for this study
     try:
@@ -888,9 +888,17 @@ def export_csv(data: list, filename: str, include_metadata: bool, include_path: 
     if not data:
         raise HTTPException(status_code=404, detail="No data to export")
 
+    # Collect all possible fieldnames from all records
+    all_fieldnames = set()
+    for row in data:
+        all_fieldnames.update(row.keys())
+
+    # Convert to list for consistent ordering (you might want to sort them)
+    fieldnames = sorted(all_fieldnames)
+
     # Create CSV in memory
     output = StringIO()
-    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
 
     # Write header and data
     writer.writeheader()
