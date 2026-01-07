@@ -18,7 +18,7 @@ from sqlmodel import Session, select
 from urllib.parse import urlparse
 import sys, argparse
 from fastapi.templating import Jinja2Templates
-from .activities_config import load_activities_config
+from .parsers.activities_config import load_activities_config
 import secrets
 from .logging_config import setup_logging
 setup_logging()

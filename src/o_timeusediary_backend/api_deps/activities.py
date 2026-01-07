@@ -7,7 +7,7 @@
 from fastapi import Depends, HTTPException, status
 from typing import Set, Optional, Dict, Any
 from sqlmodel import Session, select
-from ..activities_config import (
+from ..parsers.activities_config import (
     get_cached_activity_codes,
     get_activity_info,
     validate_activity_code,

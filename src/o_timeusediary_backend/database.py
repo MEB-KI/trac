@@ -3,8 +3,8 @@ from sqlmodel import SQLModel, create_engine, Session, select
 from typing import Generator
 from .models import Study, Participant, DayLabel, StudyParticipant, Timeline, Activity
 from .settings import settings
-from .studies_config import load_studies_config, CfgFileStudies
-from .activities_config import load_activities_config, ActivitiesConfig
+from .parsers.studies_config import load_studies_config, CfgFileStudies
+from .parsers.activities_config import load_activities_config, ActivitiesConfig
 import logging
 
 logger = logging.getLogger(__name__)
