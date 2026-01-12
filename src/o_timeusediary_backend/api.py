@@ -245,6 +245,11 @@ def debug_routes():
             })
     return {"routes": routes}
 
+
+
+# TODO: We could limit access to the config to people who are participants in the study. On the one hand, there are no
+# secrets here, on the other hand, it's just none of anyone's business what the exact activities are for studies
+# they are not part of. People could scrape all study configs otherwise, if they somehow get the study_name_short.
 @app.get("/api/studies/{study_name_short}/activities-config")
 def get_study_activities_config(
     study_name_short: str,
