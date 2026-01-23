@@ -40,6 +40,9 @@ import csv
 import json
 from io import StringIO
 from typing import Optional
+from pydantic import BaseModel, model_validator
+from typing import List, Optional, Union
+
 
 from .utils import utc_now
 
@@ -247,20 +250,27 @@ def debug_routes():
 
 
 
-# TODO: We could limit access to the config to people who are participants in the study. On the one hand, there are no
-# secrets here, on the other hand, it's just none of anyone's business what the exact activities are for studies
-# they are not part of. People could scrape all study configs otherwise, if they somehow get the study_name_short.
+
 @app.get("/api/studies/{study_name_short}/activities-config")
 def get_study_activities_config(
     study_name_short: str,
+    participant_id: Optional[str] = Query(None, description="Participant ID for authorization check. Required unless study is open for everyone."),
     session: Session = Depends(get_session)
 ):
     """
     Get the activities configuration (activities.json) for a study.
     This returns the exact configuration that was used when the study was created.
 
-    Example request:
-    curl -X GET "http://localhost:8000/api/studies/default/activities-config" -H "Accept: application/json"
+    Access is restricted to:
+    1. Study is open for everyone (allow_unlisted_participants=True), OR
+    2. The provided participant_id is listed as a study participant.
+
+    Example requests:
+    - For open study (no auth required):
+      GET /api/studies/default/activities-config
+
+    - For restricted study:
+      GET /api/studies/restricted-study/activities-config?participant_id=user123
     """
     # Find the study
     study = session.exec(
@@ -272,6 +282,41 @@ def get_study_activities_config(
             status_code=404,
             detail=f"Study '{study_name_short}' not found"
         )
+
+    # Check if participant_id is required
+    if not study.allow_unlisted_participants:
+        # Study restricts participants - participant_id parameter is required
+        if participant_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Participant ID is required for this study. "
+                       f"Please provide 'participant_id' query parameter."
+            )
+
+        # Check if the participant is authorized for this study
+        study_participant = session.exec(
+            select(StudyParticipant).where(
+                StudyParticipant.study_id == study.id,
+                StudyParticipant.participant_id == participant_id
+            )
+        ).first()
+
+        if not study_participant:
+            logger.info(f"Unauthorized participant '{participant_id}' attempted to access activities config for '{study_name_short}'")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Participant '{participant_id}' not authorized for this study"
+            )
+    else:
+        # Study allows unlisted participants
+        # If participant_id is provided, we can optionally validate they exist
+        if participant_id is not None:
+            # Check if participant exists (optional, for logging/validation)
+            participant = session.exec(
+                select(Participant).where(Participant.id == participant_id)
+            ).first()
+            if not participant:
+                logger.debug(f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'")
 
     # Try to load the activities config from the file
     try:
@@ -289,8 +334,6 @@ def get_study_activities_config(
             detail=f"Error loading activities configuration: {str(e)}"
         )
 
-from pydantic import BaseModel, model_validator
-from typing import List, Optional, Union
 
 class ActivitySubmitItem(BaseModel):
     timeline_key: str
@@ -1276,3 +1319,135 @@ async def get_active_open_study_names(
         )
 
 
+
+# Add this Pydantic model near the other Pydantic models (e.g., after ActiveOpenStudyResponse)
+class TimelineConfigResponse(BaseModel):
+    name: str  # timeline key like "primary", "digitalmediause", "device"
+    display_name: str
+    description: Optional[str] = None
+    mode: str  # "single-choice" or "multiple-choice"
+    min_coverage: Optional[int] = None
+
+class DayLabelConfigResponse(BaseModel):
+    name: str  # e.g., "monday", "typical_weekend"
+    display_order: int
+
+class StudyConfigResponse(BaseModel):
+    study_name: str
+    study_name_short: str
+    description: str
+    allow_unlisted_participants: bool
+    data_collection_start: datetime
+    data_collection_end: datetime
+    activities_json_url: str
+    timelines: List[TimelineConfigResponse]
+    day_labels: List[DayLabelConfigResponse]
+
+@app.get("/api/studies/{study_name_short}/study-config", response_model=StudyConfigResponse)
+def get_study_config(
+    study_name_short: str,
+    participant_id: Optional[str] = Query(None, description="Participant ID for authorization check. Required unless study is open for everyone."),
+    session: Session = Depends(get_session)
+):
+    """
+    Get the study configuration including timelines and day labels.
+    Access is restricted to:
+    1. Study is open for everyone (allow_unlisted_participants=True), OR
+    2. The provided participant_id is listed as a study participant.
+
+    Example requests:
+    - For open study (no auth required):
+      GET /api/studies/default/study-config
+
+    - For restricted study:
+      GET /api/studies/restricted-study/study-config?participant_id=user123
+    """
+    # Find the study
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+
+    if not study:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study '{study_name_short}' not found"
+        )
+
+    # Check if participant_id is required
+    if not study.allow_unlisted_participants:
+        # Study restricts participants - participant_id parameter is required
+        if participant_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Participant ID is required for this study. "
+                       f"Please provide 'participant_id' query parameter."
+            )
+
+        # Check if the participant is authorized for this study
+        study_participant = session.exec(
+            select(StudyParticipant).where(
+                StudyParticipant.study_id == study.id,
+                StudyParticipant.participant_id == participant_id
+            )
+        ).first()
+
+        if not study_participant:
+            logger.info(f"Unauthorized participant '{participant_id}' attempted to access study config for '{study_name_short}'")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Participant '{participant_id}' not authorized for this study"
+            )
+    else:
+        # Study allows unlisted participants
+        # If participant_id is provided, we can optionally validate they exist
+        if participant_id is not None:
+            # Check if participant exists (optional, for logging/validation)
+            participant = session.exec(
+                select(Participant).where(Participant.id == participant_id)
+            ).first()
+            if not participant:
+                logger.debug(f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'")
+
+    # Get all timelines for this study
+    timelines = session.exec(
+        select(Timeline).where(Timeline.study_id == study.id)
+    ).all()
+
+    # Get all day labels for this study
+    day_labels = session.exec(
+        select(DayLabel)
+        .where(DayLabel.study_id == study.id)
+        .order_by(DayLabel.display_order)
+    ).all()
+
+    # Prepare response
+    timeline_responses = [
+        TimelineConfigResponse(
+            name=timeline.name,
+            display_name=timeline.display_name,
+            description=timeline.description,
+            mode=timeline.mode,
+            min_coverage=timeline.min_coverage
+        )
+        for timeline in timelines
+    ]
+
+    day_label_responses = [
+        DayLabelConfigResponse(
+            name=day_label.name,
+            display_order=day_label.display_order
+        )
+        for day_label in day_labels
+    ]
+
+    return StudyConfigResponse(
+        study_name=study.name,
+        study_name_short=study.name_short,
+        description=study.description,
+        allow_unlisted_participants=study.allow_unlisted_participants,
+        data_collection_start=study.data_collection_start,
+        data_collection_end=study.data_collection_end,
+        activities_json_url=study.activities_json_url,
+        timelines=timeline_responses,
+        day_labels=day_label_responses
+    )
