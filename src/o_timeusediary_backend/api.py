@@ -1346,6 +1346,7 @@ class StudyConfigResponse(BaseModel):
     activities_json_url: str
     timelines: List[TimelineConfigResponse]
     day_labels: List[DayLabelConfigResponse]
+    study_days_count: int
 
 @app.get("/api/studies/{study_name_short}/study-config", response_model=StudyConfigResponse)
 def get_study_config(
@@ -1453,5 +1454,6 @@ def get_study_config(
         data_collection_end=study.data_collection_end,
         activities_json_url=study.activities_json_url,
         timelines=timeline_responses,
-        day_labels=day_label_responses
+        day_labels=day_label_responses,
+        study_days_count=len(day_labels),
     )
