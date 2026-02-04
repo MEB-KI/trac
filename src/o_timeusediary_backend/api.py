@@ -53,11 +53,15 @@ current_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(current_dir / "templates"))
 static_dir = Path(__file__).parent / "static"
 
+# get version from __init__.py
+import timeusediary_backend
+tud_version = timeusediary_backend.__version__
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info(f"TUD Backend starting with allowed origins: {settings.allowed_origins}")
+    logger.info(f"TUD Backend version {tud_version} starting with allowed origins: {settings.allowed_origins}")
     if settings.debug:
         print(f"Debug mode enabled.")
 
