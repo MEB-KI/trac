@@ -5,6 +5,12 @@ o-timeusediary MPIAE Changes
 Current WIP
 -----------
 
+Version 0.5.1 -- Startup bug fix
+---------------------------------
+* FIX: more robust creation of db tables during startup, required with multi-threaded WSGI server
+* NEW: add template for Linux system service file
+
+
 Version 0.5.0 -- First deployed version
 ---------------------------------------
 * NEW: support rootpath setting for FastAPI
