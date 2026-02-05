@@ -639,6 +639,8 @@ def submit_activities(
                 activity_name=activity_item.activity,
                 activity_path_frontend=compute_activity_path(activity_item),
                 color=activity_item.color,
+                category=activity_item.category,
+
             )
             session.add(activity)
             created_activities.append(activity)
@@ -655,6 +657,8 @@ def submit_activities(
                     end_minutes=activity_item.end_minutes,
                     activity_name=activity_item.activity,
                     activity_path_frontend=compute_activity_path(activity_item),
+                    color=activity_item.color,
+                    category=activity_item.category,
                 )
                 session.add(activity)
                 created_activities.append(activity)
@@ -1173,6 +1177,7 @@ def get_participant_day_activities(
             "start_minutes": activity.start_minutes,
             "end_minutes": activity.end_minutes,
             "duration": activity.end_minutes - activity.start_minutes,
+            "category": activity.category,
 
             # Metadata
             "created_at": activity.created_at.isoformat(),
@@ -1234,6 +1239,7 @@ def get_participant_day_activities(
                         "start_minutes": activity.start_minutes,
                         "end_minutes": activity.end_minutes,
                         "duration": activity.end_minutes - activity.start_minutes,
+                        "category": activity.category,
 
                         # Metadata
                         "created_at": activity.created_at.isoformat(),
