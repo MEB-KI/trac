@@ -2,7 +2,7 @@
 #
 # Use this file with the command:
 #   nginx -c /path/to/dev.nginx.conf
-# This config assumes your FastAPI backend is running on http://127.0.0.1:8000 and that you want to access it via http://localhost/ar_backend/.
+# This config assumes your FastAPI backend is running on http://127.0.0.1:8000 and that you want to access it via http://localhost/tud_backend/.
 #
 # The advantage of using nginx as a reverse proxy in development is that it closely mimics the production environment, allowing you to catch issues related to path handling, headers, and WebSocket support early on.
 #
