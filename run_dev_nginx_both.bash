@@ -18,7 +18,7 @@ GIT_FRONTEND_REPO_DEFAULT_PATH="$HOME/develop_mpiae/o-timeusediary"
 GIT_BACKEND_REPO_DEFAULT_PATH="$HOME/develop_mpiae/o-timeusediary-backend"
 
 GIT_FRONTEND_REPO_PATH="$1"
-if [ -z "$GIT_FRONTEND_REPO_DEFAULT_PATH" ]; then
+if [ -z "$GIT_FRONTEND_REPO_PATH" ]; then
     if [ -d "$GIT_FRONTEND_REPO_DEFAULT_PATH" ]; then
         GIT_FRONTEND_REPO_PATH="$GIT_FRONTEND_REPO_DEFAULT_PATH"
         echo "No frontend repository path provided, using default: $GIT_FRONTEND_REPO_PATH"
@@ -95,6 +95,6 @@ fi
 
 ## Start the FastAPI backend in the foreground (you can stop it with Ctrl+C)
 
-cd "$CURRENT_DIR" uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000 || { echo -e " Failed to start FastAPI backend"; exit 1; }
+cd "$CURRENT_DIR" && uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000 || { echo -e " Failed to start FastAPI backend"; exit 1; }
 
 
