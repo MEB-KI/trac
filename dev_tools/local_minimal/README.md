@@ -15,7 +15,7 @@ It is a less complex to setup though, as it does not require a locally running n
 
 ```sh
 # from repo root
-cp dev_tools/local_minimal/frontend_settings/ar_settings.dev-minimal.js frontend/settings/ar_settings.js
+cp dev_tools/local_minimal/frontend_settings/tud_settings.dev-minimal.js frontend/settings/tud_settings.js
 cp dev_tools/local_minimal/backend_settings/.env.dev-minimal backend/.env
 
 # run frontend (start Python's built-in HTTP server):
