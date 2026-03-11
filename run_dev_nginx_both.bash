@@ -48,14 +48,17 @@ fi
 ## save current directory to return to it later
 CURRENT_DIR=$(pwd)
 
+
+cd "$GIT_BACKEND_REPO_PATH" || { echo -e "❌ Failed to change directory to backend repository at '$GIT_BACKEND_REPO_PATH'"; exit 1; }
+
 NGINX_CONF_DIR="./dev_tools/local_nginx/webserver_config/"
 
 if [ ! -d "$NGINX_CONF_DIR" ]; then
-    echo -e "❌ nginx configuration directory not found at $NGINX_CONF_DIR"
+    echo -e "❌ nginx configuration directory not found at '$NGINX_CONF_DIR', did you set the correct backend repo root directory ('$GIT_BACKEND_REPO_PATH')? Current working directory: $(pwd)"
     exit 1
 fi
 
-cd "$NGINX_CONF_DIR" || { echo -e "❌ Failed to change directory to $NGINX_CONF_DIR"; exit 1; }
+cd "$NGINX_CONF_DIR" || { echo -e "❌ Failed to change directory to '$NGINX_CONF_DIR'"; exit 1; }
 
 
 
