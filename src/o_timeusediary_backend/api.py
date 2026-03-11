@@ -232,12 +232,12 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
 
 @app.get("/api")
 def root():
-    return {"message": "TUD API is running"}
+    return {"message": f"TUD API version {tud_version} is running"}
 
 @app.get("/api/health")
 def health_check(session: Session = Depends(get_session)):
     activities = session.exec(select(Activity)).all()
-    return {"status": "healthy", "entries_count": len(activities)}
+    return {"status": "healthy", "entries_count": len(activities), "tud_version": tud_version}
 
 
 @app.get("/api/debug/routes")
