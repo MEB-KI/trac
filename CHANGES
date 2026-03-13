@@ -5,6 +5,10 @@ o-timeusediary MPIAE Changes
 Current WIP
 -----------
 
+Version 0.7.1 -- Bump version to match frontend version only
+------------------------------------------------------------
+* CHG: Bump version to 0.7.1 to match the frontend version, no other changes.
+
 
 Version 0.6.3 -- Various bug fixes, start i18n support
 ------------------------------------------------------
