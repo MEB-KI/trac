@@ -30,19 +30,15 @@ jobs:
       - name: Setup uv and Python
         uses: astral-sh/setup-uv@v3
 
-      # Step 2: Use your existing template logic (Simplified for CI)
       - name: Configure Nginx
         run: |
-          # We use the runner's workspace variable to replace your placeholders
-          # Nginx runs as root in CI, so we use standard /var/log paths
-          sed -e "s|USERHOME|/tmp|g" \
-              -e "s|FRONTENDREPOPATH|$GITHUB_WORKSPACE/frontend|g" \
-              -e "s|BACKENDREPOPATH|$GITHUB_WORKSPACE/backend|g" \
-              ./dev_tools/local_nginx/webserver_config/dev.nginx.conf.template > ci.nginx.conf
+          # Stop system nginx to avoid port conflicts
+          sudo systemctl stop nginx
 
-          # Apply the config
-          sudo cp ci.nginx.conf /etc/nginx/sites-available/default
-          sudo nginx -t && sudo systemctl restart nginx
+          # Start our custom nginx using the file checked into the repo
+          # We use -p /tmp/ to set the prefix path for logs/pids
+          sudo nginx -c $(pwd)/dev_tools/ci/ci.nginx.conf -p /tmp/
+
 
       # Step 3: Run the Backend
       - name: Start FastAPI Backend
