@@ -4,16 +4,21 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'src/**'  # Only run when backend files change
+      - 'backend/src/**'  # Only run when backend files change
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'src/**'
+      - 'backend/src/**'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
+
   test:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend/
 
     strategy:
       matrix:
@@ -40,3 +45,5 @@ jobs:
     - name: Run tests
       run: |
         uv run pytest tests/ -v --tb=short
+
+

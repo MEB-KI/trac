@@ -6,8 +6,10 @@
 BACKEND_CONFIG_PATH="./dev_tools/local_minimal/backend_settings/.env.dev-minimal"
 
 if [ ! -f "$BACKEND_CONFIG_PATH" ]; then
-  echo "ERROR: Backend template config file not found at '$BACKEND_CONFIG_PATH', are you in the root of the backend repository?"
+  echo "ERROR: Backend minimal template config file not found at '$BACKEND_CONFIG_PATH', are you in the root of the repository?"
   exit 1
 fi
 
-uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000
+cp $BACKEND_CONFIG_PATH backend/.env || { echo "ERROR: Failed to copy backend config file, please check the paths and permissions."; exit 1; }
+
+cd backend/ && uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000

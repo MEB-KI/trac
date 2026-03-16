@@ -14,47 +14,16 @@
 #
 # You can access the frontend at http://localhost:3000/report/ and the backend API at http://localhost:3000/tud_backend/api.
 
-GIT_FRONTEND_REPO_DEFAULT_PATH="$HOME/develop_mpiae/o-timeusediary"
-GIT_BACKEND_REPO_DEFAULT_PATH="$HOME/develop_mpiae/o-timeusediary-backend"
-
-GIT_FRONTEND_REPO_PATH="$1"
-if [ -z "$GIT_FRONTEND_REPO_PATH" ]; then
-    if [ -d "$GIT_FRONTEND_REPO_DEFAULT_PATH" ]; then
-        GIT_FRONTEND_REPO_PATH="$GIT_FRONTEND_REPO_DEFAULT_PATH"
-        echo "No frontend repository path provided, using default: $GIT_FRONTEND_REPO_PATH"
-    else
-        echo "Error: No repository path provided and default path '$GIT_FRONTEND_REPO_DEFAULT_PATH' does not exist."
-        echo "Please provide the path to a checkout of the o-timeusediary git repository as the first argument."
-        echo "Usage: $0 /path/to/o-timeusediary-frontend-repository /path/to/o-timeusediary-backend-repository"
-        exit 1
-    fi
-fi
-
-GIT_BACKEND_REPO_PATH="$2"
-if [ -z "$GIT_BACKEND_REPO_PATH" ]; then
-    if [ -d "$GIT_BACKEND_REPO_DEFAULT_PATH" ]; then
-        GIT_BACKEND_REPO_PATH="$GIT_BACKEND_REPO_DEFAULT_PATH"
-        echo "No backend repository path provided, using default: $GIT_BACKEND_REPO_PATH"
-    else
-        echo "Error: No backend repository path provided and default path '$GIT_BACKEND_REPO_DEFAULT_PATH' does not exist."
-        echo "Please provide the path to a checkout of the o-timeusediary-backend git repository as the second argument."
-        echo "Usage: $0 /path/to/o-timeusediary-frontend-repository /path/to/o-timeusediary-backend-repository"
-        exit 1
-    fi
-fi
 
 ## Start nginx with the development configuration in background
 
 ## save current directory to return to it later
 CURRENT_DIR=$(pwd)
 
-
-cd "$GIT_BACKEND_REPO_PATH" || { echo -e "ERROR: Failed to change directory to backend repository at '$GIT_BACKEND_REPO_PATH'"; exit 1; }
-
 NGINX_CONF_DIR="./dev_tools/local_nginx/webserver_config/"
 
 if [ ! -d "$NGINX_CONF_DIR" ]; then
-    echo -e "ERROR: nginx configuration directory not found at '$NGINX_CONF_DIR', did you set the correct backend repo root directory ('$GIT_BACKEND_REPO_PATH')? Current working directory: $(pwd)"
+    echo -e "ERROR: nginx configuration directory not found at '$NGINX_CONF_DIR'. Current working directory: $(pwd)"
     exit 1
 fi
 
@@ -99,6 +68,6 @@ fi
 
 ## Start the FastAPI backend in the foreground (you can stop it with Ctrl+C)
 
-cd "$CURRENT_DIR" && uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000 || { echo -e " Failed to start FastAPI backend"; exit 1; }
+cd "$CURRENT_DIR/backend/" && uv run uvicorn o_timeusediary_backend.api:app --reload --host 127.0.0.1 --port 8000 || { echo -e " Failed to start FastAPI backend"; exit 1; }
 
 
