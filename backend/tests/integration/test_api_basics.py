@@ -13,7 +13,7 @@ BASE_URL = f"{BASE_SCHEME}/" + settings.rootpath.strip("/")  # Ensure no leading
 
 
 @pytest.mark.asyncio
-async def test_api_root_through_proxy():
+async def test_api_is_reachable_through_proxy_with_basepath():
     """
     Test the root /api endpoint via the reverse proxy to verify
     root_path configuration and Nginx routing.
@@ -31,3 +31,27 @@ async def test_api_root_through_proxy():
     assert "message" in data
     assert "is running" in data["message"]
     print(f"Successfully reached proxy at: {url} (rootpath is set to: '{settings.rootpath}')")
+
+
+@pytest.mark.asyncio
+async def test_admin_interface_reachable_through_proxy_with_auth():
+    """
+    Test the protected /api/admin endpoint via the reverse proxy
+    using HTTP Basic Authentication.
+    """
+    # Construct the URL
+    url = f"{BASE_URL}/admin"
+
+    async with httpx.AsyncClient() as client:
+        # Pass the auth tuple: (username, password)
+        response = await client.get(url, auth=(settings.admin_username, settings.admin_password))
+
+    # Assertions
+    # We expect 200 for a successful authenticated request
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+    data = response.json()
+    assert "status" in data
+    assert data["status"] == "authorized"
+
+    print(f"Successfully reached protected admin endpoint at: {url}")
