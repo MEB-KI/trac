@@ -71,3 +71,20 @@ async def test_admin_interface_not_reachable_without_auth():
     # We expect 401 for an unauthorized request
     assert response.status_code == 401, f"Expected 401, got {response.status_code}"
 
+
+@pytest.mark.asyncio
+async def test_admin_interface_not_reachable_with_incorrect_auth():
+    """
+    Test the protected /api/admin endpoint via the reverse proxy
+    with incorrect HTTP Basic Authentication. Should get a 401 Unauthorized response.
+    """
+    # Construct the URL
+    url = f"{BASE_URL}/admin"
+
+    async with httpx.AsyncClient() as client:
+        # Pass incorrect authentication
+        response = await client.get(url, auth=("wrong_user", "wrong_pass"))
+
+    # Assertions
+    # We expect 401 for an unauthorized request
+    assert response.status_code == 401, f"Expected 401, got {response.status_code}"
