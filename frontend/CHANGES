@@ -3,6 +3,7 @@ o-timeusediary MPIAE Changes
 
 Version 0.7.1 -- Bug fixes
 --------------------------
+* NEW: add top-bar "Skip time reporting" button with confirmation modal that redirects to thank-you page
 * FIX: update button state after loading template activities, so that users can go to next day right away if conditons are met.
 * FIX: clear selected activity when switching timelines, to prevent user from placing a primary activity on secondary timeline
 * FIX: await backend study config, so that stuff like number of study days is properly taken from there, not from frontend default config
