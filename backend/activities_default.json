@@ -246,9 +246,9 @@
                 "childItems": []
               },
               {
-                "name": "Playing instrument / Creating music",
+                "name": "Playing instrument or singing",
                 "code": 1142,
-                "label": "playing instrument or creating music",
+                "label": "playing instrument or singing",
                 "short": "play music",
                 "vshort": "music",
                 "color": "#EE82EE"

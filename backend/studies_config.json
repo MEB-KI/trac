@@ -1,9 +1,9 @@
 {
   "studies": [
     {
-      "name": "Default Study",
+      "name": "Default Weekly Study for Adults",
       "name_short": "default",
-      "description": "Default open study for time use research for two days",
+      "description": "Default Study for Adults at KI, filled out by themselves",
       "day_labels": [
           { "name": "monday", "display_order": 0, "display_name": "Monday" },
           { "name": "tuesday", "display_order": 1, "display_name": "Tuesday" },
@@ -15,15 +15,15 @@
         ],
       "study_participant_ids": [],
       "allow_unlisted_participants": true,
-      "default_language": "sv",
-      "activities_json_file": "activities_default.sv.json",
+      "default_language": "en",
+      "activities_json_file": "activities_ki_adults_en.json",
       "data_collection_start": "2024-01-01T00:00:00Z",
       "data_collection_end": "2026-12-31T23:59:59Z"
     },
     {
-      "name": "Weekly Study",
-      "name_short": "weekly",
-      "description": "Closed study covering a full week",
+      "name": "Weekly Study for 15 year olds",
+      "name_short": "15yearolds",
+      "description": "Weekly Study for 15 year olds at KI, filled out by themselves.",
       "day_labels": [
           { "name": "monday", "display_order": 0, "display_name": "Monday" },
           { "name": "tuesday", "display_order": 1, "display_name": "Tuesday" },
@@ -33,10 +33,30 @@
           { "name": "saturday", "display_order": 5, "display_name": "Saturday" },
           { "name": "sunday", "display_order": 6, "display_name": "Sunday" }
         ],
-      "study_participant_ids": ["bernddasbrot", "annasmith", "john_doe"],
-      "allow_unlisted_participants": false,
+      "study_participant_ids": [],
+      "allow_unlisted_participants": true,
       "default_language": "en",
-      "activities_json_file": "activities_weekly.json",
+      "activities_json_file": "activities_ki_15yearolds_en.json",
+      "data_collection_start": "2024-01-01T00:00:00Z",
+      "data_collection_end": "2026-12-31T23:59:59Z"
+    },
+    {
+      "name": "Weekly Study for 9 year olds",
+      "name_short": "9yearolds",
+      "description": "Weekly Study for 9 year olds at KI, filled out by their parents.",
+      "day_labels": [
+          { "name": "monday", "display_order": 0, "display_name": "Monday" },
+          { "name": "tuesday", "display_order": 1, "display_name": "Tuesday" },
+          { "name": "wednesday", "display_order": 2, "display_name": "Wednesday" },
+          { "name": "thursday", "display_order": 3, "display_name": "Thursday" },
+          { "name": "friday", "display_order": 4, "display_name": "Friday" },
+          { "name": "saturday", "display_order": 5, "display_name": "Saturday" },
+          { "name": "sunday", "display_order": 6, "display_name": "Sunday" }
+        ],
+      "study_participant_ids": [],
+      "allow_unlisted_participants": true,
+      "default_language": "en",
+      "activities_json_file": "activities_ki_9yearolds_en.json",
       "data_collection_start": "2024-01-01T00:00:00Z",
       "data_collection_end": "2026-12-31T23:59:59Z"
     }
