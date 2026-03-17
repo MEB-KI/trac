@@ -1,6 +1,8 @@
 o-timeusediary MPIAE Changes
 ============================
 
+See CHANGES file in project root for later versions.
+
 Version 0.7.1 -- Bug fixes
 --------------------------
 * NEW: add top-bar "Skip time reporting" button with confirmation modal that redirects to thank-you page

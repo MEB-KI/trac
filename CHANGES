@@ -5,6 +5,16 @@ TRAC MPIAE Changes
 Current WIP
 -----------
 
+Version 0.9.1 -- More bug fixes, skip button
+---------------------------------------------
+* CHG: refactor activity loading to happen in one central place.
+* FIX: Replace hard-coded use of local activities_config.json file everywhere with new central activity loading.
+* FIX: when selecting an activitiy, ensure all others are unselected.
+* FIX: when changing page, ensure currently selected activity (if any) is cleared
+* NEW: add skip button in frontend
+* WIP: adding E2E tests with playwright. Currently still failing due to wrong expectations on start URL. Ignore for now.
+
+
 Version 0.9.0 -- Small fixes
 -----------------------------
 * NEW: on startup, report for each study the JSON activities file URL and the number of activities in DB for this study.
