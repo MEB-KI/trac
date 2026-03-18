@@ -159,4 +159,7 @@ test('instructions -> add Sleeping at ~50% -> next timeline/day shows Tuesday', 
   }
 
   await expect(currentDayDisplay).toHaveAttribute('title', /Tuesday/, { timeout: 30000 });
+
+  const primaryActivitiesContainer = page.locator('#primary .activities');
+  await expect(primaryActivitiesContainer).toContainText('Sleeping', { timeout: 30000 });
 });
