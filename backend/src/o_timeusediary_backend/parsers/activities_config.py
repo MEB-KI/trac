@@ -321,7 +321,8 @@ def compute_activity_path_from_config(
     timeline_key: str,
     category_name: str,
     activity: 'ActivityItem',
-    parent_name: Optional[str] = None
+    parent_name: Optional[str] = None,
+    short: bool = False
 ) -> str:
     """Compute the frontend_path string for an ActivityItem from the config file.
 
@@ -332,18 +333,28 @@ def compute_activity_path_from_config(
     @param category_name The category name the activity belongs to.
     @param activity      The ActivityItem.
     @param parent_name   Parent activity name if this is a child item, otherwise None.
+    @param short         Whether to omit the "timeline:" and "category:" prefixes for a more concise path (e.g. "primary > General Activities > activity:Sleeping").
     @return Path string in the same format as activity_path_frontend on DB rows.
     """
-    parts = [f"timeline:{timeline_key}"]
+    parts = [timeline_key] if short else [f"timeline:{timeline_key}"]
     if category_name and category_name.strip():
-        parts.append(f"category:{category_name}")
+        if short:
+            parts.append(category_name)
+        else:
+            parts.append(f"category:{category_name}")
     if parent_name:
-        parts.append(f"parent:{parent_name}")
-    parts.append(f"activity:{activity.name}")
+        if short:
+            parts.append(parent_name)
+        else:
+            parts.append(f"parent:{parent_name}")
+    if short:
+        parts.append(activity.name)
+    else:
+        parts.append(f"activity:{activity.name}")
     return " > ".join(parts)
 
 
-def get_activities_cfg_text(config: ActivitiesConfig) -> str:
+def get_activities_cfg_text(config: ActivitiesConfig, short: bool = False) -> str:
     """Build a condensed multi-line text representation of all activities in the config.
 
     Format::
@@ -367,21 +378,22 @@ def get_activities_cfg_text(config: ActivitiesConfig) -> str:
         for category in timeline_cfg.categories:
             lines.append(f"  Category: {category.name}")
             for activity in category.activities:
-                path = compute_activity_path_from_config(timeline_key, category.name, activity)
+                path = compute_activity_path_from_config(timeline_key, category.name, activity, short=short)
                 lines.append(f"    {activity.code}  {path}")
                 for child in activity.childItems:
                     child_path = compute_activity_path_from_config(
-                        timeline_key, category.name, child, parent_name=activity.name
+                        timeline_key, category.name, child, parent_name=activity.name, short=short
                     )
                     lines.append(f"      {child.code}  {child_path}")
     return "\n".join(lines)
 
 
-def get_activities_cfg_text_for_path(config_path: str) -> str:
+def get_activities_cfg_text_for_path(config_path: str, short: bool = False) -> str:
     """Convenience wrapper: load (cached) config from *config_path* and return its condensed text.
 
     @param config_path Path to the activities JSON configuration file.
+    @param short       Whether to use the short path format.
     @return Multi-line condensed text of all activities.
     """
     config = get_cached_activities_config(config_path)
-    return get_activities_cfg_text(config)
+    return get_activities_cfg_text(config, short=short)
