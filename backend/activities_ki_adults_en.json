@@ -1,7 +1,7 @@
 {
   "general": {
     "experimentID": "default",
-    "app_name": "O-ELIDDI MPIAE",
+    "app_name": "KI Time Use Diary - Adults",
     "version": "1.0.0",
     "author": "Tim Schaefer",
     "language": "en",
@@ -89,7 +89,7 @@
                   {
                     "name": "Travelling: car, motorbike, moped, E-scooter, taxi or similar",
                     "code": 1114,
-                    "label": "travelling: motorbike, moped",
+                    "label": "travelling: car, motorbike, moped",
                     "short": "car/motor",
                     "vshort": "car",
                     "color": "#7CFC00"
