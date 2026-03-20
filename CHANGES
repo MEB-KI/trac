@@ -5,6 +5,13 @@ TRAC MPIAE Changes
 Current WIP
 -----------
 
+Version 0.9.5 -- Admin interface overhaul II
+----------------------------------------------
+* NEW: Dramatically improve information in admin interface
+* NEW: improve usage reminder banner text to include 'd' key for delete info, as users may have trouble with DEL
+* FIX: make all times in DB TZ-aware
+* NEW: development only: add test scripts, make e2e test more robust to slower loading on CI
+
 
 Version 0.9.4 -- More frontend corncer case fixes, UX improvements and tests
 ----------------------------------------------------------------------------
