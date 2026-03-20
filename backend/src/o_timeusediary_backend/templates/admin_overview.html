@@ -385,7 +385,7 @@
 
                 <!-- Export buttons section -->
                 <div class="export-buttons" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e9ecef;">
-                    <strong style="display: block; margin-bottom: 0.5rem; color: #495057;">Export Activities:</strong>
+                    <strong style="display: block; margin-bottom: 0.5rem; color: #495057;">Export {{ study_data.total_activities_logged }} Activities:</strong>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     {% if study_data.total_activities_logged > 0 %}
                         <a href="{{ request.scope.root_path }}/api/admin/export/{{ study_data.study.name_short }}/activities?format=csv"
@@ -446,6 +446,8 @@
                             <p><strong>Different Categories in config:</strong> {{ timeline_stat.category_count_cfg_file }}</p>
                             {% if timeline_stat.min_coverage %}
                             <p><strong>Min Coverage:</strong> {{ timeline_stat.min_coverage }} minutes</p>
+                            {%else %}
+                            <p><strong>Min Coverage:</strong> None (Users can submit day with this timeline empty)</p>
                             {% endif %}
                             {% if timeline_stat.description %}
                             <p><strong>Description:</strong> {{ timeline_stat.description }}</p>

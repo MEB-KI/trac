@@ -786,7 +786,7 @@ async def admin_overview(
                     "activity_count": participant_activity_count
                 })
 
-        # Get activities for this study (first 10 for preview)
+        # Get logged activities from DB for this study (first 10 for preview)
         activities = session.exec(
             select(Activity)
             .where(Activity.study_id == study.id)
