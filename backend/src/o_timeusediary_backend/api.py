@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import logging
 import uuid
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 import csv
 import json
@@ -18,7 +18,7 @@ from sqlmodel import Session, select
 from urllib.parse import urlparse
 import sys, argparse
 from fastapi.templating import Jinja2Templates
-from .parsers.activities_config import load_activities_config
+from .parsers.activities_config import get_num_categories_in_cfgfile_per_timeline, load_activities_config, get_num_activities_in_cfgfile_per_timeline
 import secrets
 from .logging_config import setup_logging
 setup_logging()
@@ -834,11 +834,17 @@ async def admin_overview(
                 "created_at": activity.created_at
             })
 
-        # Get total activity count for this study
-        total_activities = session.exec(
+        # Get total activity count for this study in database
+        total_activities_logged = session.exec(
             select(func.count(Activity.id))
             .where(Activity.study_id == study.id)
         ).first() or 0
+
+        num_activities_in_cfgfile_by_timeline : Dict = get_num_activities_in_cfgfile_per_timeline(study.activities_json_url)
+        num_activities_in_cfgfile_total = sum(num_activities_in_cfgfile_by_timeline.values())
+
+        num_categories_in_cfgfile_per_timeline = get_num_categories_in_cfgfile_per_timeline(study.activities_json_url)
+        num_categories_in_cfgfile_total = sum(num_categories_in_cfgfile_per_timeline.values())
 
         # Get timeline statistics
         timeline_stats = []
@@ -851,11 +857,16 @@ async def admin_overview(
                 )
             ).first() or 0
 
+            timeline_num_activities_cfg_file : int = num_activities_in_cfgfile_by_timeline.get(timeline.name, 0)
+            timeline_num_categories_cfg_file : int = num_categories_in_cfgfile_per_timeline.get(timeline.name, 0)
+
             timeline_stats.append({
                 "name": timeline.name,
                 "display_name": timeline.display_name,
                 "mode": timeline.mode,
-                "activity_count": timeline_activity_count,
+                "activity_count": timeline_activity_count, # instances recorded in database by participants
+                "activity_count_cfg_file": timeline_num_activities_cfg_file, # different ones available in activities.json
+                "category_count_cfg_file": timeline_num_categories_cfg_file, # different ones available in activities.json
                 "description": timeline.description,
                 "min_coverage": timeline.min_coverage
             })
@@ -867,7 +878,9 @@ async def admin_overview(
             "timeline_stats": timeline_stats,
             "participants": participants,
             "activities_preview": enriched_activities,
-            "total_activities": total_activities,
+            "total_activities_logged": total_activities_logged,
+            "total_activities_cfg": num_activities_in_cfgfile_total,
+            "total_categories_cfg": num_categories_in_cfgfile_total,
             "participant_count": len(participants)
         })
 

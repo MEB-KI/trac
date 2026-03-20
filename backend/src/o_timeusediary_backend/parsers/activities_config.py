@@ -273,3 +273,45 @@ def validate_multiple_activity_codes(config_path: str, codes: List[int]) -> Dict
             results["all_valid"] = False
 
     return results
+
+def get_num_activities_in_cfgfile_per_timeline(config_path: str) -> Dict[str, int]:
+    """
+    Get the number of activities defined in the config file per timeline.
+
+    @param config_path Path to the activities JSON configuration file.
+    @return Dictionary mapping timeline name to number of activities (including child items).
+    """
+    config = get_cached_activities_config(config_path)
+    timeline_counts = {}
+
+    def count_activities(activities: List[ActivityItem]) -> int:
+        count = 0
+        for activity in activities:
+            count += 1  # Count current activity
+            if activity.childItems:
+                count += count_activities(activity.childItems)  # Count child items recursively
+        return count
+
+    for timeline_name, timeline_config in config.timeline.items():
+        total_count = 0
+        for category in timeline_config.categories:
+            total_count += count_activities(category.activities)
+        timeline_counts[timeline_name] = total_count
+
+    return timeline_counts
+
+def get_num_categories_in_cfgfile_per_timeline(config_path: str) -> Dict[str, int]:
+    """
+    Get the number of categories defined in the config file per timeline.
+
+    @param config_path Path to the activities JSON configuration file.
+    @return Dictionary mapping timeline name to number of categories.
+    """
+    config = get_cached_activities_config(config_path)
+    timeline_category_counts = {}
+
+    for timeline_name, timeline_config in config.timeline.items():
+        category_count = len(timeline_config.categories)
+        timeline_category_counts[timeline_name] = category_count
+
+    return timeline_category_counts

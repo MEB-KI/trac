@@ -374,7 +374,9 @@
                 <div class="study-meta">
                     <div><strong>ID:</strong> {{ study_data.study.id }}</div>
                     <div><strong>Participants:</strong> {{ study_data.participant_count }}</div>
-                    <div><strong>Activities logged:</strong> {{ study_data.total_activities }}</div>
+                    <div><strong>Activities logged:</strong> {{ study_data.total_activities_logged }}</div>
+                    <div><strong>Different Activities in config:</strong> {{ study_data.total_activities_cfg }}</div>
+                    <div><strong>Different Categories in config:</strong> {{ study_data.total_categories_cfg }}</div>
                     <div><strong>Created:</strong> {{ study_data.study.created_at.strftime('%Y-%m-%d') }}</div>
                 </div>
 
@@ -382,7 +384,7 @@
                 <div class="export-buttons" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e9ecef;">
                     <strong style="display: block; margin-bottom: 0.5rem; color: #495057;">Export Activities:</strong>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    {% if study_data.total_activities > 0 %}
+                    {% if study_data.total_activities_logged > 0 %}
                         <a href="{{ request.scope.root_path }}/api/admin/export/{{ study_data.study.name_short }}/activities?format=csv"
                         class="export-btn"
                         style="display: inline-block; padding: 0.5rem 1rem; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; font-weight: 500; transition: background 0.2s;">
@@ -424,7 +426,7 @@
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('timelines-{{ study_data.study.id }}', this)">Timelines</button>
                 <button class="tab" onclick="switchTab('participants-{{ study_data.study.id }}', this)">Participants ({{ study_data.participant_count }})</button>
-                <button class="tab" onclick="switchTab('activities-{{ study_data.study.id }}', this)">Activities ({{ study_data.total_activities }})</button>
+                <button class="tab" onclick="switchTab('activities-{{ study_data.study.id }}', this)">Activities ({{ study_data.total_activities_logged }})</button>
                 <button class="tab" onclick="switchTab('daylabels-{{ study_data.study.id }}', this)">Day Labels</button>
             </div>
 
@@ -437,6 +439,8 @@
                             <h3>{{ timeline_stat.display_name }} <span class="badge badge-timeline">{{ timeline_stat.name }}</span></h3>
                             <p><strong>Mode:</strong> {{ timeline_stat.mode }}</p>
                             <p><strong>Activities logged:</strong> {{ timeline_stat.activity_count }}</p>
+                            <p><strong>Different Activities in config:</strong> {{ timeline_stat.activity_count_cfg_file }}</p>
+                            <p><strong>Different Categories in config:</strong> {{ timeline_stat.category_count_cfg_file }}</p>
                             {% if timeline_stat.min_coverage %}
                             <p><strong>Min Coverage:</strong> {{ timeline_stat.min_coverage }}%</p>
                             {% endif %}
@@ -508,7 +512,7 @@
                         </table>
                     </div>
                     <div class="pagination">
-                        <span>Showing first 10 of {{ study_data.total_activities }} activities</span>
+                        <span>Showing first 10 of {{ study_data.total_activities_logged }} activities</span>
                     </div>
                     {% else %}
                     <div class="empty-state">
@@ -547,7 +551,7 @@
         <!-- Recent Activities Section -->
         <div class="study-section">
             <div class="study-header">
-                <h2>📊 Recent Activities (All Studies)</h2>
+                <h2>📊 Recently Logged Activities (Across All Studies)</h2>
                 <p>Last 10 activities recorded across all studies</p>
             </div>
             <div class="tab-content">
