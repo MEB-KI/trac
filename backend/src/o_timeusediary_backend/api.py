@@ -909,7 +909,7 @@ async def admin_overview(
     recent_activities = session.exec(
         select(Activity)
         .order_by(Activity.created_at.desc())
-        .limit(10)
+        .limit(20)
     ).all()
 
     enriched_recent_activities = []
