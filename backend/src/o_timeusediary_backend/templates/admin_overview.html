@@ -24,6 +24,29 @@
             margin: 0 auto;
         }
 
+        .admin-nav {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .admin-nav-link {
+            display: inline-block;
+            padding: 0.55rem 0.9rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #374151;
+            background: #e5e7eb;
+        }
+
+        .admin-nav-link.active {
+            color: white;
+            background: #4f46e5;
+        }
+
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -334,6 +357,11 @@
 </head>
 <body>
     <div class="container">
+        <nav class="admin-nav">
+            <a class="admin-nav-link active" href="{{ request.scope.root_path }}/admin">Overview</a>
+            <a class="admin-nav-link" href="{{ request.scope.root_path }}/admin/participant-management">Participant Management</a>
+        </nav>
+
         <div class="header">
             <h1>TUD Admin Overview</h1>
             <p>Time Use Diary Database Administration Interface</p>

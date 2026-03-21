@@ -955,6 +955,233 @@ async def admin_overview(
         }
     )
 
+
+class AssignParticipantsRequest(BaseModel):
+    participant_ids: List[str]
+    must_be_new: bool = False
+
+
+@app.get("/admin/participant-management", name="Admin Participant Management Page", response_class=HTMLResponse)
+async def admin_participant_management(
+    request: Request,
+    study_name_short: Optional[str] = Query(None),
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session)
+):
+    """Render participant-management page for assigning/removing study participants.
+
+    @param request FastAPI request object for template rendering.
+    @param study_name_short Optional selected study short name.
+    @param current_admin Authenticated admin username from Basic Auth dependency.
+    @param session Database session dependency.
+    @returns HTML page with study selector and participant management controls.
+    """
+    logger.info(f"Admin '{current_admin}' accessed participant management page for study '{study_name_short}'.")
+
+    studies = session.exec(select(Study).order_by(Study.name_short)).all()
+    studies_for_dropdown = []
+    for study in studies:
+        participant_count = session.exec(
+            select(func.count(StudyParticipant.id)).where(StudyParticipant.study_id == study.id)
+        ).first() or 0
+
+        studies_for_dropdown.append({
+            "name": study.name,
+            "name_short": study.name_short,
+            "allow_unlisted_participants": study.allow_unlisted_participants,
+            "participant_count": participant_count,
+        })
+    selected_study = None
+    current_participants = []
+
+    if study_name_short:
+        selected_study = session.exec(
+            select(Study).where(Study.name_short == study_name_short)
+        ).first()
+
+        if not selected_study:
+            raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+        study_participants = session.exec(
+            select(StudyParticipant)
+            .where(StudyParticipant.study_id == selected_study.id)
+            .order_by(StudyParticipant.created_at.desc())
+        ).all()
+
+        for association in study_participants:
+            participant = session.get(Participant, association.participant_id)
+            if not participant:
+                continue
+
+            participant_activity_count = session.exec(
+                select(func.count(Activity.id)).where(
+                    Activity.study_id == selected_study.id,
+                    Activity.participant_id == participant.id
+                )
+            ).first() or 0
+
+            current_participants.append({
+                "id": participant.id,
+                "created_at": participant.created_at,
+                "assigned_at": association.created_at,
+                "activity_count": participant_activity_count,
+            })
+
+    return templates.TemplateResponse(
+        "admin_participant_management.html",
+        {
+            "request": request,
+            "current_admin": current_admin,
+            "studies": studies_for_dropdown,
+            "selected_study": selected_study,
+            "current_participants": current_participants,
+            "current_time": utc_now(),
+        }
+    )
+
+
+@app.post("/api/admin/studies/{study_name_short}/assign-participants")
+async def assign_participants_to_study(
+    study_name_short: str,
+    payload: AssignParticipantsRequest,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session)
+):
+    """Assign a list of participants to a study, creating participant records when needed.
+
+    @param study_name_short Study short name.
+    @param payload Participant assignment request payload.
+    @param current_admin Authenticated admin username from Basic Auth dependency.
+    @param session Database session dependency.
+    @returns Assignment summary and resulting study participant count.
+    """
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    normalized_ids = []
+    seen = set()
+    for raw_id in payload.participant_ids:
+        participant_id = (raw_id or "").strip()
+        if not participant_id or participant_id in seen:
+            continue
+        seen.add(participant_id)
+        normalized_ids.append(participant_id)
+
+    if not normalized_ids:
+        raise HTTPException(status_code=400, detail="No valid participant IDs provided")
+
+    if payload.must_be_new:
+        existing_participants = session.exec(
+            select(Participant).where(Participant.id.in_(normalized_ids))
+        ).all()
+        if existing_participants:
+            existing_ids = sorted([participant.id for participant in existing_participants])
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Some participants already exist and must_be_new is enabled",
+                    "existing_participant_ids": existing_ids,
+                }
+            )
+
+    summary = {
+        "created_and_assigned": 0,
+        "already_existed_and_assigned": 0,
+        "already_assigned": 0,
+    }
+
+    for participant_id in normalized_ids:
+        participant = session.get(Participant, participant_id)
+        participant_created = False
+        if not participant:
+            participant = Participant(id=participant_id)
+            session.add(participant)
+            participant_created = True
+
+        existing_association = session.exec(
+            select(StudyParticipant).where(
+                StudyParticipant.study_id == study.id,
+                StudyParticipant.participant_id == participant_id,
+            )
+        ).first()
+
+        if existing_association:
+            summary["already_assigned"] += 1
+            continue
+
+        session.add(StudyParticipant(study_id=study.id, participant_id=participant_id))
+
+        if participant_created:
+            summary["created_and_assigned"] += 1
+        else:
+            summary["already_existed_and_assigned"] += 1
+
+    session.commit()
+
+    total_after_assignment = session.exec(
+        select(func.count(StudyParticipant.id)).where(StudyParticipant.study_id == study.id)
+    ).first() or 0
+
+    logger.info(
+        f"Admin '{current_admin}' assigned participants to study '{study_name_short}'. "
+        f"Summary: {summary}, total_after_assignment={total_after_assignment}"
+    )
+
+    return {
+        "study_name_short": study_name_short,
+        "summary": {
+            **summary,
+            "total_after_assignment": total_after_assignment,
+        },
+    }
+
+
+@app.delete("/api/admin/studies/{study_name_short}/participants/{participant_id}")
+async def remove_participant_from_study(
+    study_name_short: str,
+    participant_id: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session)
+):
+    """Remove participant association from a study.
+
+    @param study_name_short Study short name.
+    @param participant_id Participant identifier.
+    @param current_admin Authenticated admin username from Basic Auth dependency.
+    @param session Database session dependency.
+    @returns A confirmation object when association is deleted.
+    """
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    association = session.exec(
+        select(StudyParticipant).where(
+            StudyParticipant.study_id == study.id,
+            StudyParticipant.participant_id == participant_id,
+        )
+    ).first()
+
+    if not association:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Participant '{participant_id}' is not assigned to study '{study_name_short}'",
+        )
+
+    session.delete(association)
+    session.commit()
+
+    logger.info(
+        f"Admin '{current_admin}' removed participant '{participant_id}' from study '{study_name_short}'."
+    )
+
+    return {
+        "message": "Participant removed from study",
+        "study_name_short": study_name_short,
+        "participant_id": participant_id,
+    }
+
 @app.get("/api/admin/export/{study_name_short}/activities")
 async def export_study_activities(
     request: Request,

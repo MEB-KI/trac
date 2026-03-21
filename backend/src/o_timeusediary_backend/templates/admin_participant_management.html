@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TUD Admin - Participant Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .admin-nav {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .admin-nav-link {
+            display: inline-block;
+            padding: 0.55rem 0.9rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #374151;
+            background: #e5e7eb;
+        }
+
+        .admin-nav-link.active {
+            color: white;
+            background: #4f46e5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .select-row {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        select, textarea {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            font-size: 14px;
+        }
+
+        select {
+            flex: 1;
+            min-width: 280px;
+        }
+
+        button {
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.6rem 0.9rem;
+        }
+
+        .btn-primary {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            padding: 0.45rem 0.7rem;
+            font-size: 12px;
+        }
+
+        .hint {
+            color: #6b7280;
+            font-size: 13px;
+            margin-top: 0.35rem;
+        }
+
+        .status {
+            margin-top: 0.8rem;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            padding: 0.65rem;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f9fafb;
+            color: #374151;
+            font-weight: 700;
+        }
+
+        code {
+            background: #f3f4f6;
+            border-radius: 4px;
+            padding: 0.15rem 0.35rem;
+        }
+
+        .empty {
+            color: #6b7280;
+            font-style: italic;
+            padding: 0.6rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="admin-nav">
+            <a class="admin-nav-link" href="{{ request.scope.root_path }}/admin">Overview</a>
+            <a class="admin-nav-link active" href="{{ request.scope.root_path }}/admin/participant-management">Participant Management</a>
+        </nav>
+
+        <div class="header">
+            <h1>Participant Management</h1>
+            <p>Add or remove participants for a study</p>
+            <div class="header-info">
+                <div>
+                    <strong>Admin:</strong> {{ current_admin }}
+                </div>
+                <div>
+                    <strong>Last Updated:</strong> {{ current_time.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 0.75rem;">Select study</h2>
+            <div class="select-row">
+                <select id="studySelect">
+                    <option value="">-- Select a study --</option>
+                    {% for study in studies %}
+                    <option value="{{ study.name_short }}" {% if selected_study and selected_study.name_short == study.name_short %}selected{% endif %}>
+                        {{ study.name_short }} - {{ study.name }}
+                        {% if study.allow_unlisted_participants %}
+                            (open)
+                        {% else %}
+                            (closed: {{ study.participant_count }} participants)
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button id="loadParticipantsBtn" class="btn-primary" type="button">Load participants</button>
+            </div>
+        </div>
+
+        {% if selected_study %}
+        <div class="card">
+            <h2 style="margin-bottom: 0.75rem;">Participants in "{{ selected_study.name_short }}" ({{ current_participants|length }})</h2>
+            {% if current_participants %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Participant ID</th>
+                        <th>Created</th>
+                        <th>Activity Count</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for participant in current_participants %}
+                    <tr>
+                        <td><code>{{ participant.id }}</code></td>
+                        <td>{{ participant.created_at.strftime('%Y-%m-%d %H:%M') if participant.created_at else '-' }}</td>
+                        <td>{{ participant.activity_count }}</td>
+                        <td>
+                            <button type="button" class="btn-danger" onclick="removeParticipant('{{ participant.id }}')">Remove</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No participants assigned yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 0.75rem;">Add participants</h2>
+            <textarea id="participantIds" rows="6" placeholder="participant_001\nparticipant_002\nparticipant_003"></textarea>
+            <div class="hint">Use new lines, comma, semicolon, or spaces as separators.</div>
+            <div style="margin-top: 0.75rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                <button type="button" class="btn-primary" onclick="addParticipants()">Add participants</button>
+                <button type="button" class="btn-secondary" onclick="clearForm()">Clear</button>
+                <div id="addStatus" class="status"></div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const rootPath = "{{ request.scope.root_path }}";
+
+        function parseParticipantIds(input) {
+            if (!input) return [];
+            return input
+                .replace(/[;,]/g, '\n')
+                .split(/\n|\s+/)
+                .map(id => id.trim())
+                .filter(id => id.length > 0);
+        }
+
+        document.getElementById('loadParticipantsBtn')?.addEventListener('click', () => {
+            const select = document.getElementById('studySelect');
+            const studyName = select?.value;
+            if (!studyName) {
+                alert('Please select a study first.');
+                return;
+            }
+            window.location.href = `${rootPath}/admin/participant-management?study_name_short=${encodeURIComponent(studyName)}`;
+        });
+
+        async function addParticipants() {
+            const select = document.getElementById('studySelect');
+            const studyName = select?.value;
+            if (!studyName) {
+                alert('Please select a study first.');
+                return;
+            }
+
+            const participantIds = parseParticipantIds(document.getElementById('participantIds').value);
+            if (!participantIds.length) {
+                alert('Please enter at least one participant ID.');
+                return;
+            }
+
+            const status = document.getElementById('addStatus');
+            status.textContent = 'Adding participants...';
+            status.style.color = '#4f46e5';
+
+            try {
+                const response = await fetch(`${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/assign-participants`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ participant_ids: participantIds })
+                });
+
+                const body = await response.json();
+                if (!response.ok) {
+                    throw new Error(body.detail || 'Failed to add participants');
+                }
+
+                status.textContent = `Added: ${body.summary.created_and_assigned + body.summary.already_existed_and_assigned} (already assigned: ${body.summary.already_assigned})`;
+                status.style.color = '#059669';
+                setTimeout(() => {
+                    window.location.href = `${rootPath}/admin/participant-management?study_name_short=${encodeURIComponent(studyName)}`;
+                }, 700);
+            } catch (error) {
+                status.textContent = error.message;
+                status.style.color = '#dc2626';
+            }
+        }
+
+        async function removeParticipant(participantId) {
+            const select = document.getElementById('studySelect');
+            const studyName = select?.value;
+            if (!studyName) {
+                alert('Please select a study first.');
+                return;
+            }
+
+            if (!confirm(`Remove participant "${participantId}" from study "${studyName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/participants/${encodeURIComponent(participantId)}`,
+                    { method: 'DELETE', credentials: 'same-origin' }
+                );
+
+                const body = await response.json();
+                if (!response.ok) {
+                    throw new Error(body.detail || 'Failed to remove participant');
+                }
+
+                window.location.href = `${rootPath}/admin/participant-management?study_name_short=${encodeURIComponent(studyName)}`;
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        function clearForm() {
+            const textarea = document.getElementById('participantIds');
+            const status = document.getElementById('addStatus');
+            if (textarea) textarea.value = '';
+            if (status) {
+                status.textContent = '';
+                status.style.color = '#374151';
+            }
+        }
+    </script>
+</body>
+</html>
