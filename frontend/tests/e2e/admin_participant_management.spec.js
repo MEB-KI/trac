@@ -23,5 +23,7 @@ test('admin login -> participant management -> study participant list', async ({
   await page.locator('#loadParticipantsBtn').click();
 
   await expect(page).toHaveURL(/study_name_short=default/);
-  await expect(page.locator('h2')).toContainText(/Participants in "default"/);
+  await expect(
+    page.getByRole('heading', { level: 2, name: /Participants in "default"\s*\(\d+\)/ })
+  ).toBeVisible();
 });
