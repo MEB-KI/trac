@@ -12,7 +12,7 @@ test('language selector lists supported languages and applies study intro/outro 
   const options = await languageSelect.locator('option').allTextContents();
   expect(options).toEqual(expect.arrayContaining(['EN', 'SV']));
 
-  await expect(page.locator('#study-custom-message-intro')).toContainText('Vänligen fyll i denna studie för ditt barn');
+  await expect(page.locator('#study-custom-message-intro')).toContainText('Vänligen fyll i denna studie för 9-åringar');
 
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
