@@ -22,9 +22,13 @@ A pure JavaScript frontend for this app can be found at `frontend/src`.
 
 Users of the frontend see an instructions page for the study that typically explains the purpose of data collection and gives a quick introduction in how to use the time use tool. When they click next, this page is followed by the data collection page, the main page of the app. On the data collection page, users can select the activities at the bottom, and they see one or more timelines at the top, e.g., a 'primary activity' timeline and a 'secondary activity' timeline. Users place activities on timelines to indicate what they have been doing during the day. They click on an activity to select it, and then click on the timeline to place the activity on the timeline. The activity can be moved and resized on the timeline. The timeline is divided into 10-minute intervals and covers one entire day (1440 minutes).
 
- ## Frontend configuration
+## Frontend configuration
+
+The frontend is NOT a single-page application (SPA), and it does not require or use any build system. There are npm files in `frontend/`, but they are only needed for the frontend E2E tests.
+
 
 The frontend settings, the most important one of which is the backend API URL, are defined in the `frontend/src/settings/tud_settings.js` file. In production, the frontend will be served via nginx, and the backend API will be available at a nested path on the same domain, so the backend API URL in the frontend config file should be set to this nested path (e.g., `/api`), and the backend should be configured to support this via the FastAPI `root_path` setting.
+
 
 ## Study layer and study setup
 
@@ -50,6 +54,11 @@ The backend is configured via en `.env` file, which is read by the backend at st
 
 
 In production, the frontend and backend may be run on different servers and at a nested path on a domain, so we need to make sure that the backend can be configured to support this, via the FastAPI `root_path` setting.
+
+### Backend build system
+
+The backend uses `uv`, and one should use it for all commands or manually activate the .venv it creates first. E.g., the recommended way to run the unit tests would be `cd backend && uv run pytest`. An alternative is `cd backend && source .venv/bin/activate && python -m pytest`. But `uv` is the way to go. So to build the backend, do `cd backend && uv run build`.
+
 
 ## Development scripts
 
