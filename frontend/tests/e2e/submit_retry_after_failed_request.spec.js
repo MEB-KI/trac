@@ -104,7 +104,7 @@ async function openSubmitConfirmation(page) {
   await expect(confirmationModal).toBeVisible();
 }
 
-test('failed submit keeps last timeline submittable for immediate retry', async ({ page }) => {
+test('failed submit auto-retries and proceeds without manual retry', async ({ page }) => {
   let submitAttempts = 0;
 
   await page.route('**/studies/**/participants/**/day_labels/**/activities', async (route) => {
@@ -152,33 +152,16 @@ test('failed submit keeps last timeline submittable for immediate retry', async 
   await expect
     .poll(async () => submitAttempts, {
       timeout: 10000,
-      message: 'Waiting for the first submit attempt',
-    })
-    .toBe(1);
-
-  await expect(loadingModal).toBeHidden({ timeout: 10000 });
-  await expect(page.locator('.toast.error')).toContainText(/Error submitting diary/i);
-  await expect(nextBtn).toBeEnabled();
-  await expect(navSubmitBtn).toBeEnabled();
-
-  await expect
-    .poll(async () => page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]), {
-      timeout: 10000,
-      message: 'Current timeline should remain the last timeline after failed submit',
-    })
-    .toBe('secondary');
-
-  await openSubmitConfirmation(page);
-  await page.locator('#confirmOk').click();
-
-  await expect
-    .poll(async () => submitAttempts, {
-      timeout: 10000,
-      message: 'Waiting for the retry submit attempt',
+      message: 'Waiting for auto-retry submit attempts',
     })
     .toBe(2);
 
+  await expect(loadingModal).toBeHidden({ timeout: 10000 });
+
+  // Auto-retry succeeds on the second attempt, so we should advance to the next day
   await expect(currentDayDisplay).toHaveAttribute('title', /Tuesday/, {
     timeout: 30000,
   });
+
+  await expect(confirmationModal).toBeHidden();
 });
