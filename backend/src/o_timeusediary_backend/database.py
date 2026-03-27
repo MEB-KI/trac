@@ -53,12 +53,13 @@ def report_on_db_contents():
             for timeline in timelines:
                 logger.info(f"    - {timeline.name} (display: '{timeline.display_name}', mode: {timeline.mode})")
 
-            # Report participants
+            # Report participants, but list at most 10 to avoid too much output
             study_participants = session.exec(
                 select(StudyParticipant).where(StudyParticipant.study_id == study.id)
             ).all()
-            logger.info(f"  Participants ({len(study_participants)}):")
-            for sp in study_participants:
+            sample_participants = study_participants[:10]
+            logger.info(f"  Participants ({len(study_participants)} total, showing first {len(sample_participants)}):")
+            for sp in sample_participants:
                 participant = session.get(Participant, sp.participant_id)
                 logger.info(f"    - {participant.id} (joined: {participant.created_at})")
 
