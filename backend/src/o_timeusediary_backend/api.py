@@ -49,6 +49,16 @@ from .utils import utc_now, get_time_for_minutes_from_midnight
 
 security = HTTPBasic()
 
+
+def _normalize_language_code(language: Optional[str]) -> Optional[str]:
+    if not isinstance(language, str):
+        return None
+    normalized = language.strip().lower()
+    if not normalized:
+        return None
+    primary_subtag = normalized.split("-")[0]
+    return primary_subtag or None
+
 # Initialize templates with absolute path
 current_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(current_dir / "templates"))
@@ -365,9 +375,11 @@ def get_study_activities_config(
 
     cfg_study = get_cfg_study_by_name_short(study_name_short, settings.studies_config_path)
 
+    normalized_lang = _normalize_language_code(lang)
+
     file_path_for_lang = None
     if cfg_study:
-        file_path_for_lang = cfg_study.get_activities_json_file_for_language(lang)
+        file_path_for_lang = cfg_study.get_activities_json_file_for_language(normalized_lang)
 
     # Fallback to database field (legacy/compatibility)
     if not file_path_for_lang:
@@ -2025,12 +2037,21 @@ def get_study_config(
                 logger.debug(f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'")
 
     cfg_study = get_cfg_study_by_name_short(study_name_short, settings.studies_config_path)
-    selected_language = lang or study.default_language
+    normalized_lang = _normalize_language_code(lang)
+    selected_language = normalized_lang or study.default_language
     supported_languages: List[str] = [study.default_language]
     if cfg_study:
-        supported_languages = cfg_study.get_supported_languages()
+        supported_languages = [_normalize_language_code(language) or language for language in cfg_study.get_supported_languages()]
         if selected_language not in supported_languages:
             selected_language = study.default_language
+
+    logger.info(
+        "[TRAC day-label-debug] study-config language resolution: requested_lang='%s' normalized_lang='%s' selected_language='%s' supported_languages=%s",
+        lang,
+        normalized_lang,
+        selected_language,
+        supported_languages,
+    )
 
     # Get all timelines for this study
     timelines = session.exec(
