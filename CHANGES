@@ -2,6 +2,16 @@ TRAC MPIAE Changes
 ===================
 
 
+Version 0.11.0 -- Improved delete UX and other improvements
+------------------------------------------------------------
+* NEW: add support for return_url URL param, see #53
+* NEW: keep unsaved activities when reloading page (e.g., F5)
+* NEW: add context menu (right-click) on desktop with delete activity button
+* NEW: add delete activity reminder in template message. FIX: make message text match exact button name
+* NEW: add supported_languages entry to studies_config.json for each study, make backend use it
+* NEW: add more project metadata to pyproject.toml
+
+
 Version 0.10.0 -- Template data from other users, switch to submitted days
 ---------------------------------------------------------------------------
 * NEW: allow deleting activities via long-press on desktop, show red animation before delete on desktop and mobile
