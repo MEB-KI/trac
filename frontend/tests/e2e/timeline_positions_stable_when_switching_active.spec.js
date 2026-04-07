@@ -50,9 +50,12 @@ async function addSleepingToMainTimeline(page) {
 async function getTimelineTopByTitle(page, titleText) {
   const timelineContainer = page.locator('.timeline-container').filter({ hasText: titleText }).first();
   await expect(timelineContainer).toBeVisible();
-  const box = await timelineContainer.boundingBox();
-  expect(box).not.toBeNull();
-  return box.y;
+  const docTop = await timelineContainer.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.top + window.scrollY;
+  });
+  expect(docTop).not.toBeNull();
+  return docTop;
 }
 
 test('desktop timeline positions stay stable when active timeline changes', async ({ page }) => {
