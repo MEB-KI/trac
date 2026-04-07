@@ -150,7 +150,9 @@ test('desktop context menu deletes activity and shows info modal in English', as
   const infoModal = page.locator('#activityInfoModal');
   await expect(infoModal).toBeVisible();
   await expect(infoModal.locator('.modal-header h3')).toHaveText('Activity details');
-  await expect(infoModal.locator('#activityInfoTableBody tr')).toHaveCount(5);
+  await expect(infoModal.locator('#activityInfoTableBody tr')).toHaveCount(7);
+  await expect(infoModal.locator('#activityInfoTableBody')).toContainText('Label');
+  await expect(infoModal.locator('#activityInfoTableBody')).toContainText('Category');
 
   await infoModal.locator('.modal-close').click();
   await expect(infoModal).not.toBeVisible();
