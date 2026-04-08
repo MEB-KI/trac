@@ -34,7 +34,7 @@ Playwright tests are stored in `frontend/tests/e2e`.
 
 	- `cd frontend`
 	- `npm install`
-	- `npx playwright install --with-deps chromium`
+	- `npx playwright install --with-deps chromium firefox webkit`
 
 3. Run tests:
 
