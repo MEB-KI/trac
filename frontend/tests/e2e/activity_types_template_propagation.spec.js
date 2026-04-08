@@ -81,10 +81,18 @@ async function selectFromSubmenuCustom(page, customText) {
   const childItemsModal = page.locator('#childItemsModal');
   await expect(childItemsModal).toBeVisible();
 
-  const customConsoleOption = page
-    .locator('#childItemsContainer .child-item-button')
-    .filter({ hasText: /Console,\s*alone\s*\(please specify game\)/i })
+  // Prefer stable code-based selection so name tweaks do not break the test.
+  let customConsoleOption = page
+    .locator('#childItemsContainer .child-item-button[data-code="1221"]')
     .first();
+
+  if ((await customConsoleOption.count()) === 0) {
+    customConsoleOption = page
+      .locator('#childItemsContainer .child-item-button')
+      .filter({ hasText: /Console,\s*alone/i })
+      .first();
+  }
+
   await expect(customConsoleOption).toBeVisible();
   await customConsoleOption.click();
 

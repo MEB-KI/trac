@@ -60,7 +60,10 @@ async function submitCurrentDayAndWaitFor(page, expectedDayName) {
   }
 
   await expect
-    .poll(async () => page.evaluate(() => Number(new URLSearchParams(window.location.search).get('day_label_index') || 0)), {
+    .poll(async () => {
+      const currentUrl = page.url();
+      return Number(new URL(currentUrl).searchParams.get('day_label_index') || 0);
+    }, {
       timeout: 30000,
       message: 'Waiting for day_label_index=1 after submission',
     })
