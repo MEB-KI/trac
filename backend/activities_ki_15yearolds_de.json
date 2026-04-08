@@ -118,8 +118,8 @@
             "name": "Arbeit / Studium",
             "activities": [
               {
-                "name": "Bezahlte Arbeit (bitte Art der Arbeit angeben)",
-                "examples": "Babysitten, Zeitungsaustragen, Teilzeitjob, etc",
+                "name": "Bezahlte Arbeit",
+                "examples": "Babysitten, Zeitungsaustragen, Teilzeitjob, etc. Bitte Art der Arbeit angeben.",
                 "code": 1120,
                 "label": "bezahlte arbeit",
                 "short": "arbeit",
@@ -244,7 +244,8 @@
                 "childItems": []
               },
               {
-                "name": "Andere Aktivitäten Zuhause (bitte angeben)",
+                "name": "Andere Aktivitäten Zuhause",
+                "examples": "Bitte angeben.",
                 "code": 1147,
                 "label": "sonstiges",
                 "short": "sonstiges",
@@ -304,8 +305,8 @@
                 "color": "#DA70D6"
               },
               {
-                "name": "Hobby nicht-Sport (bitte angeben)",
-                "examples": "Museumsbesuch, Musikstunde, Buchclub, Ehrenamt, etc",
+                "name": "Hobby nicht-Sport",
+                "examples": "Museumsbesuch, Musikstunde, Buchclub, Ehrenamt, etc. Bitte angeben.",
                 "code": 1164,
                 "label": "hobby nicht-sport",
                 "short": "hobby nicht-sport",
@@ -440,9 +441,9 @@
               "color": "#FFA500",
               "childItems": [
                   {
-                    "name": "Konsole, allein (bitte Spiel angeben)",
+                    "name": "Konsole, allein",
                     "code": 1221,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Bitte Spiel angeben.",
                     "label": "Konsolenspiel, allein",
                     "short": "konsole",
                     "vshort": "kon",
@@ -450,9 +451,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Konsole, mit anderen (bitte Spiel angeben)",
+                    "name": "Konsole, mit anderen",
                     "code": 1222,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Bitte Spiel angeben.",
                     "label": "Konsolenspiel, mit anderen",
                     "short": "konsole",
                     "vshort": "kon",
@@ -460,9 +461,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computerspiel, allein (bitte Spiel angeben)",
+                    "name": "Computerspiel, allein",
                     "code": 1223,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Bitte Spiel angeben.",
                     "label": "Computerspiel, allein",
                     "short": "computer",
                     "vshort": "pc",
@@ -470,9 +471,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computerspiel, mit anderen (bitte Spiel angeben)",
+                    "name": "Computerspiel, mit anderen",
                     "code": 1224,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Bitte Spiel angeben.",
                     "label": "Computerspiel, mit anderen",
                     "short": "computer",
                     "vshort": "pc",
@@ -480,9 +481,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobiles Spielen, allein (bitte Spiel angeben)",
+                    "name": "Mobiles Spielen, allein",
                     "code": 1225,
-                    "examples": "Telefon, Tablet, etc",
+                    "examples": "Telefon, Tablet, etc. Bitte Spiel angeben.",
                     "label": "Mobiles Spielen, allein",
                     "short": "mobil",
                     "vshort": "mob",
@@ -490,9 +491,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobiles Spielen, mit anderen (bitte Spiel angeben)",
+                    "name": "Mobiles Spielen, mit anderen",
                     "code": 1226,
-                    "examples": "Telefon, Tablet, etc",
+                    "examples": "Telefon, Tablet, etc. Bitte Spiel angeben.",
                     "label": "Mobiles Spielen, mit anderen",
                     "short": "mobil",
                     "vshort": "mob",
@@ -526,7 +527,8 @@
             "color": "#C0C0C0",
             "activities": [
               {
-                "name": "Andere Aktivität (bitte angeben)",
+                "name": "Andere Aktivität",
+                "examples": "Bitte angeben.",
                 "code": 1248,
                 "color": "#C0C0C0",
                 "is_custom_input": true,
@@ -581,7 +583,8 @@
                 "color": "#D8BFD8"
               },
               {
-                "name": "Andere Aktivitäten (bitte angeben)",
+                "name": "Andere Aktivitäten",
+                "examples": "Bitte angeben.",
                 "code": 2147,
                 "label": "sonstiges",
                 "short": "sonstiges",
@@ -643,9 +646,9 @@
               "color": "#FFA500",
               "childItems": [
                   {
-                    "name": "Konsole, allein (bitte Spiel angeben)",
+                    "name": "Konsole, allein",
                     "code": 2221,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Bitte Spiel angeben.",
                     "label": "Konsolenspiel, allein",
                     "short": "konsole",
                     "vshort": "kon",
@@ -653,9 +656,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Konsole, mit anderen (bitte Spiel angeben)",
+                    "name": "Konsole, mit anderen",
                     "code": 2222,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Bitte Spiel angeben.",
                     "label": "Konsolenspiel, mit anderen",
                     "short": "konsole",
                     "vshort": "kon",
@@ -663,9 +666,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computerspiel, allein (bitte Spiel angeben)",
+                    "name": "Computerspiel, allein",
                     "code": 2223,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Bitte Spiel angeben.",
                     "label": "Computerspiel, allein",
                     "short": "computer",
                     "vshort": "pc",
@@ -673,9 +676,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computerspiel, mit anderen (bitte Spiel angeben)",
+                    "name": "Computerspiel, mit anderen",
                     "code": 2224,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Bitte Spiel angeben.",
                     "label": "Computerspiel, mit anderen",
                     "short": "computer",
                     "vshort": "pc",
@@ -683,9 +686,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobiles Spielen, allein (bitte Spiel angeben)",
+                    "name": "Mobiles Spielen, allein",
                     "code": 2225,
-                    "examples": "Telefon, Tablet, etc",
+                    "examples": "Telefon, Tablet, etc. Bitte Spiel angeben.",
                     "label": "Mobiles Spielen, allein",
                     "short": "mobil",
                     "vshort": "mob",
@@ -693,9 +696,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobiles Spielen, mit anderen (bitte Spiel angeben)",
+                    "name": "Mobiles Spielen, mit anderen",
                     "code": 2226,
-                    "examples": "Telefon, Tablet, etc",
+                    "examples": "Telefon, Tablet, etc. Bitte Spiel angeben.",
                     "label": "Mobiles Spielen, mit anderen",
                     "short": "mobil",
                     "vshort": "mob",

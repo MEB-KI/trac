@@ -118,8 +118,8 @@
             "name": "Arbete / Studier",
             "activities": [
               {
-                "name": "Betalt Arbete (ange gärna typ av arbete)",
-                "examples": "Barnvakt, tidningsbud, deltidsjobb, etc",
+                "name": "Betalt Arbete",
+                "examples": "Barnvakt, tidningsbud, deltidsjobb, etc. Ange gärna typ av arbete.",
                 "code": 1120,
                 "label": "paid work",
                 "short": "work",
@@ -244,7 +244,8 @@
                 "childItems": []
               },
               {
-                "name": "Andra hemmaaktiviteter (ange gärna)",
+                "name": "Andra hemmaaktiviteter",
+                "examples": "Ange gärna.",
                 "code": 1147,
                 "label": "other",
                 "short": "other",
@@ -304,8 +305,8 @@
                 "color": "#DA70D6"
               },
               {
-                "name": "Hobby ej sport (ange gärna)",
-                "examples": "Besöka museum, musiklektion, bokcirkel, ideellt arbete, etc",
+                "name": "Hobby ej sport",
+                "examples": "Besöka museum, musiklektion, bokcirkel, ideellt arbete, etc. Ange gärna.",
                 "code": 1164,
                 "label": "hobby non-sports",
                 "short": "hobby non-sports",
@@ -440,9 +441,9 @@
               "color": "#FFA500",
               "childItems": [
                   {
-                    "name": "Konsol, ensam (ange gärna spel)",
+                    "name": "Konsol, ensam",
                     "code": 1221,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Ange gärna spel.",
                     "label": "Console Gaming, alone",
                     "short": "console",
                     "vshort": "console",
@@ -450,9 +451,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Konsol, med andra (ange gärna spel)",
+                    "name": "Konsol, med andra",
                     "code": 1222,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Ange gärna spel.",
                     "label": "Console Gaming, with others",
                     "short": "console",
                     "vshort": "console",
@@ -460,9 +461,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Datorspel, ensam (ange gärna spel)",
+                    "name": "Datorspel, ensam",
                     "code": 1223,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Ange gärna spel.",
                     "label": "Computer Gaming, alone",
                     "short": "computer",
                     "vshort": "comp",
@@ -470,9 +471,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Datorspel, med andra (ange gärna spel)",
+                    "name": "Datorspel, med andra",
                     "code": 1224,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Ange gärna spel.",
                     "label": "Computer Gaming, with others",
                     "short": "computer",
                     "vshort": "comp",
@@ -480,9 +481,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobilspel, ensam (ange gärna spel)",
+                    "name": "Mobilspel, ensam",
                     "code": 1225,
-                    "examples": "Telefon, surfplatta, etc",
+                    "examples": "Telefon, surfplatta, etc. Ange gärna spel.",
                     "label": "Mobile Gaming, alone",
                     "short": "mobile",
                     "vshort": "mob",
@@ -490,9 +491,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobilspel, med andra (ange gärna spel)",
+                    "name": "Mobilspel, med andra",
                     "code": 1226,
-                    "examples": "Telefon, surfplatta, etc",
+                    "examples": "Telefon, surfplatta, etc. Ange gärna spel.",
                     "label": "Mobile Gaming, with others",
                     "short": "mobile",
                     "vshort": "mob",
@@ -526,7 +527,8 @@
             "color": "#C0C0C0",
             "activities": [
               {
-                "name": "Annan Aktivitet (ange gärna)",
+                "name": "Annan Aktivitet",
+                "examples": "Ange gärna.",
                 "code": 1248,
                 "color": "#C0C0C0",
                 "is_custom_input": true,
@@ -581,7 +583,8 @@
                 "color": "#D8BFD8"
               },
               {
-                "name": "Andra aktiviteter (ange gärna)",
+                "name": "Andra aktiviteter",
+                "examples": "Ange gärna.",
                 "code": 2147,
                 "label": "other",
                 "short": "other",
@@ -643,9 +646,9 @@
               "color": "#FFA500",
               "childItems": [
                   {
-                    "name": "Konsol, ensam (ange gärna spel)",
+                    "name": "Konsol, ensam",
                     "code": 2221,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Ange gärna spel.",
                     "label": "Console Gaming, alone",
                     "short": "console",
                     "vshort": "console",
@@ -653,9 +656,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Konsol, med andra (ange gärna spel)",
+                    "name": "Konsol, med andra",
                     "code": 2222,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Ange gärna spel.",
                     "label": "Console Gaming, with others",
                     "short": "console",
                     "vshort": "console",
@@ -663,9 +666,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Datorspel, ensam (ange gärna spel)",
+                    "name": "Datorspel, ensam",
                     "code": 2223,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Ange gärna spel.",
                     "label": "Computer Gaming, alone",
                     "short": "computer",
                     "vshort": "comp",
@@ -673,9 +676,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Datorspel, med andra (ange gärna spel)",
+                    "name": "Datorspel, med andra",
                     "code": 2224,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Ange gärna spel.",
                     "label": "Computer Gaming, with others",
                     "short": "computer",
                     "vshort": "comp",
@@ -683,9 +686,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobilspel, ensam (ange gärna spel)",
+                    "name": "Mobilspel, ensam",
                     "code": 2225,
-                    "examples": "Telefon, surfplatta, etc",
+                    "examples": "Telefon, surfplatta, etc. Ange gärna spel.",
                     "label": "Mobile Gaming, alone",
                     "short": "mobile",
                     "vshort": "mob",
@@ -693,9 +696,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobilspel, med andra (ange gärna spel)",
+                    "name": "Mobilspel, med andra",
                     "code": 2226,
-                    "examples": "Telefon, surfplatta, etc",
+                    "examples": "Telefon, surfplatta, etc. Ange gärna spel.",
                     "label": "Mobile Gaming, with others",
                     "short": "mobile",
                     "vshort": "mob",

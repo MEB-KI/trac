@@ -118,8 +118,8 @@
             "name": "Work / Study",
             "activities": [
               {
-                "name": "Paid Work (please specify job)",
-                "examples": "Including work from home",
+                "name": "Paid Work",
+                "examples": "Including work from home. Please specify job.",
                 "code": 1120,
                 "label": "paid work (including at home)",
                 "short": "work",
@@ -266,7 +266,8 @@
                 "childItems": []
               },
               {
-                "name": "Other home activities (please specify)",
+                "name": "Other home activities",
+                "examples": "Please specify.",
                 "code": 1147,
                 "label": "other",
                 "short": "other",
@@ -282,7 +283,7 @@
             "activities": [
               {
                 "name": "Socialising",
-                "examples": "meeting family, friends",
+                "examples": "Meeting family, friends",
                 "code": 1160,
                 "label": "Socialising out of home with family, friends, phone call",
                 "short": "socialise out",
@@ -317,8 +318,8 @@
                 "color": "#DA70D6"
               },
               {
-                "name": "Hobby non-sports (Please specify)",
-                "examples": "Visiting a museum, music lesson, book club, voluntary work, etc",
+                "name": "Hobby non-sports",
+                "examples": "Visiting a museum, music lesson, book club, voluntary work, etc. Please specify.",
                 "code": 1164,
                 "label": "hobby non-sports",
                 "short": "hobby non-sports",
@@ -453,9 +454,9 @@
               "color": "#FFA500",
               "childItems": [
                   {
-                    "name": "Console, alone (please specify game)",
+                    "name": "Console, alone",
                     "code": 1221,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Please specify game.",
                     "label": "Console Gaming, alone",
                     "short": "console",
                     "vshort": "console",
@@ -463,9 +464,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Console, with others (please specify game)",
+                    "name": "Console, with others",
                     "code": 1222,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Please specify game.",
                     "label": "Console Gaming, with others",
                     "short": "console",
                     "vshort": "console",
@@ -473,9 +474,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computer Gaming, alone (please specify game)",
+                    "name": "Computer Gaming, alone",
                     "code": 1223,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Please specify game.",
                     "label": "Computer Gaming, alone",
                     "short": "computer",
                     "vshort": "comp",
@@ -483,9 +484,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computer Gaming, with others (please specify game)",
+                    "name": "Computer Gaming, with others",
                     "code": 1224,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Please specify game.",
                     "label": "Computer Gaming, with others",
                     "short": "computer",
                     "vshort": "comp",
@@ -493,9 +494,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobile Gaming, alone (please specify game)",
+                    "name": "Mobile Gaming, alone",
                     "code": 1225,
-                    "examples": "Phone, tablet, etc",
+                    "examples": "Phone, tablet, etc. Please specify game.",
                     "label": "Mobile Gaming, alone",
                     "short": "mobile",
                     "vshort": "mob",
@@ -503,9 +504,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobile Gaming, with others (please specify game)",
+                    "name": "Mobile Gaming, with others",
                     "code": 1226,
-                    "examples": "Phone, tablet, etc",
+                    "examples": "Phone, tablet, etc. Please specify game.",
                     "label": "Mobile Gaming, with others",
                     "short": "mobile",
                     "vshort": "mob",
@@ -539,7 +540,8 @@
             "color": "#C0C0C0",
             "activities": [
               {
-                "name": "Other Activity (please specify)",
+                "name": "Other Activity",
+                "examples": "Please specify.",
                 "code": 1248,
                 "color": "#C0C0C0",
                 "is_custom_input": true,
@@ -594,7 +596,8 @@
                 "color": "#D8BFD8"
               },
               {
-                "name": "Other activities (please specify)",
+                "name": "Other activities",
+                "examples": "Please specify.",
                 "code": 2147,
                 "label": "other",
                 "short": "other",
@@ -656,9 +659,9 @@
               "color": "#FFA500",
               "childItems": [
                   {
-                    "name": "Console, alone (please specify game)",
+                    "name": "Console, alone",
                     "code": 2221,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Please specify game.",
                     "label": "Console Gaming, alone",
                     "short": "console",
                     "vshort": "console",
@@ -666,9 +669,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Console, with others (please specify game)",
+                    "name": "Console, with others",
                     "code": 2222,
-                    "examples": "Playstation, Xbox, Nintendo Switch, etc",
+                    "examples": "Playstation, Xbox, Nintendo Switch, etc. Please specify game.",
                     "label": "Console Gaming, with others",
                     "short": "console",
                     "vshort": "console",
@@ -676,9 +679,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computer Gaming, alone (please specify game)",
+                    "name": "Computer Gaming, alone",
                     "code": 2223,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Please specify game.",
                     "label": "Computer Gaming, alone",
                     "short": "computer",
                     "vshort": "comp",
@@ -686,9 +689,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Computer Gaming, with others (please specify game)",
+                    "name": "Computer Gaming, with others",
                     "code": 2224,
-                    "examples": "PC, Mac, etc",
+                    "examples": "PC, Mac, etc. Please specify game.",
                     "label": "Computer Gaming, with others",
                     "short": "computer",
                     "vshort": "comp",
@@ -696,9 +699,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobile Gaming, alone (please specify game)",
+                    "name": "Mobile Gaming, alone",
                     "code": 2225,
-                    "examples": "Phone, tablet, etc",
+                    "examples": "Phone, tablet, etc. Please specify game.",
                     "label": "Mobile Gaming, alone",
                     "short": "mobile",
                     "vshort": "mob",
@@ -706,9 +709,9 @@
                     "is_custom_input": true
                   },
                   {
-                    "name": "Mobile Gaming, with others (please specify game)",
+                    "name": "Mobile Gaming, with others",
                     "code": 2226,
-                    "examples": "Phone, tablet, etc",
+                    "examples": "Phone, tablet, etc. Please specify game.",
                     "label": "Mobile Gaming, with others",
                     "short": "mobile",
                     "vshort": "mob",
