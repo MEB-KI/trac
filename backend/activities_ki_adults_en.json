@@ -221,7 +221,8 @@
                 "childItems": []
               },
               {
-                "name": "Reading (Physical book, magazine, newspaper)",
+                "name": "Reading",
+                "examples": "Physical book, magazine, newspaper",
                 "code": 1141,
                 "label": "reading physical",
                 "short": "read",
@@ -575,7 +576,8 @@
                 "childItems": []
               },
               {
-                "name": "Reading (Physical book, magazine, newspaper)",
+                "name": "Reading",
+                "examples": "Physical book, magazine, newspaper",
                 "code": 2141,
                 "label": "reading physical",
                 "short": "read",

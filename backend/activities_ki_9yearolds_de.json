@@ -187,7 +187,8 @@
                 "childItems": []
               },
               {
-                "name": "Lesen (Physisches Buch, Zeitschrift, Zeitung)",
+                "name": "Lesen",
+                "examples": "Physisches Buch, Zeitschrift, Zeitung",
                 "code": 1141,
                 "label": "lesen physisch",
                 "short": "lesen",
@@ -528,7 +529,8 @@
                 "childItems": []
               },
               {
-                "name": "Lesen (Physisches Buch, Zeitschrift, Zeitung)",
+                "name": "Lesen",
+                "examples": "Physisches Buch, Zeitschrift, Zeitung",
                 "code": 2141,
                 "label": "lesen physisch",
                 "short": "lesen",
