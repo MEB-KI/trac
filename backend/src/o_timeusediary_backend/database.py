@@ -1,7 +1,19 @@
 # database.py
 from sqlmodel import SQLModel, create_engine, Session, select
 from typing import Generator
-from .models import Study, Participant, DayLabel, StudyParticipant, Timeline, Activity, StudyActivityConfigBlob
+from .models import (
+    Study,
+    Participant,
+    DayLabel,
+    StudyParticipant,
+    Timeline,
+    Activity,
+    StudyActivityConfigBlob,
+    StudyAvailableTimeline,
+    StudyAvailableCategory,
+    StudyAvailableActivity,
+    StudyAvailableActivityI18n,
+)
 from .settings import settings
 from .parsers.studies_config import load_studies_config, CfgFileStudies
 from .parsers.activities_config import load_activities_config, ActivitiesConfig, get_activity_codes_set, get_all_activity_codes
@@ -62,6 +74,104 @@ def _ensure_activity_blobs_from_config(session: Session, study: Study, study_con
     for language, activity_file in files_by_lang.items():
         activities_json_data = _load_json_dict_from_path(activity_file)
         _upsert_study_activity_blob(session, study.id, language, activities_json_data)
+
+
+def _ensure_available_catalog_from_activities_configs(
+    session: Session,
+    study: Study,
+    activities_by_language: dict[str, ActivitiesConfig],
+    default_language: str,
+) -> None:
+    existing_available_activity_count = session.exec(
+        select(StudyAvailableActivity).where(StudyAvailableActivity.study_id == study.id)
+    ).all()
+    if existing_available_activity_count:
+        return
+
+    default_cfg = activities_by_language[default_language]
+    activity_info_by_language = {
+        language: get_all_activity_codes(activities_cfg)
+        for language, activities_cfg in activities_by_language.items()
+    }
+
+    timeline_id_by_key: dict[str, int] = {}
+    category_id_by_key: dict[tuple[str, str], int] = {}
+
+    for timeline_order, (timeline_key, timeline_cfg) in enumerate(default_cfg.timeline.items()):
+        timeline_row = StudyAvailableTimeline(
+            study_id=study.id,
+            timeline_key=timeline_key,
+            display_name=timeline_cfg.name,
+            description=timeline_cfg.description,
+            mode=timeline_cfg.mode,
+            min_coverage=int(timeline_cfg.min_coverage) if timeline_cfg.min_coverage is not None else None,
+            sort_order=timeline_order,
+        )
+        session.add(timeline_row)
+        session.flush()
+        timeline_id_by_key[timeline_key] = timeline_row.id
+
+        for category_order, category_cfg in enumerate(timeline_cfg.categories):
+            category_row = StudyAvailableCategory(
+                study_id=study.id,
+                timeline_id=timeline_row.id,
+                category_name=category_cfg.name,
+                sort_order=category_order,
+            )
+            session.add(category_row)
+            session.flush()
+            category_id_by_key[(timeline_key, category_cfg.name)] = category_row.id
+
+    def _insert_activities_recursive(
+        timeline_key: str,
+        category_name: str,
+        activity_items,
+        parent_code: int | None = None,
+    ) -> None:
+        for activity_order, activity_item in enumerate(activity_items):
+            activity_row = StudyAvailableActivity(
+                study_id=study.id,
+                timeline_id=timeline_id_by_key[timeline_key],
+                category_id=category_id_by_key[(timeline_key, category_name)],
+                activity_code=activity_item.code,
+                parent_activity_code=parent_code,
+                is_custom_input=bool(activity_item.is_custom_input),
+                sort_order=activity_order,
+            )
+            session.add(activity_row)
+            session.flush()
+
+            for language, info_by_code in activity_info_by_language.items():
+                language_activity_info = info_by_code.get(activity_item.code, {})
+                session.add(
+                    StudyAvailableActivityI18n(
+                        activity_id=activity_row.id,
+                        language=language,
+                        name=language_activity_info.get("name") or activity_item.name,
+                        label=language_activity_info.get("label"),
+                        short=language_activity_info.get("short"),
+                        vshort=language_activity_info.get("vshort"),
+                        examples=language_activity_info.get("examples"),
+                        color=language_activity_info.get("color"),
+                    )
+                )
+
+            if activity_item.childItems:
+                _insert_activities_recursive(
+                    timeline_key=timeline_key,
+                    category_name=category_name,
+                    activity_items=activity_item.childItems,
+                    parent_code=activity_item.code,
+                )
+
+    for timeline_key, timeline_cfg in default_cfg.timeline.items():
+        for category_cfg in timeline_cfg.categories:
+            _insert_activities_recursive(
+                timeline_key=timeline_key,
+                category_name=category_cfg.name,
+                activity_items=category_cfg.activities,
+                parent_code=None,
+            )
 
 
 def create_db_and_tables(do_report_contents: bool = False):
@@ -201,6 +311,20 @@ def create_config_file_studies_in_database(config_path: str):
 
                 if existing_study:
                     _ensure_activity_blobs_from_config(session, existing_study, study_config)
+
+                    supported_files = study_config.get_supported_activities_json_files()
+                    activities_cfg_by_language: dict[str, ActivitiesConfig] = {}
+                    for language, activity_file in supported_files.items():
+                        resolved_path = _resolve_relative_to_studies_config(activity_file)
+                        activities_cfg_by_language[language] = load_activities_config(str(resolved_path))
+
+                    if study_config.default_language in activities_cfg_by_language:
+                        _ensure_available_catalog_from_activities_configs(
+                            session=session,
+                            study=existing_study,
+                            activities_by_language=activities_cfg_by_language,
+                            default_language=study_config.default_language,
+                        )
                     session.commit()
                     logger.info(
                         f"Study already exists: '{study_config.name_short}' with long name: '{study_config.name}'")
@@ -217,6 +341,12 @@ def create_config_file_studies_in_database(config_path: str):
 
                 activities_config: ActivitiesConfig = load_activities_config(
                     default_activities_file)
+
+                supported_files = study_config.get_supported_activities_json_files()
+                activities_cfg_by_language: dict[str, ActivitiesConfig] = {}
+                for language, activity_file in supported_files.items():
+                    resolved_path = _resolve_relative_to_studies_config(activity_file)
+                    activities_cfg_by_language[language] = load_activities_config(str(resolved_path))
                 valid_activity_codes = get_activity_codes_set(
                     activities_config)
                 activity_info_by_code = get_all_activity_codes(
@@ -299,6 +429,12 @@ def create_config_file_studies_in_database(config_path: str):
                 session.commit()  # Commit immediately after each study
 
                 _ensure_activity_blobs_from_config(session, study, study_config)
+                _ensure_available_catalog_from_activities_configs(
+                    session=session,
+                    study=study,
+                    activities_by_language=activities_cfg_by_language,
+                    default_language=study_config.default_language,
+                )
 
                 # Create day labels
                 day_labels_by_name: dict[str, DayLabel] = {}

@@ -97,6 +97,17 @@ async def test_admin_import_study_config_with_embedded_activities_data():
         assert "timeline" in activities_data
         assert set(activities_data["timeline"].keys()) == set(activities_payload["timeline"].keys())
 
+        summary_response = await client.get(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/available-activities-summary",
+            auth=ADMIN_AUTH,
+        )
+        assert summary_response.status_code == 200
+        summary_data = summary_response.json()
+        assert summary_data["available_timeline_count"] > 0
+        assert summary_data["available_category_count"] > 0
+        assert summary_data["available_activity_count"] > 0
+        assert summary_data["available_activity_i18n_count"] > 0
+
         duplicate_response = await client.post(
             f"{BASE_URL}/api/admin/studies/import-config",
             json=payload,

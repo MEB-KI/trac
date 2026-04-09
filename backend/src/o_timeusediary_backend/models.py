@@ -37,6 +37,9 @@ class Study(SQLModel, table=True):
     timelines: List["Timeline"] = Relationship(back_populates="study")
     activities: List["Activity"] = Relationship(back_populates="study")
     activity_config_blobs: List["StudyActivityConfigBlob"] = Relationship(back_populates="study")
+    available_timelines: List["StudyAvailableTimeline"] = Relationship(back_populates="study")
+    available_categories: List["StudyAvailableCategory"] = Relationship(back_populates="study")
+    available_activities: List["StudyAvailableActivity"] = Relationship(back_populates="study")
 
 
 class StudyActivityConfigBlob(SQLModel, table=True):
@@ -59,6 +62,91 @@ class StudyActivityConfigBlob(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
 
     study: Study = Relationship(back_populates="activity_config_blobs")
+
+
+class StudyAvailableTimeline(SQLModel, table=True):
+    """Available timeline definition for a study (catalog, not logged events)."""
+    __tablename__ = "study_available_timelines"
+    __table_args__ = (
+        UniqueConstraint("study_id", "timeline_key", name="uq_study_available_timeline_study_key"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    study_id: int = Field(foreign_key="studies.id", index=True)
+    timeline_key: str = Field(index=True)
+    display_name: str
+    description: Optional[str] = None
+    mode: str = Field(index=True)
+    min_coverage: Optional[int] = None
+    sort_order: int = Field(default=0, index=True)
+    created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    study: Study = Relationship(back_populates="available_timelines")
+    categories: List["StudyAvailableCategory"] = Relationship(back_populates="timeline")
+    activities: List["StudyAvailableActivity"] = Relationship(back_populates="timeline")
+
+
+class StudyAvailableCategory(SQLModel, table=True):
+    """Available activity category for a study timeline (catalog, not logged events)."""
+    __tablename__ = "study_available_categories"
+    __table_args__ = (
+        UniqueConstraint("timeline_id", "category_name", name="uq_study_available_category_timeline_name"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    study_id: int = Field(foreign_key="studies.id", index=True)
+    timeline_id: int = Field(foreign_key="study_available_timelines.id", index=True)
+    category_name: str = Field(index=True)
+    sort_order: int = Field(default=0, index=True)
+    created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    study: Study = Relationship(back_populates="available_categories")
+    timeline: StudyAvailableTimeline = Relationship(back_populates="categories")
+    activities: List["StudyAvailableActivity"] = Relationship(back_populates="category")
+
+
+class StudyAvailableActivity(SQLModel, table=True):
+    """Available activity entry for a study (catalog, not logged events)."""
+    __tablename__ = "study_available_activities"
+    __table_args__ = (
+        UniqueConstraint("study_id", "activity_code", name="uq_study_available_activity_study_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    study_id: int = Field(foreign_key="studies.id", index=True)
+    timeline_id: int = Field(foreign_key="study_available_timelines.id", index=True)
+    category_id: int = Field(foreign_key="study_available_categories.id", index=True)
+    activity_code: int = Field(index=True)
+    parent_activity_code: Optional[int] = Field(default=None, index=True)
+    is_custom_input: bool = Field(default=False)
+    sort_order: int = Field(default=0, index=True)
+    created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    study: Study = Relationship(back_populates="available_activities")
+    timeline: StudyAvailableTimeline = Relationship(back_populates="activities")
+    category: StudyAvailableCategory = Relationship(back_populates="activities")
+    i18n: List["StudyAvailableActivityI18n"] = Relationship(back_populates="activity")
+
+
+class StudyAvailableActivityI18n(SQLModel, table=True):
+    """Language-specific labels and metadata for available activities."""
+    __tablename__ = "study_available_activity_i18n"
+    __table_args__ = (
+        UniqueConstraint("activity_id", "language", name="uq_study_available_activity_i18n_activity_lang"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    activity_id: int = Field(foreign_key="study_available_activities.id", index=True)
+    language: str = Field(index=True)
+    name: str = Field(index=True)
+    label: Optional[str] = None
+    short: Optional[str] = None
+    vshort: Optional[str] = None
+    examples: Optional[str] = None
+    color: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
+
+    activity: StudyAvailableActivity = Relationship(back_populates="i18n")
 
 class DayLabel(SQLModel, table=True):
     """Valid day labels for a study (e.g., "monday", "tuesday", "typical_weekend")"""

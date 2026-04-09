@@ -21,6 +21,7 @@ import sys, argparse
 from fastapi.templating import Jinja2Templates
 from .parsers.activities_config import (
     ActivitiesConfig,
+    get_all_activity_codes,
     get_activity_codes_set,
     get_num_categories_in_cfgfile_per_timeline,
     load_activities_config,
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 from .settings import settings
 from .models import Activity, Study, Timeline, DayLabel, StudyParticipant, Participant, StudyActivityConfigBlob
+from .models import StudyAvailableTimeline, StudyAvailableCategory, StudyAvailableActivity, StudyAvailableActivityI18n
 from .database import get_session, create_db_and_tables, get_timelines_for_study
 from pathlib import Path
 import hashlib
@@ -1166,6 +1168,98 @@ def _compute_blob_hash(payload: Dict) -> str:
     ).hexdigest()
 
 
+def _create_available_catalog_from_validated_activities(
+    session: Session,
+    study: Study,
+    parsed_activities_by_lang: Dict[str, ActivitiesConfig],
+    default_language: str,
+) -> None:
+    default_cfg = parsed_activities_by_lang[default_language]
+    activity_info_by_language = {
+        language: get_all_activity_codes(activities_cfg)
+        for language, activities_cfg in parsed_activities_by_lang.items()
+    }
+
+    timeline_id_by_key: Dict[str, int] = {}
+    category_id_by_key: Dict[Tuple[str, str], int] = {}
+
+    for timeline_order, (timeline_key, timeline_cfg) in enumerate(default_cfg.timeline.items()):
+        timeline_row = StudyAvailableTimeline(
+            study_id=study.id,
+            timeline_key=timeline_key,
+            display_name=timeline_cfg.name,
+            description=timeline_cfg.description,
+            mode=timeline_cfg.mode,
+            min_coverage=int(timeline_cfg.min_coverage) if timeline_cfg.min_coverage is not None else None,
+            sort_order=timeline_order,
+        )
+        session.add(timeline_row)
+        session.flush()
+        timeline_id_by_key[timeline_key] = timeline_row.id
+
+        for category_order, category_cfg in enumerate(timeline_cfg.categories):
+            category_row = StudyAvailableCategory(
+                study_id=study.id,
+                timeline_id=timeline_row.id,
+                category_name=category_cfg.name,
+                sort_order=category_order,
+            )
+            session.add(category_row)
+            session.flush()
+            category_id_by_key[(timeline_key, category_cfg.name)] = category_row.id
+
+    def _insert_recursive(
+        timeline_key: str,
+        category_name: str,
+        activity_items: List,
+        parent_code: Optional[int] = None,
+    ) -> None:
+        for activity_order, activity_item in enumerate(activity_items):
+            activity_row = StudyAvailableActivity(
+                study_id=study.id,
+                timeline_id=timeline_id_by_key[timeline_key],
+                category_id=category_id_by_key[(timeline_key, category_name)],
+                activity_code=activity_item.code,
+                parent_activity_code=parent_code,
+                is_custom_input=bool(activity_item.is_custom_input),
+                sort_order=activity_order,
+            )
+            session.add(activity_row)
+            session.flush()
+
+            for language, info_by_code in activity_info_by_language.items():
+                language_info = info_by_code.get(activity_item.code, {})
+                session.add(
+                    StudyAvailableActivityI18n(
+                        activity_id=activity_row.id,
+                        language=language,
+                        name=language_info.get("name") or activity_item.name,
+                        label=language_info.get("label"),
+                        short=language_info.get("short"),
+                        vshort=language_info.get("vshort"),
+                        examples=language_info.get("examples"),
+                        color=language_info.get("color"),
+                    )
+                )
+
+            if activity_item.childItems:
+                _insert_recursive(
+                    timeline_key=timeline_key,
+                    category_name=category_name,
+                    activity_items=activity_item.childItems,
+                    parent_code=activity_item.code,
+                )
+
+    for timeline_key, timeline_cfg in default_cfg.timeline.items():
+        for category_cfg in timeline_cfg.categories:
+            _insert_recursive(
+                timeline_key=timeline_key,
+                category_name=category_cfg.name,
+                activity_items=category_cfg.activities,
+                parent_code=None,
+            )
+
+
 def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> Dict:
     if study_payload.data_collection_start >= study_payload.data_collection_end:
         raise ValueError("data_collection_start must be earlier than data_collection_end")
@@ -1311,7 +1405,49 @@ def _create_study_from_import_payload(
             )
         )
 
+    _create_available_catalog_from_validated_activities(
+        session=session,
+        study=study,
+        parsed_activities_by_lang=validated_data["parsed_activities_by_lang"],
+        default_language=default_language,
+    )
+
     return study
+
+
+@app.get("/api/admin/studies/{study_name_short}/available-activities-summary")
+async def get_available_activities_summary(
+    study_name_short: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Return counts for normalized available activities catalog tables for a study."""
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    timeline_count = session.exec(
+        select(func.count(StudyAvailableTimeline.id)).where(StudyAvailableTimeline.study_id == study.id)
+    ).first() or 0
+    category_count = session.exec(
+        select(func.count(StudyAvailableCategory.id)).where(StudyAvailableCategory.study_id == study.id)
+    ).first() or 0
+    activity_count = session.exec(
+        select(func.count(StudyAvailableActivity.id)).where(StudyAvailableActivity.study_id == study.id)
+    ).first() or 0
+    i18n_count = session.exec(
+        select(func.count(StudyAvailableActivityI18n.id))
+        .join(StudyAvailableActivity, StudyAvailableActivityI18n.activity_id == StudyAvailableActivity.id)
+        .where(StudyAvailableActivity.study_id == study.id)
+    ).first() or 0
+
+    return {
+        "study_name_short": study_name_short,
+        "available_timeline_count": timeline_count,
+        "available_category_count": category_count,
+        "available_activity_count": activity_count,
+        "available_activity_i18n_count": i18n_count,
+    }
 
 
 @app.post("/api/admin/studies/import-config")
