@@ -13,6 +13,105 @@ The frontend is based on [github.com/andreifoldes/o-timeusediary by Andrei Tamas
 When using the software in this repo, please also cite [Andrei Tamas Foldes' paper](https://doi.org/10.32797/jtur-2020-1) `Time use diary design for our times - an overview, presenting a Click-and-Drag Diary Instrument (CaDDI) for online application`.
 
 
+## Installation Instructions
+
+TRAC consists of three components that must be set up together:
+
+1. **PostgreSQL database** — stores participant data and study definitions
+2. **Python/FastAPI backend** — serves the REST API and the admin interface
+3. **Frontend** — a static JavaScript/HTML/CSS app served by any web server
+
+
+### Prerequisites
+
+- A **PostgreSQL** server (any recent version)
+- **Python 3.10+** and [`uv`](https://github.com/astral-sh/uv) for the backend
+- A **web server** (e.g., nginx, Apache, Caddy) to serve the frontend static files and optionally act as a reverse proxy in front of the backend
+- For production: a domain name and TLS/HTTPS (strongly recommended — see [Security](#security) below)
+
+
+### 1. Database Setup
+
+Create a dedicated PostgreSQL database and user for the application. The database schema is created automatically by the backend on first startup. You need to provide the connection details in the backend configuration (see next step).
+
+
+### 2. Backend Configuration
+
+The backend is configured via a `.env` file placed in the directory from which the backend process is started. Copy `backend/.env.example` to `backend/.env` and adjust the values:
+
+```ini
+# Database connection
+TUD_DATABASE_USER=<db_user>
+TUD_DATABASE_PASSWORD=<db_password>     # use a strong password
+TUD_DATABASE_HOST=<db_host>             # usually 'localhost'
+TUD_DATABASE_PORT=5432
+TUD_DATABASE_NAME=<db_name>
+TUD_DATABASE_URL=postgresql://<db_user>:<db_password>@<db_host>:5432/<db_name>
+
+# CORS: list all origins (scheme + host + port) from which the frontend will be served
+TUD_ALLOWED_ORIGINS='["https://your.domain.example.com"]'
+
+# Admin interface credentials — use strong, unique values
+TUD_API_ADMIN_USERNAME=<admin_username>
+TUD_API_ADMIN_PASSWORD=<admin_password>
+
+# Root path: set this if the backend API is served under a sub-path via a reverse proxy
+# e.g., TUD_ROOTPATH=/tud_backend  when proxied at https://your.domain.example.com/tud_backend/
+TUD_ROOTPATH=/
+```
+
+Install the backend into a virtual environment and start it with a WSGI server such as `uvicorn` (development) or `gunicorn` (production). The backend will automatically create the database tables and load study configuration from `studies_config.json` on first startup.
+
+
+### 3. Study Configuration
+
+Studies are defined in `backend/studies_config.json`. Each entry specifies the study name, supported languages, the days to cover, participant handling (open or invite-only via `allow_unlisted_participants`), and references to one or more activity list files (`backend/activities_*.json`). When the backend starts it registers any new studies listed in this file; existing studies are left unchanged.
+
+Participants access the app via an invitation link containing their unique ID. For open studies any visitor is assigned an ID automatically.
+
+
+### 4. Frontend Configuration
+
+The frontend has a single settings file: `frontend/src/settings/tud_settings.js`. The most important setting is `API_BASE_URL`, which must point to the backend API:
+
+```js
+const TUD_SETTINGS = {
+    // URL of the backend API as seen from the user's browser.
+    // If the backend is proxied at a sub-path, include that path here.
+    API_BASE_URL: 'https://your.domain.example.com/tud_backend/api',
+
+    // Short name of the study to load by default (must match 'name_short' in studies_config.json)
+    DEFAULT_STUDY_NAME: 'default',
+
+    // Whether to show navigation buttons for previous days
+    SHOW_PREVIOUS_DAYS_BUTTONS: true
+};
+```
+
+No build step is required. Once this file is configured, the entire `frontend/src/` directory can be deployed as-is to any static file server.
+
+
+### 5. Web Server and Reverse Proxy
+
+In a typical production setup a single web server (or reverse proxy) handles all traffic:
+
+- Static frontend files are served directly from the `frontend/src/` directory.
+- Requests to the backend API path (e.g., `/tud_backend/`) are forwarded to the running backend process.
+
+Make sure the proxy passes the correct `X-Forwarded-*` headers so that the backend can construct correct URLs, and configure `TUD_ROOTPATH` and `TUD_ALLOWED_ORIGINS` accordingly.
+
+
+### Security
+
+Because TRAC collects research data from study participants over the internet, you **must** secure the deployment:
+
+- **Use HTTPS** for all traffic. Never run the app over plain HTTP in production.
+- **Set strong, unique passwords** for the database user and the admin interface.
+- **Restrict `TUD_ALLOWED_ORIGINS`** to only the exact origin(s) from which the frontend is served.
+- **Protect the admin interface** — it is served at `<TUD_ROOTPATH>/admin/` and is protected by HTTP Basic Auth. Make sure the admin password is strong and that it is only transmitted over HTTPS.
+- Follow general web-server hardening best practices (secure headers, rate limiting, firewall rules, etc.) appropriate for your server software and environment.
+
+
 ## Developer Documentation
 
 ### Development Setup
