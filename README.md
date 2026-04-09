@@ -193,7 +193,7 @@ Because TRAC collects research data from study participants over the internet, y
 
 ## Developer Documentation
 
-### Development Setup
+### Development Without Docker
 
 Make sure you have `git`, `uv`, `postgresql` and `nginx`. Python comes with every Linux distribution, so you should not need to install it. This will get you everything you need under Ubuntu 24 LTS:
 
@@ -247,11 +247,15 @@ We recommend to also run the E2E tests, see next section.
 
 You can now connect to [http://localhost:3000](http://localhost:3000) to access nginx. The default nginx page will show details on how to access the frontend, admin interface, and API.
 
-### Running the tests locally
+#### Running Tests Locally (Without Docker)
 
-You also have everything installed run the backend unit and integration tests if you followed the development setup instructions above.
+Now that you have all local test dependencies, you can run tests directly from your host machine:
 
-If you want to run the E2E tests, you will need to have [node.js](https://nodejs.org/en/download) installed. Then install playwright and headless browsers to run the tests in:
+- Unit tests do not require services to be running: `./test_backend_unit.sh`
+- Integration tests require the backend and database to be running: `./test_backend_integration.sh`
+- E2E tests require frontend and backend to be running: `./test_e2e.sh`
+
+If you want to run E2E tests, install Node.js and Playwright once:
 
 ```bash
 cd frontend/
@@ -259,11 +263,66 @@ npm install
 npx playwright install --with-deps chromium firefox webkit
 ```
 
-Now that you have all test dependencies, you can run the tests:
+### Development With Docker Compose
 
-* Unit tests do not require the services to be running. To run them from the repo root: `./test_backend_unit.sh`
-* Integration tests require the backend to be running. To run them from the repo root: `./test_backend_integration.sh`
-* The E2E tests require the frontend and backend to be setup correctly, and all services to be running. To run them from the repo root: `./test_e2e.sh`
+If you prefer a container-based development setup, this repo also includes `docker-compose.dev.yml`. It starts three services:
+
+- PostgreSQL database
+- backend container with the local `backend/` directory mounted for live code reload
+- nginx container with the local `frontend/src/` directory mounted and proxied under `/report/`
+
+This setup mirrors the normal local nginx development layout:
+
+- frontend: `http://localhost:3000/report/`
+- backend via reverse proxy: `http://localhost:3000/tud_backend/`
+- backend direct port: `http://localhost:8000/`
+- admin interface: `http://localhost:3000/tud_backend/admin`
+- API docs: `http://localhost:3000/tud_backend/api/docs`
+
+Start the stack from the repo root:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+Stop it again with:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+If you also want to delete the Docker volumes, including the PostgreSQL data volume, use:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+```
+
+The compose setup uses Docker-specific config overlays from `dev_tools/docker/` and does not require you to overwrite your normal local development settings files manually.
+
+#### Running Tests with Docker
+
+Helper scripts are provided to run tests against the containerized stack:
+
+```bash
+# Run all backend tests (unit + integration) in Docker
+./run_tests_docker.sh
+
+# Or run specific test suites
+./run_tests_docker_unit.sh          # backend unit tests only
+./run_tests_docker_integration.sh   # backend integration tests only
+
+# Run E2E tests fully inside Docker (Playwright container)
+./run_tests_docker.sh e2e
+./run_tests_docker_e2e.sh
+```
+
+These scripts assume the docker-compose stack is already running. Start it first with:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+The E2E test command uses the `e2e` service in `docker-compose.dev.yml`, which installs frontend test dependencies inside the container and runs Playwright there. This is useful when you want to avoid installing Node.js/Playwright on the host.
 
 
 
