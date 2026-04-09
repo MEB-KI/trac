@@ -21,6 +21,12 @@ http {
     access_log USERHOME/nginx-dev-access.log;
     error_log USERHOME/nginx-dev-error.log;
 
+    # Temporary directory for buffering large request bodies (e.g., study configuration imports with embedded activities).
+    # This must be writable by the nginx process user. When running nginx locally as your user (not root),
+    # the default /var/lib/nginx/body directory may not be writable, causing "Permission denied" errors on large POST requests.
+    client_body_temp_path USERHOME/nginx-client-body-temp;
+
+    # websocket support
     map $http_upgrade $connection_upgrade {
         default upgrade;
         ''      close;

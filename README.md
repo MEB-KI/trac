@@ -63,6 +63,17 @@ TUD_ROOTPATH=/
 Install the backend into a virtual environment and start it with a WSGI server such as `uvicorn` (development) or `gunicorn` (production). The backend will automatically create the database tables and load study configuration from `studies_config.json` on first startup.
 
 
+### Important: Large Request Handling
+
+TRAC supports exporting and importing study configurations with embedded activity definitions, which can result in large HTTP POST request bodies (typically 10-50 KB depending on the number of activities and languages supported). Most web servers require special configuration to handle large request bodies. In particular:
+
+- **nginx**: Configure a `client_body_temp_path` directive in your nginx configuration to a directory where the nginx process has write permissions. See the [developer documentation](dev_tools/local_nginx/README.md) for details.
+- **Apache**: Ensure the `LimitRequestBody` directive is set high enough (default 10 MB should be sufficient).
+- **Other web servers**: Verify that large POST body handling is configured appropriately for your setup.
+
+If you encounter HTTP 413 (Payload Too Large) or 500 errors when importing study configurations, the root cause is typically insufficient request body handling configuration in your web server.
+
+
 ### 3. Study Configuration
 
 Studies are defined in `backend/studies_config.json`. Each entry specifies the study name, supported languages, the days to cover, participant handling (open or invite-only via `allow_unlisted_participants`), and references to one or more activity list files (`backend/activities_*.json`). When the backend starts it registers any new studies listed in this file; existing studies are left unchanged.

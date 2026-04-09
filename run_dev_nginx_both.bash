@@ -38,6 +38,7 @@ if [ ! -f "$NGINX_CONF_FILE" ]; then
 fi
 
 FULL_NGINX_CONF_PATH="$(pwd)/$NGINX_CONF_FILE" # nginx requires an absolute path to the configuration file, or changing its config dir.
+mkdir -p "$HOME/nginx-client-body-temp" || { echo -e "ERROR: Failed to create nginx client body temp directory"; exit 1; }
 
 # Copy frontend config file
 cp "$CURRENT_DIR/dev_tools/local_nginx/frontend_settings/tud_settings.dev-nginx.js" "$CURRENT_DIR/frontend/src/settings/tud_settings.js" || { echo -e "ERROR: Failed to copy frontend config file"; exit 1; }

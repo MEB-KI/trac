@@ -190,7 +190,7 @@ def test_load_studies_config_rejects_supported_language_without_activity_file(tm
     config_file = tmp_path / "studies_config.json"
     config_file.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="supported_languages contains languages without activities_json_files entry"):
+    with pytest.raises(ValueError, match="supported_languages contains languages without activities configuration"):
         load_studies_config(str(config_file))
 
 
@@ -210,3 +210,36 @@ def test_load_studies_config_ignores_unsupported_language_file_for_code_consiste
 
     config = load_studies_config(str(config_file))
     assert len(config.studies) == 1
+
+
+def test_load_studies_config_accepts_embedded_activities_json_data(tmp_path):
+    payload = _valid_studies_payload()
+    payload["studies"][0].pop("activities_json_files", None)
+    payload["studies"][0]["supported_languages"] = ["en", "sv"]
+    payload["studies"][0]["activities_json_data"] = {
+        "en": _minimal_activities_payload([100, 200]),
+        "sv": _minimal_activities_payload([100, 200]),
+    }
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    config = load_studies_config(str(config_file))
+    study = config.studies[0]
+    assert study.get_supported_languages() == ["en", "sv"]
+    assert set(study.get_supported_activities_json_data().keys()) == {"en", "sv"}
+    assert study.get_supported_activities_json_files() == {}
+
+
+def test_load_studies_config_rejects_mismatching_codes_for_mixed_file_and_embedded_data(tmp_path):
+    _write_default_multilingual_activities(tmp_path, codes_en=[100, 200], codes_sv=[100, 200])
+    payload = _valid_studies_payload()
+    payload["studies"][0]["activities_json_data"] = {
+        "sv": _minimal_activities_payload([100, 999]),
+    }
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="inconsistent activity code sets"):
+        load_studies_config(str(config_file))

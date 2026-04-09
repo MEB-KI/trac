@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from functools import lru_cache
 import logging
-from .activities_config import load_activities_config, get_activity_codes_set
+from .activities_config import ActivitiesConfig, load_activities_config, get_activity_codes_set
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ class CfgFileStudy(BaseModel):
     supported_languages: Optional[List[str]] = None
     activities_json_file: Optional[Union[str, Dict[str, str]]] = None
     activities_json_files: Optional[Dict[str, str]] = None
+    activities_json_data: Optional[Dict[str, Dict[str, Any]]] = None
     study_text_intro: Optional[Dict[str, str]] = None
     study_text_end_completed: Optional[Dict[str, str]] = None
     study_text_end_skipped: Optional[Dict[str, str]] = None
@@ -65,6 +66,11 @@ class CfgFileStudy(BaseModel):
 
         return {}
 
+    def get_activities_json_data(self) -> Dict[str, Dict[str, Any]]:
+        if isinstance(self.activities_json_data, dict) and self.activities_json_data:
+            return self.activities_json_data
+        return {}
+
     def get_supported_languages(self) -> List[str]:
         if self.supported_languages:
             deduplicated_languages: List[str] = []
@@ -72,7 +78,8 @@ class CfgFileStudy(BaseModel):
                 if language not in deduplicated_languages:
                     deduplicated_languages.append(language)
             return deduplicated_languages
-        return sorted(self.get_activities_json_files().keys())
+        available_languages = set(self.get_activities_json_files().keys()) | set(self.get_activities_json_data().keys())
+        return sorted(available_languages)
 
     def get_supported_activities_json_files(self) -> Dict[str, str]:
         files_by_lang = self.get_activities_json_files()
@@ -81,6 +88,15 @@ class CfgFileStudy(BaseModel):
             language: files_by_lang[language]
             for language in supported_languages
             if language in files_by_lang
+        }
+
+    def get_supported_activities_json_data(self) -> Dict[str, Dict[str, Any]]:
+        data_by_lang = self.get_activities_json_data()
+        supported_languages = self.get_supported_languages()
+        return {
+            language: data_by_lang[language]
+            for language in supported_languages
+            if language in data_by_lang
         }
 
     def get_activities_json_file_for_language(self, language: Optional[str] = None) -> Optional[str]:
@@ -162,8 +178,9 @@ class CfgFileStudy(BaseModel):
     @model_validator(mode='after')
     def validate_multilingual_activity_and_daylabel_config(self) -> 'CfgFileStudy':
         files_by_lang = self.get_activities_json_files()
-        if not files_by_lang:
-            raise ValueError('One of activities_json_files or activities_json_file must be configured and non-empty')
+        data_by_lang = self.get_activities_json_data()
+        if not files_by_lang and not data_by_lang:
+            raise ValueError('One of activities_json_files / activities_json_file or activities_json_data must be configured and non-empty')
 
         for language, file_path in files_by_lang.items():
             if not isinstance(language, str) or not re.match(r'^[a-z]{2}$', language):
@@ -174,10 +191,21 @@ class CfgFileStudy(BaseModel):
             if not isinstance(file_path, str) or file_path.strip() == "":
                 raise ValueError(f'activities_json file for language "{language}" must be a non-empty string')
 
-        if self.default_language not in files_by_lang:
+        for language, json_payload in data_by_lang.items():
+            if not isinstance(language, str) or not re.match(r'^[a-z]{2}$', language):
+                raise ValueError(
+                    f'activities data language key "{language}" is invalid. '
+                    f'Must be a 2-letter lowercase ASCII string (a-z).'
+                )
+            if not isinstance(json_payload, dict) or not json_payload:
+                raise ValueError(f'activities_json_data for language "{language}" must be a non-empty object')
+
+        available_activity_languages = set(files_by_lang.keys()) | set(data_by_lang.keys())
+
+        if self.default_language not in available_activity_languages:
             raise ValueError(
-                f'default_language "{self.default_language}" must be present in activities_json_files keys: '
-                f'{sorted(files_by_lang.keys())}'
+                f'default_language "{self.default_language}" must be present in activities configuration languages: '
+                f'{sorted(available_activity_languages)}'
             )
 
         if self.supported_languages is not None:
@@ -200,11 +228,11 @@ class CfgFileStudy(BaseModel):
                     f'{self.supported_languages}'
                 )
 
-            missing_activity_files = sorted(set(self.supported_languages) - set(files_by_lang.keys()))
-            if missing_activity_files:
+            missing_activity_configs = sorted(set(self.supported_languages) - available_activity_languages)
+            if missing_activity_configs:
                 raise ValueError(
-                    f'supported_languages contains languages without activities_json_files entry: '
-                    f'{missing_activity_files}'
+                    f'supported_languages contains languages without activities configuration (file or embedded data): '
+                    f'{missing_activity_configs}'
                 )
 
         required_languages = set(self.get_supported_languages())
@@ -268,14 +296,24 @@ def _resolve_activities_path(raw_path: str, base_dir: Path) -> Path:
 def _validate_multilingual_activity_code_sets(cfg_studies: CfgFileStudies, config_dir: Path) -> None:
     for study in cfg_studies.studies:
         files_by_lang = study.get_supported_activities_json_files()
-        if len(files_by_lang) <= 1:
+        data_by_lang = study.get_supported_activities_json_data()
+        supported_languages = study.get_supported_languages()
+        if len(supported_languages) <= 1:
             continue
 
         codes_by_lang: Dict[str, set[int]] = {}
 
-        for language, activity_file in sorted(files_by_lang.items()):
-            resolved_path = _resolve_activities_path(activity_file, config_dir)
-            activities_cfg = load_activities_config(str(resolved_path))
+        for language in sorted(supported_languages):
+            if language in data_by_lang:
+                activities_cfg = ActivitiesConfig(**data_by_lang[language])
+            elif language in files_by_lang:
+                activity_file = files_by_lang[language]
+                resolved_path = _resolve_activities_path(activity_file, config_dir)
+                activities_cfg = load_activities_config(str(resolved_path))
+            else:
+                raise ValueError(
+                    f"Study '{study.name_short}' has supported language '{language}' without activities configuration"
+                )
             codes_by_lang[language] = get_activity_codes_set(activities_cfg)
 
         reference_language = study.default_language if study.default_language in codes_by_lang else sorted(codes_by_lang.keys())[0]

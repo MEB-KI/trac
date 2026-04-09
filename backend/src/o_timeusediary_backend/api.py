@@ -300,20 +300,6 @@ async def redirect_to_docs(request: Request):
     return RedirectResponse(url=redirect_url)
 
 
-# @app.get("/api/debug/routes")
-# def debug_routes():
-#     routes = []
-#     for route in app.routes:
-#         if hasattr(route, "path") and "/api/studies" in route.path:
-#             routes.append({
-#                 "path": route.path,
-#                 "methods": getattr(route, "methods", []),
-#                 "name": getattr(route, "name", "")
-#             })
-#     return {"routes": routes}
-
-
-
 
 @app.get("/api/studies/{study_name_short}/activities-config")
 def get_study_activities_config(
@@ -1644,26 +1630,6 @@ async def export_runtime_studies_config(
             study_text_end_completed = None
             study_text_end_skipped = None
 
-        exported_studies.append(
-            {
-                "name": study.name,
-                "name_short": study.name_short,
-                "description": study.description,
-                "day_labels": day_labels_export,
-                "study_participant_ids": participant_ids,
-                "allow_unlisted_participants": study.allow_unlisted_participants,
-                "default_language": study.default_language,
-                "supported_languages": supported_languages,
-                "activities_json_files": activities_json_files,
-                "study_text_intro": study_text_intro,
-                "study_text_end_completed": study_text_end_completed,
-                "study_text_end_skipped": study_text_end_skipped,
-                "data_collection_start": study.data_collection_start,
-                "data_collection_end": study.data_collection_end,
-                "activities_logged_by_userid": logged_activities,
-            }
-        )
-
         activity_configs_for_study: Dict = {}
         for lang, activity_file_path in activities_json_files.items():
             if lang in blob_by_lang:
@@ -1678,6 +1644,27 @@ async def export_runtime_studies_config(
                 }
 
         activities_by_study[study.name_short] = activity_configs_for_study
+
+        exported_studies.append(
+            {
+                "name": study.name,
+                "name_short": study.name_short,
+                "description": study.description,
+                "day_labels": day_labels_export,
+                "study_participant_ids": participant_ids,
+                "allow_unlisted_participants": study.allow_unlisted_participants,
+                "default_language": study.default_language,
+                "supported_languages": supported_languages,
+                "activities_json_files": activities_json_files,
+                "activities_json_data": activity_configs_for_study,
+                "study_text_intro": study_text_intro,
+                "study_text_end_completed": study_text_end_completed,
+                "study_text_end_skipped": study_text_end_skipped,
+                "data_collection_start": study.data_collection_start,
+                "data_collection_end": study.data_collection_end,
+                "activities_logged_by_userid": logged_activities,
+            }
+        )
 
     logger.info(
         "Admin '%s' exported runtime studies config%s",

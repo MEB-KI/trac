@@ -69,11 +69,36 @@ def _upsert_study_activity_blob(session: Session, study_id: int, language: str, 
 
 
 def _ensure_activity_blobs_from_config(session: Session, study: Study, study_config) -> None:
-    """Ensure language-specific activity config blobs are present for a study from config file references."""
+    """Ensure language-specific activity config blobs are present for a study from config references or embedded payload."""
+    activities_data_by_lang = study_config.get_supported_activities_json_data()
     files_by_lang = study_config.get_supported_activities_json_files()
-    for language, activity_file in files_by_lang.items():
-        activities_json_data = _load_json_dict_from_path(activity_file)
+
+    for language in study_config.get_supported_languages():
+        activities_json_data = activities_data_by_lang.get(language)
+        if activities_json_data is None:
+            activity_file = files_by_lang.get(language)
+            if not activity_file:
+                continue
+            activities_json_data = _load_json_dict_from_path(activity_file)
         _upsert_study_activity_blob(session, study.id, language, activities_json_data)
+
+
+def _load_activities_configs_by_language(study_config) -> dict[str, ActivitiesConfig]:
+    activities_cfg_by_language: dict[str, ActivitiesConfig] = {}
+    activities_data_by_lang = study_config.get_supported_activities_json_data()
+    files_by_lang = study_config.get_supported_activities_json_files()
+
+    for language in study_config.get_supported_languages():
+        activities_json_data = activities_data_by_lang.get(language)
+        if activities_json_data is None:
+            activity_file = files_by_lang.get(language)
+            if not activity_file:
+                continue
+            activities_json_data = _load_json_dict_from_path(activity_file)
+
+        activities_cfg_by_language[language] = ActivitiesConfig(**activities_json_data)
+
+    return activities_cfg_by_language
 
 
 def _ensure_available_catalog_from_activities_configs(
@@ -312,11 +337,7 @@ def create_config_file_studies_in_database(config_path: str):
                 if existing_study:
                     _ensure_activity_blobs_from_config(session, existing_study, study_config)
 
-                    supported_files = study_config.get_supported_activities_json_files()
-                    activities_cfg_by_language: dict[str, ActivitiesConfig] = {}
-                    for language, activity_file in supported_files.items():
-                        resolved_path = _resolve_relative_to_studies_config(activity_file)
-                        activities_cfg_by_language[language] = load_activities_config(str(resolved_path))
+                    activities_cfg_by_language = _load_activities_configs_by_language(study_config)
 
                     if study_config.default_language in activities_cfg_by_language:
                         _ensure_available_catalog_from_activities_configs(
@@ -331,26 +352,27 @@ def create_config_file_studies_in_database(config_path: str):
                     continue  # Skip to next study
 
                 # Create study
-                default_activities_file = study_config.get_activities_json_file_for_language(
-                    study_config.default_language)
-                if not default_activities_file:
+                activities_cfg_by_language = _load_activities_configs_by_language(study_config)
+
+                if study_config.default_language not in activities_cfg_by_language:
                     raise ValueError(
-                        f"No activities JSON file configured for study '{study_config.name_short}' "
+                        f"No activities configuration found for study '{study_config.name_short}' "
                         f"and default language '{study_config.default_language}'"
                     )
 
-                activities_config: ActivitiesConfig = load_activities_config(
-                    default_activities_file)
-
-                supported_files = study_config.get_supported_activities_json_files()
-                activities_cfg_by_language: dict[str, ActivitiesConfig] = {}
-                for language, activity_file in supported_files.items():
-                    resolved_path = _resolve_relative_to_studies_config(activity_file)
-                    activities_cfg_by_language[language] = load_activities_config(str(resolved_path))
+                activities_config: ActivitiesConfig = activities_cfg_by_language[study_config.default_language]
                 valid_activity_codes = get_activity_codes_set(
                     activities_config)
                 activity_info_by_code = get_all_activity_codes(
                     activities_config)
+
+                default_activities_file = study_config.get_activities_json_file_for_language(
+                    study_config.default_language)
+                default_activities_url = (
+                    default_activities_file
+                    if default_activities_file
+                    else f"db_blob://{study_config.name_short}/{study_config.default_language}"
+                )
 
                 activities_logged_by_userid = study_config.get_logged_activities_by_participant()
                 allowed_day_labels = {
@@ -412,7 +434,7 @@ def create_config_file_studies_in_database(config_path: str):
                     raise ValueError(
                         "Invalid studies_config JSON for study "
                         f"'{study_config.name_short}': activity codes in activities_logged_by_userid are missing in the study default-language activities file "
-                        f"('{default_activities_file}'). Invalid entries: {invalid_codes[:10]}"
+                        f"(default language '{study_config.default_language}'). Invalid entries: {invalid_codes[:10]}"
                     )
 
                 study = Study(
@@ -421,7 +443,7 @@ def create_config_file_studies_in_database(config_path: str):
                     description=study_config.description,
                     allow_unlisted_participants=study_config.allow_unlisted_participants,
                     default_language=study_config.default_language,
-                    activities_json_url=default_activities_file,
+                    activities_json_url=default_activities_url,
                     data_collection_start=study_config.data_collection_start,
                     data_collection_end=study_config.data_collection_end
                 )
