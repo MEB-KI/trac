@@ -1,7 +1,11 @@
+import os
 import json
 from pathlib import Path
 
 import pytest
+
+os.environ.setdefault("TUD_DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
 
 from o_timeusediary_backend.api import ImportStudiesConfigStudy, _validate_import_study_payload
 from o_timeusediary_backend.settings import settings
