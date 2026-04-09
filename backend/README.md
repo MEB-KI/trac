@@ -1,5 +1,5 @@
 # o-timeusediary
-The FastAPI frontend and backend for the custom o-timeusediary (TUD) fork of MPIAE.
+The FastAPI backend for the custom o-timeusediary (TUD) fork of MPIAE.
 
 [![Backend Unit Tests](https://github.com/dfsp-spirit/trac/actions/workflows/backend_unit_tests.yml/badge.svg)](https://github.com/dfsp-spirit/trac/actions/workflows/backend_unit_tests.yml)
 
