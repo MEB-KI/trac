@@ -61,10 +61,10 @@ keywords:
   - "data-collection"
   - "software-tool"
 
-## Optional: Digital Object Identifier (if you have one from Zenodo)
-#identifiers:
-#  - type: doi
-#    value: 10.5281/zenodo.1234
+## Optional: Digital Object Identifier
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.19594929
 
 # References to software/libraries used by your tool
 references:
