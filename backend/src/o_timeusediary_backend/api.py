@@ -25,9 +25,10 @@ from .parsers.activities_config import (
 )
 from .parsers.studies_config import get_cfg_study_by_name_short
 import secrets
-from .logging_config import setup_logging
+from .logging_config import setup_logging, get_admin_audit_logger
 setup_logging()
 logger = logging.getLogger(__name__)
+admin_audit_logger = get_admin_audit_logger()
 
 from .settings import settings
 from .models import Activity, Study, Timeline, DayLabel, StudyParticipant, Participant, StudyActivityConfigBlob
@@ -59,6 +60,11 @@ from typing import List, Optional, Union
 from .utils import utc_now, get_time_for_minutes_from_midnight
 
 security = HTTPBasic()
+
+
+def audit_admin_action(admin_username: str, action_text: str) -> None:
+    """Write a high-level admin action entry to the dedicated audit log."""
+    admin_audit_logger.info("Admin '%s' %s", admin_username, action_text)
 
 
 def _normalize_language_code(language: Optional[str]) -> Optional[str]:
@@ -747,6 +753,7 @@ async def admin_overview(
     """
 
     logger.info(f"Admin '{current_admin}' accessed the admin overview page.")
+    audit_admin_action(current_admin, "opened admin overview page")
 
     # Get all studies with their relationships
     studies = session.exec(
@@ -1373,6 +1380,8 @@ async def get_available_activities_summary(
     if not study:
         raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
 
+    audit_admin_action(current_admin, f"requested available activities summary for study '{study_name_short}'")
+
     timeline_count = session.exec(
         select(func.count(StudyAvailableTimeline.id)).where(StudyAvailableTimeline.study_id == study.id)
     ).first() or 0
@@ -1546,6 +1555,13 @@ async def import_studies_config(
         dry_run,
         payload.transaction_mode,
     )
+    audit_admin_action(
+        current_admin,
+        (
+            f"imported studies config (received={summary['received']}, created={summary['created']}, "
+            f"failed={summary['failed']}, dry_run={dry_run}, transaction_mode={payload.transaction_mode})"
+        ),
+    )
 
     return {
         "dry_run": dry_run,
@@ -1605,6 +1621,14 @@ async def update_study_collection_window(
         study.data_collection_start.isoformat(),
         previous_end.isoformat(),
         study.data_collection_end.isoformat(),
+    )
+    audit_admin_action(
+        current_admin,
+        (
+            f"updated collection window for study '{study_name_short}' "
+            f"(start {previous_start.isoformat()} -> {study.data_collection_start.isoformat()}, "
+            f"end {previous_end.isoformat()} -> {study.data_collection_end.isoformat()})"
+        ),
     )
 
     return {
@@ -1788,6 +1812,10 @@ async def export_runtime_studies_config(
         current_admin,
         f" for study '{study_name}'" if study_name else " for all studies",
     )
+    if study_name:
+        audit_admin_action(current_admin, f"exported runtime studies config for study '{study_name}'")
+    else:
+        audit_admin_action(current_admin, "exported runtime studies config for all studies")
 
     response_payload = {
         "studies_config": {
@@ -1827,6 +1855,10 @@ async def admin_participant_management(
     @returns HTML page with study selector and participant management controls.
     """
     logger.info(f"Admin '{current_admin}' accessed participant management page for study '{study_name_short}'.")
+    if study_name_short:
+        audit_admin_action(current_admin, f"opened participant management page for study '{study_name_short}'")
+    else:
+        audit_admin_action(current_admin, "opened participant management page")
 
     studies = session.exec(select(Study).order_by(Study.name_short)).all()
     studies_for_dropdown = []
@@ -1903,6 +1935,7 @@ async def admin_tools(
     installed from a wheel (Starlette/Jinja template cache bug).
     """
     logger.info("Admin '%s' accessed the admin tools page.", current_admin)
+    audit_admin_action(current_admin, "opened admin tools page")
 
     context_dict = {
         "request": request,
@@ -2001,6 +2034,15 @@ async def assign_participants_to_study(
         f"Admin '{current_admin}' assigned participants to study '{study_name_short}'. "
         f"Summary: {summary}, total_after_assignment={total_after_assignment}"
     )
+    assigned_count = summary["created_and_assigned"] + summary["already_existed_and_assigned"]
+    audit_admin_action(
+        current_admin,
+        (
+            f"assigned participants to study '{study_name_short}' "
+            f"(new_assignments={assigned_count}, already_assigned={summary['already_assigned']}, "
+            f"total_after_assignment={total_after_assignment})"
+        ),
+    )
 
     return {
         "study_name_short": study_name_short,
@@ -2049,6 +2091,7 @@ async def remove_participant_from_study(
     logger.info(
         f"Admin '{current_admin}' removed participant '{participant_id}' from study '{study_name_short}'."
     )
+    audit_admin_action(current_admin, f"removed participant '{participant_id}' from study '{study_name_short}'")
 
     return {
         "message": "Participant removed from study",
@@ -2189,6 +2232,14 @@ async def export_study_activities(
     # Generate filename with timestamp
     timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
     filename = f"{study_name_short}_activities_{timestamp}"
+
+    audit_admin_action(
+        current_admin,
+        (
+            f"downloaded activities export for study '{study_name_short}' "
+            f"(format={format.lower()}, records={len(export_data)}, include_metadata={include_metadata}, include_path={include_path})"
+        ),
+    )
 
     if format.lower() == "json":
         return export_json(export_data, filename)

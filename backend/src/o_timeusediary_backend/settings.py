@@ -109,6 +109,23 @@ class TUDBackendSettings:
             )
         return list(zip(usernames, passwords))
 
+    @property
+    def admin_audit_log_file(self) -> str:
+        """Path to persistent admin action audit log file."""
+        return os.getenv("TUD_ADMIN_AUDIT_LOG_FILE", "admin_actions.log")
+
+    @property
+    def admin_audit_log_max_bytes(self) -> int:
+        """Maximum size (bytes) before rotating audit log file."""
+        value = os.getenv("TUD_ADMIN_AUDIT_LOG_MAX_BYTES", str(5 * 1024 * 1024))
+        return int(value)
+
+    @property
+    def admin_audit_log_backup_count(self) -> int:
+        """Number of rotated audit log backups to keep."""
+        value = os.getenv("TUD_ADMIN_AUDIT_LOG_BACKUP_COUNT", "10")
+        return int(value)
+
 
 settings = TUDBackendSettings()
 
