@@ -22,9 +22,7 @@ def _example_activities_payload() -> dict:
                             {
                                 "name": "Sleep",
                                 "code": 100,
-                                "childItems": [
-                                    {"name": "Nap", "code": 101}
-                                ],
+                                "childItems": [{"name": "Nap", "code": 101}],
                             },
                             {"name": "Work", "code": 200},
                         ],

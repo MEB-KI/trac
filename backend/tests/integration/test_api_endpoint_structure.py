@@ -12,8 +12,12 @@ BASE_SCHEME = os.getenv("TUD_BASE_SCHEME", "http://localhost:3000")
 BASE_URL = f"{BASE_SCHEME}/" + settings.rootpath.strip("/")
 
 
-async def _get_first_activity_selection(client: httpx.AsyncClient, study_name_short: str) -> dict:
-    activities_response = await client.get(f"{BASE_URL}/api/studies/{study_name_short}/activities-config")
+async def _get_first_activity_selection(
+    client: httpx.AsyncClient, study_name_short: str
+) -> dict:
+    activities_response = await client.get(
+        f"{BASE_URL}/api/studies/{study_name_short}/activities-config"
+    )
     assert activities_response.status_code == 200
     activities_data = activities_response.json()
     assert "timeline" in activities_data
@@ -39,7 +43,9 @@ async def prepared_submission_context():
     async with httpx.AsyncClient() as client:
         study_name_short = "default"
 
-        study_cfg_response = await client.get(f"{BASE_URL}/api/studies/{study_name_short}/study-config")
+        study_cfg_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config"
+        )
         assert study_cfg_response.status_code == 200
         study_cfg = study_cfg_response.json()
         assert "day_labels" in study_cfg
@@ -93,11 +99,15 @@ async def test_public_endpoints_are_available_with_expected_structure():
         for key in ["status", "all_studies_count", "open_studies_count", "tud_version"]:
             assert key in health_data
 
-        docs_redirect_response = await client.get(f"{BASE_URL}/api/docs", follow_redirects=False)
+        docs_redirect_response = await client.get(
+            f"{BASE_URL}/api/docs", follow_redirects=False
+        )
         assert docs_redirect_response.status_code in {302, 307}
         assert "location" in docs_redirect_response.headers
 
-        open_studies_response = await client.get(f"{BASE_URL}/api/active_open_study_names")
+        open_studies_response = await client.get(
+            f"{BASE_URL}/api/active_open_study_names"
+        )
         assert open_studies_response.status_code == 200
         open_studies_data = open_studies_response.json()
         assert isinstance(open_studies_data, list)
@@ -109,13 +119,17 @@ async def test_public_endpoints_are_available_with_expected_structure():
 
 
 @pytest.mark.asyncio
-async def test_study_and_participant_endpoints_are_available_with_expected_structure(prepared_submission_context):
+async def test_study_and_participant_endpoints_are_available_with_expected_structure(
+    prepared_submission_context,
+):
     study_name_short = prepared_submission_context["study_name_short"]
     participant_id = prepared_submission_context["participant_id"]
     day_label_name = prepared_submission_context["day_label_name"]
 
     async with httpx.AsyncClient() as client:
-        study_cfg_response = await client.get(f"{BASE_URL}/api/studies/{study_name_short}/study-config")
+        study_cfg_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config"
+        )
         assert study_cfg_response.status_code == 200
         study_cfg = study_cfg_response.json()
         for key in [
@@ -134,7 +148,11 @@ async def test_study_and_participant_endpoints_are_available_with_expected_struc
         assert isinstance(study_cfg["supported_languages"], list)
         assert study_cfg["default_language"] in study_cfg["supported_languages"]
 
-        selected_lang = "sv" if "sv" in study_cfg["supported_languages"] else study_cfg["default_language"]
+        selected_lang = (
+            "sv"
+            if "sv" in study_cfg["supported_languages"]
+            else study_cfg["default_language"]
+        )
         study_cfg_lang_response = await client.get(
             f"{BASE_URL}/api/studies/{study_name_short}/study-config",
             params={"lang": selected_lang},
@@ -143,7 +161,9 @@ async def test_study_and_participant_endpoints_are_available_with_expected_struc
         study_cfg_lang = study_cfg_lang_response.json()
         assert study_cfg_lang["selected_language"] == selected_lang
 
-        activities_cfg_response = await client.get(f"{BASE_URL}/api/studies/{study_name_short}/activities-config")
+        activities_cfg_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/activities-config"
+        )
         assert activities_cfg_response.status_code == 200
         activities_cfg = activities_cfg_response.json()
         for key in ["general", "timeline"]:
@@ -174,7 +194,9 @@ async def test_study_and_participant_endpoints_are_available_with_expected_struc
 
 
 @pytest.mark.asyncio
-async def test_admin_endpoints_are_available_with_auth_and_expected_structure(prepared_submission_context):
+async def test_admin_endpoints_are_available_with_auth_and_expected_structure(
+    prepared_submission_context,
+):
     study_name_short = prepared_submission_context["study_name_short"]
 
     async with httpx.AsyncClient() as client:
@@ -187,7 +209,10 @@ async def test_admin_endpoints_are_available_with_auth_and_expected_structure(pr
         )
         assert admin_response.status_code == 200
         assert "text/html" in admin_response.headers.get("Content-Type", "")
-        assert f"{settings.rootpath.rstrip('/')}/api/admin/export/studies-runtime-config" in admin_response.text
+        assert (
+            f"{settings.rootpath.rstrip('/')}/api/admin/export/studies-runtime-config"
+            in admin_response.text
+        )
 
         export_response = await client.get(
             f"{BASE_URL}/api/admin/export/{study_name_short}/activities",
@@ -212,14 +237,25 @@ async def test_admin_endpoints_are_available_with_auth_and_expected_structure(pr
         assert len(runtime_config_export_data["studies_config"]["studies"]) == 1
 
         exported_study = runtime_config_export_data["studies_config"]["studies"][0]
-        for key in ["name", "name_short", "supported_languages", "activities_logged_by_userid", "study_participant_ids", "activities_json_data"]:
+        for key in [
+            "name",
+            "name_short",
+            "supported_languages",
+            "activities_logged_by_userid",
+            "study_participant_ids",
+            "activities_json_data",
+        ]:
             assert key in exported_study
 
         assert isinstance(exported_study["supported_languages"], list)
-        assert exported_study["default_language"] in exported_study["supported_languages"]
+        assert (
+            exported_study["default_language"] in exported_study["supported_languages"]
+        )
 
         assert "activities_logged_by_userid" in exported_study
         assert isinstance(exported_study["activities_json_data"], dict)
-        assert exported_study["default_language"] in exported_study["activities_json_data"]
+        assert (
+            exported_study["default_language"] in exported_study["activities_json_data"]
+        )
 
         assert study_name_short in runtime_config_export_data["activities"]

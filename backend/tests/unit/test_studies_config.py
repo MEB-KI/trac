@@ -13,14 +13,18 @@ def _valid_studies_payload() -> dict:
                 "name_short": "demo_study",
                 "description": "Short description",
                 "day_labels": [
-                    {"name": "day1", "display_order": 1, "display_names": {"en": "Day 1", "sv": "Day 1"}}
+                    {
+                        "name": "day1",
+                        "display_order": 1,
+                        "display_names": {"en": "Day 1", "sv": "Day 1"},
+                    }
                 ],
                 "study_participant_ids": ["p1"],
                 "allow_unlisted_participants": False,
                 "default_language": "en",
                 "activities_json_files": {
                     "en": "activities_default.json",
-                    "sv": "activities_default.sv.json"
+                    "sv": "activities_default.sv.json",
                 },
                 "data_collection_start": "2024-01-01T00:00:00Z",
                 "data_collection_end": "2024-01-07T00:00:00Z",
@@ -49,7 +53,9 @@ def _minimal_activities_payload(codes: list[int]) -> dict:
     }
 
 
-def _write_default_multilingual_activities(tmp_path, codes_en: list[int] | None = None, codes_sv: list[int] | None = None):
+def _write_default_multilingual_activities(
+    tmp_path, codes_en: list[int] | None = None, codes_sv: list[int] | None = None
+):
     en_codes = codes_en or [100, 200, 300]
     sv_codes = codes_sv or en_codes
 
@@ -88,7 +94,9 @@ def test_load_studies_config_rejects_invalid_name_short(tmp_path):
         load_studies_config(str(config_file))
 
 
-def test_load_studies_config_rejects_missing_daylabel_translation_for_existing_activity_language(tmp_path):
+def test_load_studies_config_rejects_missing_daylabel_translation_for_existing_activity_language(
+    tmp_path,
+):
     _write_default_multilingual_activities(tmp_path)
     payload = _valid_studies_payload()
     payload["studies"][0]["day_labels"][0]["display_names"] = {"en": "Day 1"}
@@ -100,8 +108,12 @@ def test_load_studies_config_rejects_missing_daylabel_translation_for_existing_a
         load_studies_config(str(config_file))
 
 
-def test_load_studies_config_rejects_mismatching_activity_code_sets_across_languages(tmp_path):
-    _write_default_multilingual_activities(tmp_path, codes_en=[100, 200], codes_sv=[100, 300])
+def test_load_studies_config_rejects_mismatching_activity_code_sets_across_languages(
+    tmp_path,
+):
+    _write_default_multilingual_activities(
+        tmp_path, codes_en=[100, 200], codes_sv=[100, 300]
+    )
     config_file = tmp_path / "studies_config.json"
     config_file.write_text(json.dumps(_valid_studies_payload()), encoding="utf-8")
 
@@ -109,8 +121,12 @@ def test_load_studies_config_rejects_mismatching_activity_code_sets_across_langu
         load_studies_config(str(config_file))
 
 
-def test_load_studies_config_accepts_matching_activity_code_sets_across_languages(tmp_path):
-    _write_default_multilingual_activities(tmp_path, codes_en=[100, 200, 300], codes_sv=[100, 200, 300])
+def test_load_studies_config_accepts_matching_activity_code_sets_across_languages(
+    tmp_path,
+):
+    _write_default_multilingual_activities(
+        tmp_path, codes_en=[100, 200, 300], codes_sv=[100, 200, 300]
+    )
     config_file = tmp_path / "studies_config.json"
     config_file.write_text(json.dumps(_valid_studies_payload()), encoding="utf-8")
 
@@ -118,14 +134,18 @@ def test_load_studies_config_accepts_matching_activity_code_sets_across_language
     assert len(config.studies) == 1
 
 
-def test_load_studies_config_warns_for_extra_text_language_without_activities_file(tmp_path, caplog):
+def test_load_studies_config_warns_for_extra_text_language_without_activities_file(
+    tmp_path, caplog
+):
     _write_default_multilingual_activities(tmp_path)
     payload = _valid_studies_payload()
     payload["studies"][0]["study_text_intro"] = {
         "en": "English intro",
         "sv": "Swedish intro",
     }
-    payload["studies"][0]["study_text_intro"]["de"] = "Zusätzlicher Text ohne Activities-Datei"
+    payload["studies"][0]["study_text_intro"]["de"] = (
+        "Zusätzlicher Text ohne Activities-Datei"
+    )
 
     config_file = tmp_path / "studies_config.json"
     config_file.write_text(json.dumps(payload), encoding="utf-8")
@@ -136,7 +156,9 @@ def test_load_studies_config_warns_for_extra_text_language_without_activities_fi
     assert "extra language 'de'" in caplog.text
 
 
-def test_load_studies_config_warns_for_extra_daylabel_language_without_activities_file(tmp_path, caplog):
+def test_load_studies_config_warns_for_extra_daylabel_language_without_activities_file(
+    tmp_path, caplog
+):
     _write_default_multilingual_activities(tmp_path)
     payload = _valid_studies_payload()
     payload["studies"][0]["day_labels"][0]["display_names"]["de"] = "Tag 1"
@@ -167,7 +189,9 @@ def test_load_studies_config_uses_explicit_supported_languages_subset(tmp_path):
     }
 
 
-def test_load_studies_config_rejects_supported_languages_missing_text_translation(tmp_path):
+def test_load_studies_config_rejects_supported_languages_missing_text_translation(
+    tmp_path,
+):
     _write_default_multilingual_activities(tmp_path)
     payload = _valid_studies_payload()
     payload["studies"][0]["supported_languages"] = ["en", "sv"]
@@ -178,7 +202,10 @@ def test_load_studies_config_rejects_supported_languages_missing_text_translatio
     config_file = tmp_path / "studies_config.json"
     config_file.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="study_text_intro is missing translations for supported_languages"):
+    with pytest.raises(
+        ValueError,
+        match="study_text_intro is missing translations for supported_languages",
+    ):
         load_studies_config(str(config_file))
 
 
@@ -190,12 +217,19 @@ def test_load_studies_config_rejects_supported_language_without_activity_file(tm
     config_file = tmp_path / "studies_config.json"
     config_file.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="supported_languages contains languages without activities configuration"):
+    with pytest.raises(
+        ValueError,
+        match="supported_languages contains languages without activities configuration",
+    ):
         load_studies_config(str(config_file))
 
 
-def test_load_studies_config_ignores_unsupported_language_file_for_code_consistency(tmp_path):
-    _write_default_multilingual_activities(tmp_path, codes_en=[100, 200], codes_sv=[100, 200])
+def test_load_studies_config_ignores_unsupported_language_file_for_code_consistency(
+    tmp_path,
+):
+    _write_default_multilingual_activities(
+        tmp_path, codes_en=[100, 200], codes_sv=[100, 200]
+    )
     (tmp_path / "activities_default.de.json").write_text(
         json.dumps(_minimal_activities_payload([999])),
         encoding="utf-8",
@@ -231,8 +265,12 @@ def test_load_studies_config_accepts_embedded_activities_json_data(tmp_path):
     assert study.get_supported_activities_json_files() == {}
 
 
-def test_load_studies_config_rejects_mismatching_codes_for_mixed_file_and_embedded_data(tmp_path):
-    _write_default_multilingual_activities(tmp_path, codes_en=[100, 200], codes_sv=[100, 200])
+def test_load_studies_config_rejects_mismatching_codes_for_mixed_file_and_embedded_data(
+    tmp_path,
+):
+    _write_default_multilingual_activities(
+        tmp_path, codes_en=[100, 200], codes_sv=[100, 200]
+    )
     payload = _valid_studies_payload()
     payload["studies"][0]["activities_json_data"] = {
         "sv": _minimal_activities_payload([100, 999]),

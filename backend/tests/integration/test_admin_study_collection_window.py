@@ -26,7 +26,9 @@ def _parse_dt(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-async def _create_study_for_window_tests(client: httpx.AsyncClient, study_name_short: str) -> None:
+async def _create_study_for_window_tests(
+    client: httpx.AsyncClient, study_name_short: str
+) -> None:
     activities_payload = _load_activities_template()
     payload = {
         "mode": "create_only",
@@ -98,22 +100,30 @@ async def test_admin_collection_window_update_and_pause_behavior():
         future_window_response = await client.patch(
             f"{BASE_URL}/api/admin/studies/{study_name_short}/collection-window",
             json={
-                "data_collection_start": tomorrow_start.isoformat().replace("+00:00", "Z"),
+                "data_collection_start": tomorrow_start.isoformat().replace(
+                    "+00:00", "Z"
+                ),
                 "data_collection_end": tomorrow_end.isoformat().replace("+00:00", "Z"),
             },
             auth=ADMIN_AUTH,
         )
         assert future_window_response.status_code == 200
         future_window_json = future_window_response.json()
-        updated_start = _parse_dt(future_window_json["updated"]["data_collection_start"]).astimezone(timezone.utc)
-        updated_end = _parse_dt(future_window_json["updated"]["data_collection_end"]).astimezone(timezone.utc)
+        updated_start = _parse_dt(
+            future_window_json["updated"]["data_collection_start"]
+        ).astimezone(timezone.utc)
+        updated_end = _parse_dt(
+            future_window_json["updated"]["data_collection_end"]
+        ).astimezone(timezone.utc)
         assert updated_start == tomorrow_start
         assert updated_end == tomorrow_end
         assert future_window_json["is_currently_collecting"] is False
 
         yesterday = datetime.now(timezone.utc) - timedelta(days=1)
         day_before_yesterday = datetime.now(timezone.utc) - timedelta(days=2)
-        pause_start = day_before_yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        pause_start = day_before_yesterday.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         yesterday_end = yesterday.replace(hour=23, minute=59, second=59, microsecond=0)
 
         paused_response = await client.patch(
@@ -126,8 +136,12 @@ async def test_admin_collection_window_update_and_pause_behavior():
         )
         assert paused_response.status_code == 200
         paused_json = paused_response.json()
-        paused_start = _parse_dt(paused_json["updated"]["data_collection_start"]).astimezone(timezone.utc)
-        paused_end = _parse_dt(paused_json["updated"]["data_collection_end"]).astimezone(timezone.utc)
+        paused_start = _parse_dt(
+            paused_json["updated"]["data_collection_start"]
+        ).astimezone(timezone.utc)
+        paused_end = _parse_dt(
+            paused_json["updated"]["data_collection_end"]
+        ).astimezone(timezone.utc)
         assert paused_start == pause_start
         assert paused_end == yesterday_end
         assert paused_json["is_currently_collecting"] is False

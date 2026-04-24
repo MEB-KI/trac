@@ -1,5 +1,3 @@
-
-import pytest
 from datetime import time
 from o_timeusediary_backend.utils import get_time_for_minutes_from_midnight
 
@@ -95,12 +93,11 @@ class TestGetTimeForMinutesFromMidnight:
     def test_quarter_hour_increments(self):
         """Test various quarter-hour increments."""
         test_cases = [
-            (15, time(0, 15)),   # 15 minutes
-            (30, time(0, 30)),   # 30 minutes
-            (45, time(0, 45)),   # 45 minutes
+            (15, time(0, 15)),  # 15 minutes
+            (30, time(0, 30)),  # 30 minutes
+            (45, time(0, 45)),  # 45 minutes
         ]
 
         for minutes, expected in test_cases:
             result = get_time_for_minutes_from_midnight(minutes)
             assert result == expected, f"Failed for {minutes} minutes"
-

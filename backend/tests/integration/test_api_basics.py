@@ -9,7 +9,9 @@ from o_timeusediary_backend.settings import settings
 # Get the base URL from environment (default to CI Nginx port)
 # In your CI, you will set BASE_URL=http://localhost:3000/tud_backend
 BASE_SCHEME = os.getenv("TUD_BASE_SCHEME", "http://localhost:3000")
-BASE_URL = f"{BASE_SCHEME}/" + settings.rootpath.strip("/")  # Ensure no leading or trailing slash
+BASE_URL = f"{BASE_SCHEME}/" + settings.rootpath.strip(
+    "/"
+)  # Ensure no leading or trailing slash
 
 
 @pytest.mark.asyncio
@@ -20,7 +22,7 @@ async def test_api_is_reachable_through_proxy_with_basepath():
     """
     # Construct the full URL
     url = f"{BASE_URL}/api"
-    #print(f"Trying to reach backend at: {url} (rootpath is set to: '{settings.rootpath}')")
+    # print(f"Trying to reach backend at: {url} (rootpath is set to: '{settings.rootpath}')")
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
@@ -30,7 +32,7 @@ async def test_api_is_reachable_through_proxy_with_basepath():
     data = response.json()
     assert "message" in data
     assert "is running" in data["message"]
-    #print(f"Successfully reached proxy at: {url} (rootpath is set to: '{settings.rootpath}')")
+    # print(f"Successfully reached proxy at: {url} (rootpath is set to: '{settings.rootpath}')")
 
 
 @pytest.mark.asyncio
@@ -44,14 +46,18 @@ async def test_admin_interface_reachable_through_proxy_with_auth():
 
     async with httpx.AsyncClient() as client:
         # Pass the auth tuple: (username, password)
-        response = await client.get(url, auth=(settings.admin_username, settings.admin_password))
+        response = await client.get(
+            url, auth=(settings.admin_username, settings.admin_password)
+        )
 
     # Assertions
     # We expect 200 for a successful authenticated request
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
     # We expect to receive HTML page content for the admin interface
-    assert "text/html" in response.headers.get("Content-Type", ""), "Expected HTML content"
+    assert "text/html" in response.headers.get(
+        "Content-Type", ""
+    ), "Expected HTML content"
 
 
 @pytest.mark.asyncio

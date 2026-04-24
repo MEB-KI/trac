@@ -45,7 +45,11 @@ async def test_admin_participant_management_page_and_actions_work():
         assert assign_response.status_code == 200
         assign_data = assign_response.json()
         assert "summary" in assign_data
-        assert assign_data["summary"]["created_and_assigned"] + assign_data["summary"]["already_existed_and_assigned"] >= 2
+        assert (
+            assign_data["summary"]["created_and_assigned"]
+            + assign_data["summary"]["already_existed_and_assigned"]
+            >= 2
+        )
 
         after_assign_page = await client.get(
             f"{BASE_URL}/admin/participant-management",

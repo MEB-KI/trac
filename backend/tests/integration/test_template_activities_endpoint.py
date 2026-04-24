@@ -12,12 +12,16 @@ BASE_URL = f"{BASE_SCHEME}/" + settings.rootpath.strip("/")
 
 
 async def _get_submission_template(client: httpx.AsyncClient, study_name_short: str):
-    study_cfg_response = await client.get(f"{BASE_URL}/api/studies/{study_name_short}/study-config")
+    study_cfg_response = await client.get(
+        f"{BASE_URL}/api/studies/{study_name_short}/study-config"
+    )
     assert study_cfg_response.status_code == 200
     study_cfg = study_cfg_response.json()
     assert "day_labels" in study_cfg and len(study_cfg["day_labels"]) >= 2
 
-    activities_response = await client.get(f"{BASE_URL}/api/studies/{study_name_short}/activities-config")
+    activities_response = await client.get(
+        f"{BASE_URL}/api/studies/{study_name_short}/activities-config"
+    )
     assert activities_response.status_code == 200
     activities_data = activities_response.json()
     assert "timeline" in activities_data
@@ -72,14 +76,18 @@ async def _submit_day_activities(
     assert payload["participant"] == participant_id
 
 
-async def _call_template_endpoint(client: httpx.AsyncClient, study_name_short: str, source_user: str, target_user: str):
+async def _call_template_endpoint(
+    client: httpx.AsyncClient, study_name_short: str, source_user: str, target_user: str
+):
     params = {
         "study": study_name_short,
         "source_user": source_user,
         "target_user": target_user,
     }
 
-    post_response = await client.post(f"{BASE_URL}/api/template-activities", params=params)
+    post_response = await client.post(
+        f"{BASE_URL}/api/template-activities", params=params
+    )
     assert post_response.status_code == 200
     return post_response.json()
 

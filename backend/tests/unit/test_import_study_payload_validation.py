@@ -7,7 +7,10 @@ import pytest
 os.environ.setdefault("TUD_DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
 
-from o_timeusediary_backend.api import ImportStudiesConfigStudy, _validate_import_study_payload
+from o_timeusediary_backend.api import (
+    ImportStudiesConfigStudy,
+    _validate_import_study_payload,
+)
 from o_timeusediary_backend.settings import settings
 
 
@@ -68,16 +71,21 @@ def test_validate_import_payload_rejects_both_activities_sources():
 
     study_payload = ImportStudiesConfigStudy(**payload)
 
-    with pytest.raises(ValueError, match="Provide exactly one of activities_json_data or activities_json_files, not both"):
+    with pytest.raises(
+        ValueError,
+        match="Provide exactly one of activities_json_data or activities_json_files, not both",
+    ):
         _validate_import_study_payload(study_payload)
 
 
 def test_validate_import_payload_accepts_activities_json_files_only(tmp_path):
     activities_file = tmp_path / "activities_test.en.json"
-    activities_file.write_text(json.dumps(_minimal_activities_payload([100, 200])), encoding="utf-8")
+    activities_file.write_text(
+        json.dumps(_minimal_activities_payload([100, 200])), encoding="utf-8"
+    )
 
     studies_config_file = tmp_path / "studies_config.json"
-    studies_config_file.write_text("{\"studies\": []}", encoding="utf-8")
+    studies_config_file.write_text('{"studies": []}', encoding="utf-8")
 
     previous_studies_config_path = settings.studies_config_path
     settings.studies_config_path = str(studies_config_file)

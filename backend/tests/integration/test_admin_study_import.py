@@ -96,7 +96,9 @@ async def test_admin_import_study_config_with_embedded_activities_data():
         activities_data = activities_config_response.json()
 
         assert "timeline" in activities_data
-        assert set(activities_data["timeline"].keys()) == set(activities_payload["timeline"].keys())
+        assert set(activities_data["timeline"].keys()) == set(
+            activities_payload["timeline"].keys()
+        )
 
         summary_response = await client.get(
             f"{BASE_URL}/api/admin/studies/{study_name_short}/available-activities-summary",
@@ -139,7 +141,9 @@ async def test_admin_import_roundtrip_from_runtime_config_export_uses_embedded_a
         exported_study = copy.deepcopy(export_data["studies_config"]["studies"][0])
         exported_activities_json_data = exported_study.get("activities_json_data")
         if not exported_activities_json_data:
-            exported_activities_json_data = export_data.get("activities", {}).get(exported_study["name_short"])
+            exported_activities_json_data = export_data.get("activities", {}).get(
+                exported_study["name_short"]
+            )
         assert exported_activities_json_data
         exported_study["activities_json_data"] = exported_activities_json_data
 
@@ -178,8 +182,12 @@ async def test_admin_import_roundtrip_from_runtime_config_export_uses_embedded_a
         assert activities_config_response.status_code == 200
         imported_activities_data = activities_config_response.json()
 
-        exported_default_language_data = exported_study["activities_json_data"][exported_study["default_language"]]
-        assert set(imported_activities_data["timeline"].keys()) == set(exported_default_language_data["timeline"].keys())
+        exported_default_language_data = exported_study["activities_json_data"][
+            exported_study["default_language"]
+        ]
+        assert set(imported_activities_data["timeline"].keys()) == set(
+            exported_default_language_data["timeline"].keys()
+        )
 
         summary_response = await client.get(
             f"{BASE_URL}/api/admin/studies/{roundtrip_study_name_short}/available-activities-summary",
@@ -240,7 +248,8 @@ async def test_admin_import_rejects_payload_with_both_activity_sources():
         assert import_data["summary"]["created"] == 0
         assert import_data["summary"]["failed"] == 1
         assert any(
-            "Provide exactly one of activities_json_data or activities_json_files, not both" in error
+            "Provide exactly one of activities_json_data or activities_json_files, not both"
+            in error
             for result in import_data["results"]
             for error in result.get("errors", [])
         )
