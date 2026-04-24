@@ -1,15 +1,15 @@
-
 import logging
 import os
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
+
 def setup_logging():
     """Set up consistent logging configuration for the entire application"""
     logging.basicConfig(
-        format='%(levelname)s: %(name)s: %(message)s',
+        format="%(levelname)s: %(name)s: %(message)s",
         level=logging.INFO,
-        datefmt='%Y-%m-%d %H:%M:%S'
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
 

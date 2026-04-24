@@ -2,16 +2,23 @@ import os
 from dotenv import load_dotenv
 import json
 
-load_dotenv()   # load .env file in working directory if it exists
-
+load_dotenv()  # load .env file in working directory if it exists
 
 
 class TUDBackendSettings:
     def __init__(self):
         # Backend-specific settings
-        self.debug = True if os.getenv("TUD_DEBUG", "false").lower() == "true" else False
-        self.studies_config_path: str = os.getenv("TUD_STUDIES_CONFIG_PATH", "studies_config.json") # Backend file with studies configuration
-        self.print_db_contents_on_startup = True if os.getenv("TUD_REPORT_DB_CONTENTS_ON_STARTUP", "false").lower() == "true" else False
+        self.debug = (
+            True if os.getenv("TUD_DEBUG", "false").lower() == "true" else False
+        )
+        self.studies_config_path: str = os.getenv(
+            "TUD_STUDIES_CONFIG_PATH", "studies_config.json"
+        )  # Backend file with studies configuration
+        self.print_db_contents_on_startup = (
+            True
+            if os.getenv("TUD_REPORT_DB_CONTENTS_ON_STARTUP", "false").lower() == "true"
+            else False
+        )
 
     # Environment-dependent settings as properties
     @property
@@ -19,7 +26,9 @@ class TUDBackendSettings:
         """Get the database URL for the application, something like 'postgresql://user:password@localhost/dbname'."""
         db_url = os.getenv("TUD_DATABASE_URL")
         if not db_url:
-            raise ValueError("TUD_DATABASE_URL environment variable is not set. Please set it when starting the application or use an .env file in the startup directory.")
+            raise ValueError(
+                "TUD_DATABASE_URL environment variable is not set. Please set it when starting the application or use an .env file in the startup directory."
+            )
         return db_url
 
     @property
@@ -34,7 +43,9 @@ class TUDBackendSettings:
         """
         origins = json.loads(os.getenv("TUD_ALLOWED_ORIGINS", "[]"))
         if not origins:
-            raise ValueError("TUD_ALLOWED_ORIGINS environment variable is not set. Please set a JSON array of allowed origins.")
+            raise ValueError(
+                "TUD_ALLOWED_ORIGINS environment variable is not set. Please set a JSON array of allowed origins."
+            )
         return origins
 
     @property
@@ -72,13 +83,19 @@ class TUDBackendSettings:
             try:
                 parsed_value = json.loads(value)
             except json.JSONDecodeError as exc:
-                raise ValueError(f"{env_name} must be a valid JSON list of non-empty strings.") from exc
+                raise ValueError(
+                    f"{env_name} must be a valid JSON list of non-empty strings."
+                ) from exc
 
             if not isinstance(parsed_value, list) or not parsed_value:
-                raise ValueError(f"{env_name} must be a non-empty JSON list of strings.")
+                raise ValueError(
+                    f"{env_name} must be a non-empty JSON list of strings."
+                )
 
             if not all(isinstance(item, str) and item.strip() for item in parsed_value):
-                raise ValueError(f"{env_name} JSON list must contain only non-empty strings.")
+                raise ValueError(
+                    f"{env_name} JSON list must contain only non-empty strings."
+                )
 
             return parsed_value
 
@@ -128,4 +145,3 @@ class TUDBackendSettings:
 
 
 settings = TUDBackendSettings()
-

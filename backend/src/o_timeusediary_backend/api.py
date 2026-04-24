@@ -10,14 +10,11 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import logging
 import uuid
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 import csv
 import json
-import io
-from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from urllib.parse import urlparse
-import sys, argparse
 from fastapi.templating import Jinja2Templates
 from .parsers.activities_config import (
     ActivitiesConfig,
@@ -26,21 +23,28 @@ from .parsers.activities_config import (
 from .parsers.studies_config import get_cfg_study_by_name_short
 import secrets
 from .logging_config import setup_logging, get_admin_audit_logger
-setup_logging()
-logger = logging.getLogger(__name__)
-admin_audit_logger = get_admin_audit_logger()
+
 
 from .settings import settings
-from .models import Activity, Study, Timeline, DayLabel, StudyParticipant, Participant, StudyActivityConfigBlob
-from .models import StudyAvailableTimeline, StudyAvailableCategory, StudyAvailableActivity, StudyAvailableActivityI18n
+from .models import (
+    Activity,
+    Study,
+    Timeline,
+    DayLabel,
+    StudyParticipant,
+    Participant,
+    StudyActivityConfigBlob,
+)
+from .models import (
+    StudyAvailableTimeline,
+    StudyAvailableCategory,
+    StudyAvailableActivity,
+    StudyAvailableActivityI18n,
+)
 from .database import get_session, create_db_and_tables, get_timelines_for_study
 from pathlib import Path
 import hashlib
-from .api_deps.activities import (
-    validate_activity_code_dependency,
-    get_activity_info_dependency,
-    get_study_activity_codes
-)
+from .api_deps.activities import get_study_activity_codes
 from .api_deps.available_activities import (
     get_activities_cfg_text_for_config,
     get_num_activities_in_cfg_per_timeline,
@@ -49,15 +53,17 @@ from .api_deps.available_activities import (
 )
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
-import csv
-import json
 from io import StringIO
-from typing import Optional
 from pydantic import BaseModel, model_validator
-from typing import List, Optional, Union
-
+import o_timeusediary_backend
 
 from .utils import utc_now, get_time_for_minutes_from_midnight
+
+
+setup_logging()
+logger = logging.getLogger(__name__)
+admin_audit_logger = get_admin_audit_logger()
+
 
 security = HTTPBasic()
 
@@ -76,32 +82,43 @@ def _normalize_language_code(language: Optional[str]) -> Optional[str]:
     primary_subtag = normalized.split("-")[0]
     return primary_subtag or None
 
+
 # Initialize templates with absolute path
 current_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(current_dir / "templates"))
 static_dir = Path(__file__).parent / "static"
 
 # get version from __init__.py
-import o_timeusediary_backend
+
+
 tud_version = o_timeusediary_backend.__version__
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info(f"TUD Backend version {tud_version} starting with allowed origins: {settings.allowed_origins}")
+    logger.info(
+        f"TUD Backend version {tud_version} starting with allowed origins: {settings.allowed_origins}"
+    )
     if settings.debug:
-        print(f"Debug mode enabled.")
+        print("Debug mode enabled.")
 
     logger.info("Running startup tasks...")
     create_db_and_tables(settings.print_db_contents_on_startup)
-    logger.info(f"Running with rootpath '{settings.rootpath}' and allowed origins: '{settings.allowed_origins}'.")
+    logger.info(
+        f"Running with rootpath '{settings.rootpath}' and allowed origins: '{settings.allowed_origins}'."
+    )
     logger.info(f"TUD Backend version {tud_version} startup tasks completed. Ready.")
 
     yield
 
 
-app = FastAPI(title="Timeusediary (TUD) API", version=tud_version, root_path=settings.rootpath, lifespan=lifespan)
+app = FastAPI(
+    title="Timeusediary (TUD) API",
+    version=tud_version,
+    root_path=settings.rootpath,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -109,8 +126,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Operation"] # custom header to tell frontend on submit if the entry was created or updated.
+    expose_headers=[
+        "X-Operation"
+    ],  # custom header to tell frontend on submit if the entry was created or updated.
 )
+
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
@@ -123,6 +143,7 @@ async def favicon():
         return FileResponse(favicon_path)
     return Response(status_code=204)
 
+
 def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     """Verify admin credentials using HTTP Basic Auth. Raises HTTP 401 if authentication fails.
 
@@ -130,20 +151,24 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     @return: The username of the authenticated admin
     """
     for expected_username, expected_password in settings.admin_credentials:
-        correct_username = secrets.compare_digest(credentials.username, expected_username)
-        correct_password = secrets.compare_digest(credentials.password, expected_password)
+        correct_username = secrets.compare_digest(
+            credentials.username, expected_username
+        )
+        correct_password = secrets.compare_digest(
+            credentials.password, expected_password
+        )
         if correct_username and correct_password:
             logger.info(f"Admin '{credentials.username}' authenticated successfully.")
             return credentials.username
 
-    logger.info(f"Failed admin authentication attempt for user '{credentials.username}'")
+    logger.info(
+        f"Failed admin authentication attempt for user '{credentials.username}'"
+    )
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid admin credentials",
         headers={"WWW-Authenticate": "Basic"},
     )
-
-
 
 
 @app.exception_handler(Exception)
@@ -175,8 +200,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "Internal server error",
             "error_id": error_id,
-            "message": "Something went wrong on our end"
-        }
+            "message": "Something went wrong on our end",
+        },
     )
 
     # Get the origin from the request
@@ -189,7 +214,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         try:
             parsed = urlparse(origin)
             return parsed.hostname in ["localhost", "127.0.0.1", "::1"]
-        except:
+        except Exception as ex:
+            logger.debug(
+                f"Error parsing origin '{origin}', assuming not localhost. Error details: {ex}"
+            )
             return False
 
     # Check if the origin is in our configured allowed origins
@@ -205,17 +233,21 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Add this exception handler for request validation errors
 @app.exception_handler(RequestValidationError)
-async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+async def request_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
     error_id = str(uuid.uuid4())
 
     # Log detailed error information server-side
     error_details = []
     for error in exc.errors():
-        error_details.append({
-            "field": " -> ".join(str(loc) for loc in error["loc"]),
-            "message": error["msg"],
-            "type": error["type"]
-        })
+        error_details.append(
+            {
+                "field": " -> ".join(str(loc) for loc in error["loc"]),
+                "message": error["msg"],
+                "type": error["type"],
+            }
+        )
 
     logger.error(
         f"Request Validation error ID {error_id}: "
@@ -230,9 +262,10 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
         content={
             "detail": "Invalid request data",
             "error_id": error_id,
-            "message": "Please check your request data format and values"
-        }
+            "message": "Please check your request data format and values",
+        },
     )
+
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -242,11 +275,13 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
     # Log detailed error information server-side
     error_details = []
     for error in exc.errors():
-        error_details.append({
-            "field": " -> ".join(str(loc) for loc in error["loc"]),
-            "message": error["msg"],
-            "type": error["type"]
-        })
+        error_details.append(
+            {
+                "field": " -> ".join(str(loc) for loc in error["loc"]),
+                "message": error["msg"],
+                "type": error["type"],
+            }
+        )
 
     logger.error(
         f"Validation error ID {error_id}: "
@@ -261,8 +296,8 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
         content={
             "detail": "Invalid request data",
             "error_id": error_id,  # Client can reference this if needed
-            "message": "Please check your request data format and values"
-        }
+            "message": "Please check your request data format and values",
+        },
     )
 
 
@@ -274,6 +309,7 @@ def root():
     """
     return {"message": f"TUD API version {tud_version} is running"}
 
+
 @app.get("/api/health")
 def health_check(session: Session = Depends(get_session)):
     """Health check endpoint to verify that the API is running and can connect to the database.
@@ -282,8 +318,15 @@ def health_check(session: Session = Depends(get_session)):
     @returns A JSON object containing health status, study counters, and backend version.
     """
     all_studies = session.exec(select(Study)).all()
-    open_studies = session.exec(select(Study).where(Study.allow_unlisted_participants == True)).all()
-    return {"status": "healthy", "all_studies_count": len(all_studies), "open_studies_count": len(open_studies), "tud_version": tud_version}
+    open_studies = session.exec(
+        select(Study).where(Study.allow_unlisted_participants)
+    ).all()
+    return {
+        "status": "healthy",
+        "all_studies_count": len(all_studies),
+        "open_studies_count": len(open_studies),
+        "tud_version": tud_version,
+    }
 
 
 @app.get("/api/docs")
@@ -299,13 +342,18 @@ async def redirect_to_docs(request: Request):
     return RedirectResponse(url=redirect_url)
 
 
-
 @app.get("/api/studies/{study_name_short}/activities-config")
 def get_study_activities_config(
     study_name_short: str,
-    lang: Optional[str] = Query(None, description="Optional language code for activities config (e.g., 'en', 'sv'). Defaults to study default language."),
-    participant_id: Optional[str] = Query(None, description="Participant ID for authorization check. Required unless study is open for everyone."),
-    session: Session = Depends(get_session)
+    lang: Optional[str] = Query(
+        None,
+        description="Optional language code for activities config (e.g., 'en', 'sv'). Defaults to study default language.",
+    ),
+    participant_id: Optional[str] = Query(
+        None,
+        description="Participant ID for authorization check. Required unless study is open for everyone.",
+    ),
+    session: Session = Depends(get_session),
 ):
     """
     Get the activities configuration (activities.json) for a study.
@@ -334,8 +382,7 @@ def get_study_activities_config(
 
     if not study:
         raise HTTPException(
-            status_code=404,
-            detail=f"Study '{study_name_short}' not found"
+            status_code=404, detail=f"Study '{study_name_short}' not found"
         )
 
     # Check if participant_id is required
@@ -344,23 +391,25 @@ def get_study_activities_config(
         if participant_id is None:
             raise HTTPException(
                 status_code=400,
-                detail=f"Participant ID is required for this study. "
-                       f"Please provide 'participant_id' query parameter."
+                detail="Participant ID is required for this study. "
+                "Please provide 'participant_id' query parameter.",
             )
 
         # Check if the participant is authorized for this study
         study_participant = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study.id,
-                StudyParticipant.participant_id == participant_id
+                StudyParticipant.participant_id == participant_id,
             )
         ).first()
 
         if not study_participant:
-            logger.info(f"Unauthorized participant '{participant_id}' attempted to access activities config for '{study_name_short}'")
+            logger.info(
+                f"Unauthorized participant '{participant_id}' attempted to access activities config for '{study_name_short}'"
+            )
             raise HTTPException(
                 status_code=403,
-                detail=f"Participant '{participant_id}' not authorized for this study"
+                detail=f"Participant '{participant_id}' not authorized for this study",
             )
     else:
         # Study allows unlisted participants
@@ -371,25 +420,30 @@ def get_study_activities_config(
                 select(Participant).where(Participant.id == participant_id)
             ).first()
             if not participant:
-                logger.debug(f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'")
+                logger.debug(
+                    f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'"
+                )
 
     try:
-        activities_config, _source, _selected_language = get_study_activities_config_model(
-            session=session,
-            study=study,
-            lang=lang,
+        activities_config, _source, _selected_language = (
+            get_study_activities_config_model(
+                session=session,
+                study=study,
+                lang=lang,
+            )
         )
         return activities_config.dict()
     except FileNotFoundError:
         raise HTTPException(
             status_code=500,
-            detail=f"Activities configuration not found for study '{study_name_short}'"
+            detail=f"Activities configuration not found for study '{study_name_short}'",
         )
     except Exception as e:
-        logger.error(f"Error loading activities config for study {study_name_short}: {e}")
+        logger.error(
+            f"Error loading activities config for study {study_name_short}: {e}"
+        )
         raise HTTPException(
-            status_code=500,
-            detail=f"Error loading activities configuration: {str(e)}"
+            status_code=500, detail=f"Error loading activities configuration: {str(e)}"
         )
 
 
@@ -398,16 +452,22 @@ class ActivitySubmitItem(BaseModel):
     activity: str  # For reference/debugging and to compute activity path
     category: str  # For reference/debugging and to compute activity path
     code: Optional[int] = None  # For single-choice only
-    codes: Optional[List[int]] = None  # For multiple-choice only: several codes for several activities that were done in parallel
-    parent_activity_name: Optional[str] = None   # only set if this is a child activity, ignore if these is no parent_activity_code (in that case it is identical to activity, and this is NOT a child activity. frontend should be fixed not to send it then.)
-    parent_activity_code: Optional[int] = None   # only set if this is a child activity
-    original_selection: Optional[str] = None  # only set if this is a custom text input, it then shows the prompt text like "Other sport, please specify".
+    codes: Optional[List[int]] = (
+        None  # For multiple-choice only: several codes for several activities that were done in parallel
+    )
+    parent_activity_name: Optional[str] = (
+        None  # only set if this is a child activity, ignore if these is no parent_activity_code (in that case it is identical to activity, and this is NOT a child activity. frontend should be fixed not to send it then.)
+    )
+    parent_activity_code: Optional[int] = None  # only set if this is a child activity
+    original_selection: Optional[str] = (
+        None  # only set if this is a custom text input, it then shows the prompt text like "Other sport, please specify".
+    )
     start_minutes: int
     end_minutes: int
     mode: str  # "single-choice" or "multiple-choice",
     color: Optional[str] = None  # e.g., "#FF0000", used in frontend for display
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_code_or_codes(self):
         code_provided = self.code is not None
         codes_provided = self.codes is not None and len(self.codes) > 0
@@ -440,16 +500,26 @@ def compute_activity_path(activity_item: ActivitySubmitItem) -> str:
     parts.append(f"timeline:{activity_item.timeline_key}")
 
     # Include category if present and not empty
-    if activity_item.category and activity_item.category.strip() and activity_item.category != " ":
+    if (
+        activity_item.category
+        and activity_item.category.strip()
+        and activity_item.category != " "
+    ):
         parts.append(f"category:{activity_item.category}")
 
     # Include parent if different from activity (true hierarchy)
-    if (activity_item.parent_activity_code and
-        activity_item.parent_activity_name and
-        activity_item.parent_activity_name != activity_item.activity):
+    if (
+        activity_item.parent_activity_code
+        and activity_item.parent_activity_name
+        and activity_item.parent_activity_name != activity_item.activity
+    ):
         parts.append(f"parent:{activity_item.parent_activity_name}")
 
-    if activity_item.original_selection and activity_item.original_selection.strip() and activity_item.original_selection != activity_item.activity:
+    if (
+        activity_item.original_selection
+        and activity_item.original_selection.strip()
+        and activity_item.original_selection != activity_item.activity
+    ):
         parts.append(f"custom_input_prompt:{activity_item.original_selection}")
 
     # Always include the actual activity
@@ -458,14 +528,15 @@ def compute_activity_path(activity_item: ActivitySubmitItem) -> str:
     return " > ".join(parts)
 
 
-
-@app.post("/api/studies/{study_name_short}/participants/{participant_id}/day_labels/{day_label_name}/activities")
+@app.post(
+    "/api/studies/{study_name_short}/participants/{participant_id}/day_labels/{day_label_name}/activities"
+)
 def submit_activities(
     study_name_short: str,
     participant_id: str,
     day_label_name: str,
     activities_data: ActivitiesSubmitRequest,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     """
     Submit activities for a specific day label in a study.
@@ -485,8 +556,9 @@ def submit_activities(
         select(Study).where(Study.name_short == study_name_short)
     ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
-
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
     now = utc_now()
 
@@ -494,14 +566,14 @@ def submit_activities(
         raise HTTPException(
             status_code=403,
             detail=f"Study '{study.name_short}' has not started yet. "
-                    f"Data collection starts on {study.data_collection_start.isoformat()}."
+            f"Data collection starts on {study.data_collection_start.isoformat()}.",
         )
 
     if now > study.data_collection_end:
         raise HTTPException(
             status_code=403,
             detail=f"Study '{study.name_short}' has ended. "
-                    f"Data collection ended on {study.data_collection_end.isoformat()}."
+            f"Data collection ended on {study.data_collection_end.isoformat()}.",
         )
 
     # Get all valid activity codes for this study
@@ -514,7 +586,7 @@ def submit_activities(
         logger.error(f"Error loading activity codes for study {study_name_short}: {e}")
         raise HTTPException(
             status_code=500,
-            detail="Could not load activity configuration for validation"
+            detail="Could not load activity configuration for validation",
         )
 
     # Validate/Create participant based on study settings
@@ -523,14 +595,16 @@ def submit_activities(
         study_participant = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study.id,
-                StudyParticipant.participant_id == participant_id
+                StudyParticipant.participant_id == participant_id,
             )
         ).first()
         if not study_participant:
-            logger.info(f"Unauthorized participant '{participant_id}' attempted to submit to study '{study_name_short}'")
+            logger.info(
+                f"Unauthorized participant '{participant_id}' attempted to submit to study '{study_name_short}'"
+            )
             raise HTTPException(
                 status_code=403,
-                detail=f"Participant '{participant_id}' not authorized for this study"
+                detail=f"Participant '{participant_id}' not authorized for this study",
             )
     else:
         # Study allows unlisted participants - ensure participant exists and is linked to study
@@ -548,29 +622,29 @@ def submit_activities(
         study_participant = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study.id,
-                StudyParticipant.participant_id == participant_id
+                StudyParticipant.participant_id == participant_id,
             )
         ).first()
 
         if not study_participant:
             study_participant = StudyParticipant(
-                study_id=study.id,
-                participant_id=participant_id
+                study_id=study.id, participant_id=participant_id
             )
             session.add(study_participant)
 
     # Validate day label exists for this study
     day_label = session.exec(
         select(DayLabel).where(
-            DayLabel.study_id == study.id,
-            DayLabel.name == day_label_name
+            DayLabel.study_id == study.id, DayLabel.name == day_label_name
         )
     ).first()
     if not day_label:
-        logger.info(f"Day label '{day_label_name}' not found for study '{study_name_short}'")
+        logger.info(
+            f"Day label '{day_label_name}' not found for study '{study_name_short}'"
+        )
         raise HTTPException(
             status_code=404,
-            detail=f"Day label '{day_label_name}' not found for study '{study_name_short}'"
+            detail=f"Day label '{day_label_name}' not found for study '{study_name_short}'",
         )
 
     # Get all timelines for this study to validate timeline keys
@@ -587,10 +661,12 @@ def submit_activities(
         # Validate timeline exists
         timeline = timeline_map.get(activity_item.timeline_key)
         if not timeline:
-            logger.info(f"Unknown timeline '{activity_item.timeline_key}' for study '{study_name_short}'")
+            logger.info(
+                f"Unknown timeline '{activity_item.timeline_key}' for study '{study_name_short}'"
+            )
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown timeline '{activity_item.timeline_key}' for study '{study_name_short}'"
+                detail=f"Unknown timeline '{activity_item.timeline_key}' for study '{study_name_short}'",
             )
 
         # Handle single-choice activity
@@ -598,48 +674,57 @@ def submit_activities(
             if not activity_item.code:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Single-choice activity missing 'code' for timeline '{activity_item.timeline_key}'"
+                    detail=f"Single-choice activity missing 'code' for timeline '{activity_item.timeline_key}'",
                 )
 
             # Validate the activity code
             if activity_item.code not in valid_codes:
-                invalid_codes.append({
-                    "code": activity_item.code,
-                    "timeline": activity_item.timeline_key,
-                    "activity_name": activity_item.activity,
-                    "type": "single-choice"
-                })
+                invalid_codes.append(
+                    {
+                        "code": activity_item.code,
+                        "timeline": activity_item.timeline_key,
+                        "activity_name": activity_item.activity,
+                        "type": "single-choice",
+                    }
+                )
 
         # Handle multiple-choice activity
         elif activity_item.mode == "multiple-choice":
             if not activity_item.codes:
-                logger.info(f"Multiple-choice activity missing 'codes' for timeline '{activity_item.timeline_key}'")
+                logger.info(
+                    f"Multiple-choice activity missing 'codes' for timeline '{activity_item.timeline_key}'"
+                )
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Multiple-choice activity missing 'codes' for timeline '{activity_item.timeline_key}'"
+                    detail=f"Multiple-choice activity missing 'codes' for timeline '{activity_item.timeline_key}'",
                 )
 
             # Validate all codes in this multiple-choice activity
             for code in activity_item.codes:
                 if code not in valid_codes:
-                    invalid_codes.append({
-                        "code": code,
-                        "timeline": activity_item.timeline_key,
-                        "activity_name": activity_item.activity,
-                        "type": "multiple-choice"
-                    })
+                    invalid_codes.append(
+                        {
+                            "code": code,
+                            "timeline": activity_item.timeline_key,
+                            "activity_name": activity_item.activity,
+                            "type": "multiple-choice",
+                        }
+                    )
 
         else:
-            logger.info(f"Unknown activity mode '{activity_item.mode}' for study '{study_name_short}'")
+            logger.info(
+                f"Unknown activity mode '{activity_item.mode}' for study '{study_name_short}'"
+            )
             raise HTTPException(
-                status_code=400,
-                detail=f"Unknown activity mode '{activity_item.mode}'"
+                status_code=400, detail=f"Unknown activity mode '{activity_item.mode}'"
             )
 
     # REJECT ENTIRE SUBMISSION IF ANY INVALID CODE - FATAL CONFIG MISMATCH
     if invalid_codes:
-        logger.error(f"FATAL CONFIG MISMATCH: Invalid activity codes detected for study '{study_name_short}'. "
-                     f"Frontend-backend configuration mismatch! Invalid codes: {invalid_codes}")
+        logger.error(
+            f"FATAL CONFIG MISMATCH: Invalid activity codes detected for study '{study_name_short}'. "
+            f"Frontend-backend configuration mismatch! Invalid codes: {invalid_codes}"
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -647,8 +732,9 @@ def submit_activities(
                 "error_type": "configuration_mismatch",
                 "invalid_codes": invalid_codes,
                 "total_invalid": len(invalid_codes),
-                "suggestion": "Check that the activities.json file used by frontend matches the backend configuration at: " + study.activities_json_url
-            }
+                "suggestion": "Check that the activities.json file used by frontend matches the backend configuration at: "
+                + study.activities_json_url,
+            },
         )
 
     # PHASE 2: Check if activities already exist for this user-study-day_label
@@ -656,7 +742,7 @@ def submit_activities(
         select(Activity).where(
             Activity.study_id == study.id,
             Activity.participant_id == participant_id,
-            Activity.day_label_id == day_label.id
+            Activity.day_label_id == day_label.id,
         )
     ).all()
 
@@ -665,8 +751,10 @@ def submit_activities(
 
     # Delete existing activities if any (this implements the "edit/replace" logic)
     if existing_count > 0:
-        logger.info(f"Deleting {existing_count} existing activities for participant '{participant_id}', "
-                   f"study '{study_name_short}', day label '{day_label_name}' before inserting new ones")
+        logger.info(
+            f"Deleting {existing_count} existing activities for participant '{participant_id}', "
+            f"study '{study_name_short}', day label '{day_label_name}' before inserting new ones"
+        )
 
         for activity in existing_activities:
             session.delete(activity)
@@ -691,8 +779,7 @@ def submit_activities(
                 activity_path_frontend=compute_activity_path(activity_item),
                 color=activity_item.color,
                 category=activity_item.category,
-                parent_activity_code=activity_item.parent_activity_code
-
+                parent_activity_code=activity_item.parent_activity_code,
             )
             session.add(activity)
             created_activities.append(activity)
@@ -711,8 +798,7 @@ def submit_activities(
                     activity_path_frontend=compute_activity_path(activity_item),
                     color=activity_item.color,
                     category=activity_item.category,
-                    parent_activity_code=activity_item.parent_activity_code
-
+                    parent_activity_code=activity_item.parent_activity_code,
                 )
                 session.add(activity)
                 created_activities.append(activity)
@@ -733,7 +819,7 @@ def submit_activities(
         "previous_activities_deleted": existing_count,
         "operation": operation,
         "validation": "All activity codes validated against study configuration",
-        "config_source": study.activities_json_url
+        "config_source": study.activities_json_url,
     }
 
 
@@ -741,7 +827,7 @@ def submit_activities(
 async def admin_overview(
     request: Request,
     current_admin: str = Depends(verify_admin),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     """
     Admin overview page showing database contents.
@@ -756,25 +842,33 @@ async def admin_overview(
     audit_admin_action(current_admin, "opened admin overview page")
 
     # Get all studies with their relationships
-    studies = session.exec(
-        select(Study).order_by(Study.created_at.desc())
-    ).all()
+    studies = session.exec(select(Study).order_by(Study.created_at.desc())).all()
 
     # Prepare data structure for template
     studies_data = []
 
     for study in studies:
-        cfg_study = get_cfg_study_by_name_short(study.name_short, settings.studies_config_path)
-        supported_cfg_languages = cfg_study.get_supported_languages() if cfg_study else [study.default_language]
+        cfg_study = get_cfg_study_by_name_short(
+            study.name_short, settings.studies_config_path
+        )
+        supported_cfg_languages = (
+            cfg_study.get_supported_languages()
+            if cfg_study
+            else [study.default_language]
+        )
         cfg_language_query_param = f"cfg_lang_{study.name_short}"
-        selected_cfg_language = request.query_params.get(cfg_language_query_param) or study.default_language
+        selected_cfg_language = (
+            request.query_params.get(cfg_language_query_param) or study.default_language
+        )
         if selected_cfg_language not in supported_cfg_languages:
             selected_cfg_language = study.default_language
 
-        activities_config, activities_config_source, selected_cfg_language_effective = get_study_activities_config_model(
-            session=session,
-            study=study,
-            lang=selected_cfg_language,
+        activities_config, activities_config_source, selected_cfg_language_effective = (
+            get_study_activities_config_model(
+                session=session,
+                study=study,
+                lang=selected_cfg_language,
+            )
         )
         selected_cfg_language = selected_cfg_language_effective
 
@@ -785,18 +879,18 @@ async def admin_overview(
             .order_by(DayLabel.display_order)
         ).all()
 
-        study_is_currently_collecting = study.data_collection_start <= utc_now() <= study.data_collection_end
+        study_is_currently_collecting = (
+            study.data_collection_start <= utc_now() <= study.data_collection_end
+        )
 
         # Get timelines for this study
         timelines = session.exec(
-            select(Timeline)
-            .where(Timeline.study_id == study.id)
+            select(Timeline).where(Timeline.study_id == study.id)
         ).all()
 
         # Get participants for this study
         study_participants = session.exec(
-            select(StudyParticipant)
-            .where(StudyParticipant.study_id == study.id)
+            select(StudyParticipant).where(StudyParticipant.study_id == study.id)
         ).all()
 
         # Get participant details
@@ -805,20 +899,24 @@ async def admin_overview(
             participant = session.get(Participant, sp.participant_id)
             if participant:
                 # Get activity count for this participant in this study
-                participant_activity_count = session.exec(
-                    select(func.count(Activity.id))
-                    .where(
-                        Activity.study_id == study.id,
-                        Activity.participant_id == participant.id
-                    )
-                ).first() or 0
+                participant_activity_count = (
+                    session.exec(
+                        select(func.count(Activity.id)).where(
+                            Activity.study_id == study.id,
+                            Activity.participant_id == participant.id,
+                        )
+                    ).first()
+                    or 0
+                )
 
-                participants.append({
-                    "id": participant.id,
-                    "created_at": participant.created_at,
-                    "joined_study_at": sp.created_at,
-                    "activity_count": participant_activity_count
-                })
+                participants.append(
+                    {
+                        "id": participant.id,
+                        "created_at": participant.created_at,
+                        "joined_study_at": sp.created_at,
+                        "activity_count": participant_activity_count,
+                    }
+                )
 
         # Get logged activities from DB for this study (first 10 for preview)
         activities = session.exec(
@@ -835,26 +933,32 @@ async def admin_overview(
             day_label = session.get(DayLabel, activity.day_label_id)
             timeline = session.get(Timeline, activity.timeline_id)
 
-            enriched_activities.append({
-                "id": activity.id,
-                "participant_id": activity.participant_id,
-                "participant_name": participant.id if participant else "Unknown",
-                "day_label": day_label.name if day_label else "Unknown",
-                "day_display_order": day_label.display_order if day_label else 0,
-                "day_display_name": day_label.display_name if day_label else "Unknown",
-                "timeline": timeline.name if timeline else "Unknown",
-                "timeline_display_name": timeline.display_name if timeline else "Unknown",
-                "activity_code": activity.activity_code,
-                "activity_name": activity.activity_name,
-                "activity_path_frontend": activity.activity_path_frontend,
-                "category": activity.category,
-                "start_minutes": activity.start_minutes,
-                "end_minutes": activity.end_minutes,
-                "time_range": f"{activity.start_minutes//60:02d}:{activity.start_minutes%60:02d} - {activity.end_minutes//60:02d}:{activity.end_minutes%60:02d}",
-                "duration": activity.end_minutes - activity.start_minutes,
-                "parent_activity_code": activity.parent_activity_code,
-                "created_at": activity.created_at
-            })
+            enriched_activities.append(
+                {
+                    "id": activity.id,
+                    "participant_id": activity.participant_id,
+                    "participant_name": participant.id if participant else "Unknown",
+                    "day_label": day_label.name if day_label else "Unknown",
+                    "day_display_order": day_label.display_order if day_label else 0,
+                    "day_display_name": day_label.display_name
+                    if day_label
+                    else "Unknown",
+                    "timeline": timeline.name if timeline else "Unknown",
+                    "timeline_display_name": timeline.display_name
+                    if timeline
+                    else "Unknown",
+                    "activity_code": activity.activity_code,
+                    "activity_name": activity.activity_name,
+                    "activity_path_frontend": activity.activity_path_frontend,
+                    "category": activity.category,
+                    "start_minutes": activity.start_minutes,
+                    "end_minutes": activity.end_minutes,
+                    "time_range": f"{activity.start_minutes // 60:02d}:{activity.start_minutes % 60:02d} - {activity.end_minutes // 60:02d}:{activity.end_minutes % 60:02d}",
+                    "duration": activity.end_minutes - activity.start_minutes,
+                    "parent_activity_code": activity.parent_activity_code,
+                    "created_at": activity.created_at,
+                }
+            )
 
         last_study_activity = session.exec(
             select(Activity)
@@ -863,7 +967,9 @@ async def admin_overview(
             .limit(1)
         ).first()
 
-        last_study_activity_time = last_study_activity.created_at if last_study_activity else None
+        last_study_activity_time = (
+            last_study_activity.created_at if last_study_activity else None
+        )
 
         # create a string like "3h 15m ago" for last_study_activity_time
         last_activity_time_str_ago = None
@@ -874,80 +980,96 @@ async def admin_overview(
             last_activity_time_str_ago = f"{hours}h {minutes}m ago"
 
         # Get total activity count for this study in database
-        total_activities_logged = session.exec(
-            select(func.count(Activity.id))
-            .where(Activity.study_id == study.id)
-        ).first() or 0
+        total_activities_logged = (
+            session.exec(
+                select(func.count(Activity.id)).where(Activity.study_id == study.id)
+            ).first()
+            or 0
+        )
 
-        num_activities_in_cfgfile_by_timeline = get_num_activities_in_cfg_per_timeline(activities_config)
-        num_categories_in_cfgfile_per_timeline = get_num_categories_in_cfg_per_timeline(activities_config)
-        activities_cfg_text = get_activities_cfg_text_for_config(activities_config, short=True, no_duplicate_parts=True)
+        num_activities_in_cfgfile_by_timeline = get_num_activities_in_cfg_per_timeline(
+            activities_config
+        )
+        num_categories_in_cfgfile_per_timeline = get_num_categories_in_cfg_per_timeline(
+            activities_config
+        )
+        activities_cfg_text = get_activities_cfg_text_for_config(
+            activities_config, short=True, no_duplicate_parts=True
+        )
 
-        num_activities_in_cfgfile_total = sum(num_activities_in_cfgfile_by_timeline.values())
-        num_categories_in_cfgfile_total = sum(num_categories_in_cfgfile_per_timeline.values())
+        num_activities_in_cfgfile_total = sum(
+            num_activities_in_cfgfile_by_timeline.values()
+        )
+        num_categories_in_cfgfile_total = sum(
+            num_categories_in_cfgfile_per_timeline.values()
+        )
 
         # Get timeline statistics
         timeline_stats = []
         for timeline in timelines:
-            timeline_activity_count = session.exec(
-                select(func.count(Activity.id))
-                .where(
-                    Activity.study_id == study.id,
-                    Activity.timeline_id == timeline.id
-                )
-            ).first() or 0
+            timeline_activity_count = (
+                session.exec(
+                    select(func.count(Activity.id)).where(
+                        Activity.study_id == study.id,
+                        Activity.timeline_id == timeline.id,
+                    )
+                ).first()
+                or 0
+            )
 
-            timeline_num_activities_cfg_file : int = num_activities_in_cfgfile_by_timeline.get(timeline.name, 0)
-            timeline_num_categories_cfg_file : int = num_categories_in_cfgfile_per_timeline.get(timeline.name, 0)
+            timeline_num_activities_cfg_file: int = (
+                num_activities_in_cfgfile_by_timeline.get(timeline.name, 0)
+            )
+            timeline_num_categories_cfg_file: int = (
+                num_categories_in_cfgfile_per_timeline.get(timeline.name, 0)
+            )
 
-            timeline_stats.append({
-                "name": timeline.name,
-                "display_name": timeline.display_name,
-                "mode": timeline.mode,
-                "activity_count": timeline_activity_count, # instances recorded in database by participants
-                "activity_count_cfg_file": timeline_num_activities_cfg_file, # different ones available in activities.json
-                "category_count_cfg_file": timeline_num_categories_cfg_file, # different ones available in activities.json
-                "description": timeline.description,
-                "min_coverage": timeline.min_coverage
-            })
+            timeline_stats.append(
+                {
+                    "name": timeline.name,
+                    "display_name": timeline.display_name,
+                    "mode": timeline.mode,
+                    "activity_count": timeline_activity_count,  # instances recorded in database by participants
+                    "activity_count_cfg_file": timeline_num_activities_cfg_file,  # different ones available in activities.json
+                    "category_count_cfg_file": timeline_num_categories_cfg_file,  # different ones available in activities.json
+                    "description": timeline.description,
+                    "min_coverage": timeline.min_coverage,
+                }
+            )
 
-        studies_data.append({
-            "study": study,
-            "day_labels": day_labels,
-            "is_actively_collecting": study_is_currently_collecting,
-            "timelines": timelines,
-            "timeline_stats": timeline_stats,
-            "participants": participants,
-            "activities_preview": enriched_activities,
-            "total_activities_logged": total_activities_logged,
-            "total_activities_cfg": num_activities_in_cfgfile_total,
-            "total_categories_cfg": num_categories_in_cfgfile_total,
-            "activities_cfg_text": activities_cfg_text,  # condensed text view of config-file activities
-            "activities_cfg_source": activities_config_source,
-            "supported_cfg_languages": supported_cfg_languages,
-            "selected_cfg_language": selected_cfg_language,
-            "cfg_language_query_param": cfg_language_query_param,
-            "last_activity_time": last_study_activity_time, # when last activity was logged for this study by a user
-            "last_activity_time_str_ago": last_activity_time_str_ago, # human readable "3h 15m ago"
-            "participant_count": len(participants)
-        })
+        studies_data.append(
+            {
+                "study": study,
+                "day_labels": day_labels,
+                "is_actively_collecting": study_is_currently_collecting,
+                "timelines": timelines,
+                "timeline_stats": timeline_stats,
+                "participants": participants,
+                "activities_preview": enriched_activities,
+                "total_activities_logged": total_activities_logged,
+                "total_activities_cfg": num_activities_in_cfgfile_total,
+                "total_categories_cfg": num_categories_in_cfgfile_total,
+                "activities_cfg_text": activities_cfg_text,  # condensed text view of config-file activities
+                "activities_cfg_source": activities_config_source,
+                "supported_cfg_languages": supported_cfg_languages,
+                "selected_cfg_language": selected_cfg_language,
+                "cfg_language_query_param": cfg_language_query_param,
+                "last_activity_time": last_study_activity_time,  # when last activity was logged for this study by a user
+                "last_activity_time_str_ago": last_activity_time_str_ago,  # human readable "3h 15m ago"
+                "participant_count": len(participants),
+            }
+        )
 
     # Get database-wide statistics
     total_studies = len(studies)
 
-    total_participants = session.exec(
-        select(func.count(Participant.id))
-    ).first() or 0
+    total_participants = session.exec(select(func.count(Participant.id))).first() or 0
 
-    total_activities_all = session.exec(
-        select(func.count(Activity.id))
-    ).first() or 0
+    total_activities_all = session.exec(select(func.count(Activity.id))).first() or 0
 
     # Get recent activities (last 10 overall)
     recent_activities = session.exec(
-        select(Activity)
-        .order_by(Activity.created_at.desc())
-        .limit(20)
+        select(Activity).order_by(Activity.created_at.desc()).limit(20)
     ).all()
 
     enriched_recent_activities = []
@@ -957,21 +1079,23 @@ async def admin_overview(
         day_label = session.get(DayLabel, activity.day_label_id)
         timeline = session.get(Timeline, activity.timeline_id)
 
-        enriched_recent_activities.append({
-            "id": activity.id,
-            "study_name_short": study.name_short if study else "Unknown",
-            "participant_id": activity.participant_id,
-            "participant_name": participant.id if participant else "Unknown",
-            "day_label": day_label.name if day_label else "Unknown",
-            "day_display_name": day_label.display_name if day_label else "Unknown",
-            "day_display_order": day_label.display_order if day_label else 0,
-            "category": activity.category if activity else "Unknown",
-            "timeline": timeline.name if timeline else "Unknown",
-            "activity_name": activity.activity_name,
-            "activity_code": activity.activity_code,
-            "time_range": f"{activity.start_minutes//60:02d}:{activity.start_minutes%60:02d} - {activity.end_minutes//60:02d}:{activity.end_minutes%60:02d}",
-            "created_at": activity.created_at
-        })
+        enriched_recent_activities.append(
+            {
+                "id": activity.id,
+                "study_name_short": study.name_short if study else "Unknown",
+                "participant_id": activity.participant_id,
+                "participant_name": participant.id if participant else "Unknown",
+                "day_label": day_label.name if day_label else "Unknown",
+                "day_display_name": day_label.display_name if day_label else "Unknown",
+                "day_display_order": day_label.display_order if day_label else 0,
+                "category": activity.category if activity else "Unknown",
+                "timeline": timeline.name if timeline else "Unknown",
+                "activity_name": activity.activity_name,
+                "activity_code": activity.activity_code,
+                "time_range": f"{activity.start_minutes // 60:02d}:{activity.start_minutes % 60:02d} - {activity.end_minutes // 60:02d}:{activity.end_minutes % 60:02d}",
+                "created_at": activity.created_at,
+            }
+        )
 
     # Render template manually to avoid Starlette TemplateResponse caching issues with wheel-installed packages.
     # When templates are installed from a wheel, Starlette's TemplateResponse cache fails with "unhashable type: dict".
@@ -980,11 +1104,13 @@ async def admin_overview(
         "current_admin": current_admin,
         "studies_data": studies_data,
         "total_studies": total_studies,
-        "active_studies_count": sum(1 for s in studies_data if s["is_actively_collecting"]),
+        "active_studies_count": sum(
+            1 for s in studies_data if s["is_actively_collecting"]
+        ),
         "total_participants": total_participants,
         "total_activities_all": total_activities_all,
         "recent_activities": enriched_recent_activities,
-        "current_time": utc_now()
+        "current_time": utc_now(),
     }
     template = templates.get_template("admin_overview.html")
     html_content = template.render(context_dict)
@@ -1084,14 +1210,18 @@ def _create_available_catalog_from_validated_activities(
     timeline_id_by_key: Dict[str, int] = {}
     category_id_by_key: Dict[Tuple[str, str], int] = {}
 
-    for timeline_order, (timeline_key, timeline_cfg) in enumerate(default_cfg.timeline.items()):
+    for timeline_order, (timeline_key, timeline_cfg) in enumerate(
+        default_cfg.timeline.items()
+    ):
         timeline_row = StudyAvailableTimeline(
             study_id=study.id,
             timeline_key=timeline_key,
             display_name=timeline_cfg.name,
             description=timeline_cfg.description,
             mode=timeline_cfg.mode,
-            min_coverage=int(timeline_cfg.min_coverage) if timeline_cfg.min_coverage is not None else None,
+            min_coverage=int(timeline_cfg.min_coverage)
+            if timeline_cfg.min_coverage is not None
+            else None,
             sort_order=timeline_order,
         )
         session.add(timeline_row)
@@ -1163,11 +1293,15 @@ def _create_available_catalog_from_validated_activities(
 
 def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> Dict:
     if study_payload.data_collection_start >= study_payload.data_collection_end:
-        raise ValueError("data_collection_start must be earlier than data_collection_end")
+        raise ValueError(
+            "data_collection_start must be earlier than data_collection_end"
+        )
 
     supported_languages = _normalize_languages(study_payload.supported_languages)
     if not supported_languages:
-        raise ValueError("supported_languages must contain at least one valid language code")
+        raise ValueError(
+            "supported_languages must contain at least one valid language code"
+        )
 
     default_language = _normalize_language_code(study_payload.default_language)
     if default_language not in supported_languages:
@@ -1227,7 +1361,9 @@ def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> D
                     f"activities_json_files has invalid path for language '{language}'"
                 )
             try:
-                raw_activities_by_lang[language] = _load_json_file_with_studies_config_base(file_path)
+                raw_activities_by_lang[language] = (
+                    _load_json_file_with_studies_config_base(file_path)
+                )
             except Exception as error:
                 raise ValueError(
                     f"Could not load activities_json_files for language '{language}' from '{file_path}': {error}"
@@ -1237,8 +1373,12 @@ def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> D
         day_label_name = day_label.get("name", "")
         display_names = day_label.get("display_names")
         if not isinstance(display_names, dict):
-            raise ValueError(f"day_label '{day_label_name}' is missing display_names object")
-        missing_day_label_languages = sorted(set(supported_languages) - set(display_names.keys()))
+            raise ValueError(
+                f"day_label '{day_label_name}' is missing display_names object"
+            )
+        missing_day_label_languages = sorted(
+            set(supported_languages) - set(display_names.keys())
+        )
         if missing_day_label_languages:
             raise ValueError(
                 f"day_label '{day_label_name}' is missing display_names for languages: {missing_day_label_languages}"
@@ -1251,7 +1391,9 @@ def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> D
         raw_activities = raw_activities_by_lang[language]
         parsed_activities = ActivitiesConfig(**raw_activities)
         parsed_activities_by_lang[language] = parsed_activities
-        signature_by_lang[language] = _build_activity_structure_signature(parsed_activities)
+        signature_by_lang[language] = _build_activity_structure_signature(
+            parsed_activities
+        )
 
     reference_signature = signature_by_lang[default_language]
     for language, signature in signature_by_lang.items():
@@ -1285,7 +1427,9 @@ def _create_study_from_import_payload(
     validated_data: Dict,
 ) -> Study:
     default_language = validated_data["default_language"]
-    parsed_default_activities: ActivitiesConfig = validated_data["parsed_activities_by_lang"][default_language]
+    parsed_default_activities: ActivitiesConfig = validated_data[
+        "parsed_activities_by_lang"
+    ][default_language]
 
     study = Study(
         name=study_payload.name,
@@ -1300,9 +1444,15 @@ def _create_study_from_import_payload(
     session.add(study)
     session.flush()
 
-    for day_label_data in sorted(study_payload.day_labels, key=lambda row: row.get("display_order", 0)):
+    for day_label_data in sorted(
+        study_payload.day_labels, key=lambda row: row.get("display_order", 0)
+    ):
         display_names = day_label_data.get("display_names", {})
-        display_name = display_names.get(default_language) or display_names.get("en") or day_label_data.get("name")
+        display_name = (
+            display_names.get(default_language)
+            or display_names.get("en")
+            or day_label_data.get("name")
+        )
         day_label = DayLabel(
             study_id=study.id,
             name=day_label_data["name"],
@@ -1319,7 +1469,9 @@ def _create_study_from_import_payload(
                 display_name=timeline_cfg.name,
                 description=timeline_cfg.description,
                 mode=timeline_cfg.mode,
-                min_coverage=int(timeline_cfg.min_coverage) if timeline_cfg.min_coverage is not None else None,
+                min_coverage=int(timeline_cfg.min_coverage)
+                if timeline_cfg.min_coverage is not None
+                else None,
             )
         )
 
@@ -1376,26 +1528,54 @@ async def get_available_activities_summary(
     session: Session = Depends(get_session),
 ):
     """Return counts for normalized available activities catalog tables for a study."""
-    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
-    audit_admin_action(current_admin, f"requested available activities summary for study '{study_name_short}'")
+    audit_admin_action(
+        current_admin,
+        f"requested available activities summary for study '{study_name_short}'",
+    )
 
-    timeline_count = session.exec(
-        select(func.count(StudyAvailableTimeline.id)).where(StudyAvailableTimeline.study_id == study.id)
-    ).first() or 0
-    category_count = session.exec(
-        select(func.count(StudyAvailableCategory.id)).where(StudyAvailableCategory.study_id == study.id)
-    ).first() or 0
-    activity_count = session.exec(
-        select(func.count(StudyAvailableActivity.id)).where(StudyAvailableActivity.study_id == study.id)
-    ).first() or 0
-    i18n_count = session.exec(
-        select(func.count(StudyAvailableActivityI18n.id))
-        .join(StudyAvailableActivity, StudyAvailableActivityI18n.activity_id == StudyAvailableActivity.id)
-        .where(StudyAvailableActivity.study_id == study.id)
-    ).first() or 0
+    timeline_count = (
+        session.exec(
+            select(func.count(StudyAvailableTimeline.id)).where(
+                StudyAvailableTimeline.study_id == study.id
+            )
+        ).first()
+        or 0
+    )
+    category_count = (
+        session.exec(
+            select(func.count(StudyAvailableCategory.id)).where(
+                StudyAvailableCategory.study_id == study.id
+            )
+        ).first()
+        or 0
+    )
+    activity_count = (
+        session.exec(
+            select(func.count(StudyAvailableActivity.id)).where(
+                StudyAvailableActivity.study_id == study.id
+            )
+        ).first()
+        or 0
+    )
+    i18n_count = (
+        session.exec(
+            select(func.count(StudyAvailableActivityI18n.id))
+            .join(
+                StudyAvailableActivity,
+                StudyAvailableActivityI18n.activity_id == StudyAvailableActivity.id,
+            )
+            .where(StudyAvailableActivity.study_id == study.id)
+        ).first()
+        or 0
+    )
 
     return {
         "study_name_short": study_name_short,
@@ -1423,7 +1603,10 @@ async def import_studies_config(
     allowed_transaction_modes = {"all_or_nothing", "per_study"}
 
     if payload.mode not in allowed_modes:
-        raise HTTPException(status_code=400, detail=f"Unsupported mode '{payload.mode}'. Allowed: {sorted(allowed_modes)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported mode '{payload.mode}'. Allowed: {sorted(allowed_modes)}",
+        )
 
     if payload.transaction_mode not in allowed_transaction_modes:
         raise HTTPException(
@@ -1469,13 +1652,17 @@ async def import_studies_config(
         if summary["failed"] > 0:
             summary["skipped"] = max(0, summary["received"] - summary["failed"])
             for study_payload in payload.studies:
-                if study_payload.name_short in {result["study_name_short"] for result in results}:
+                if study_payload.name_short in {
+                    result["study_name_short"] for result in results
+                }:
                     continue
                 results.append(
                     {
                         "study_name_short": study_payload.name_short,
                         "status": "skipped",
-                        "errors": ["Skipped because transaction_mode=all_or_nothing and at least one study failed validation"],
+                        "errors": [
+                            "Skipped because transaction_mode=all_or_nothing and at least one study failed validation"
+                        ],
                     }
                 )
             return {
@@ -1489,7 +1676,9 @@ async def import_studies_config(
         if not dry_run:
             for study_payload in payload.studies:
                 validated_data = validation_cache[study_payload.name_short]
-                _create_study_from_import_payload(session, study_payload, validated_data)
+                _create_study_from_import_payload(
+                    session, study_payload, validated_data
+                )
                 summary["created"] += 1
                 results.append(
                     {
@@ -1525,7 +1714,9 @@ async def import_studies_config(
                     continue
 
                 validated_data = validation_cache[study_payload.name_short]
-                _create_study_from_import_payload(session, study_payload, validated_data)
+                _create_study_from_import_payload(
+                    session, study_payload, validated_data
+                )
                 session.commit()
                 summary["created"] += 1
                 results.append(
@@ -1584,9 +1775,13 @@ async def update_study_collection_window(
     This endpoint enables admins to close a study early or reopen/extend it
     by changing one or both of `data_collection_start` and `data_collection_end`.
     """
-    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
     if payload.data_collection_start is None and payload.data_collection_end is None:
         raise HTTPException(
@@ -1641,13 +1836,17 @@ async def update_study_collection_window(
             "data_collection_start": study.data_collection_start,
             "data_collection_end": study.data_collection_end,
         },
-        "is_currently_collecting": study.data_collection_start <= utc_now() <= study.data_collection_end,
+        "is_currently_collecting": study.data_collection_start
+        <= utc_now()
+        <= study.data_collection_end,
     }
 
 
 @app.get("/api/admin/export/studies-runtime-config")
 async def export_runtime_studies_config(
-    study_name: Optional[str] = Query(None, description="Optional study short name to export only one study"),
+    study_name: Optional[str] = Query(
+        None, description="Optional study short name to export only one study"
+    ),
     current_admin: str = Depends(verify_admin),
     session: Session = Depends(get_session),
 ):
@@ -1672,7 +1871,9 @@ async def export_runtime_studies_config(
     activities_by_study: Dict = {}
 
     for study in studies:
-        cfg_study = get_cfg_study_by_name_short(study.name_short, settings.studies_config_path)
+        cfg_study = get_cfg_study_by_name_short(
+            study.name_short, settings.studies_config_path
+        )
 
         day_labels = session.exec(
             select(DayLabel)
@@ -1681,7 +1882,9 @@ async def export_runtime_studies_config(
         ).all()
 
         if cfg_study:
-            day_label_lookup = {day_label.name: day_label for day_label in cfg_study.day_labels}
+            day_label_lookup = {
+                day_label.name: day_label for day_label in cfg_study.day_labels
+            }
         else:
             day_label_lookup = {}
 
@@ -1706,14 +1909,18 @@ async def export_runtime_studies_config(
             .where(StudyParticipant.study_id == study.id)
             .order_by(StudyParticipant.participant_id)
         ).all()
-        participant_ids = [association.participant_id for association in study_participants]
+        participant_ids = [
+            association.participant_id for association in study_participants
+        ]
 
         activity_rows = session.exec(
             select(Activity, DayLabel, Timeline)
             .join(DayLabel, Activity.day_label_id == DayLabel.id)
             .join(Timeline, Activity.timeline_id == Timeline.id)
             .where(Activity.study_id == study.id)
-            .order_by(DayLabel.display_order, Activity.participant_id, Activity.start_minutes)
+            .order_by(
+                DayLabel.display_order, Activity.participant_id, Activity.start_minutes
+            )
         ).all()
 
         day_keys = [day_label.name for day_label in day_labels]
@@ -1727,7 +1934,9 @@ async def export_runtime_studies_config(
             day_key = day_label.name
 
             if participant_key not in logged_activities:
-                logged_activities[participant_key] = {day_name: [] for day_name in day_keys}
+                logged_activities[participant_key] = {
+                    day_name: [] for day_name in day_keys
+                }
 
             logged_activities[participant_key][day_key].append(
                 {
@@ -1765,7 +1974,9 @@ async def export_runtime_studies_config(
                 }
                 supported_languages = sorted(blob_by_lang.keys())
             else:
-                activities_json_files = {study.default_language: study.activities_json_url}
+                activities_json_files = {
+                    study.default_language: study.activities_json_url
+                }
                 supported_languages = [study.default_language]
             study_text_intro = None
             study_text_end_completed = None
@@ -1778,7 +1989,9 @@ async def export_runtime_studies_config(
                 continue
 
             try:
-                activity_configs_for_study[lang] = _load_json_file_with_studies_config_base(activity_file_path)
+                activity_configs_for_study[lang] = (
+                    _load_json_file_with_studies_config_base(activity_file_path)
+                )
             except Exception as error:
                 activity_configs_for_study[lang] = {
                     "error": f"Could not load activities file '{activity_file_path}': {error}"
@@ -1813,9 +2026,13 @@ async def export_runtime_studies_config(
         f" for study '{study_name}'" if study_name else " for all studies",
     )
     if study_name:
-        audit_admin_action(current_admin, f"exported runtime studies config for study '{study_name}'")
+        audit_admin_action(
+            current_admin, f"exported runtime studies config for study '{study_name}'"
+        )
     else:
-        audit_admin_action(current_admin, "exported runtime studies config for all studies")
+        audit_admin_action(
+            current_admin, "exported runtime studies config for all studies"
+        )
 
     response_payload = {
         "studies_config": {
@@ -1833,18 +2050,20 @@ async def export_runtime_studies_config(
 
     return JSONResponse(
         content=jsonable_encoder(response_payload),
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        },
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
-@app.get("/admin/participant-management", name="Admin Participant Management Page", response_class=HTMLResponse)
+@app.get(
+    "/admin/participant-management",
+    name="Admin Participant Management Page",
+    response_class=HTMLResponse,
+)
 async def admin_participant_management(
     request: Request,
     study_name_short: Optional[str] = Query(None),
     current_admin: str = Depends(verify_admin),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     """Render participant-management page for assigning/removing study participants.
 
@@ -1854,25 +2073,37 @@ async def admin_participant_management(
     @param session Database session dependency.
     @returns HTML page with study selector and participant management controls.
     """
-    logger.info(f"Admin '{current_admin}' accessed participant management page for study '{study_name_short}'.")
+    logger.info(
+        f"Admin '{current_admin}' accessed participant management page for study '{study_name_short}'."
+    )
     if study_name_short:
-        audit_admin_action(current_admin, f"opened participant management page for study '{study_name_short}'")
+        audit_admin_action(
+            current_admin,
+            f"opened participant management page for study '{study_name_short}'",
+        )
     else:
         audit_admin_action(current_admin, "opened participant management page")
 
     studies = session.exec(select(Study).order_by(Study.name_short)).all()
     studies_for_dropdown = []
     for study in studies:
-        participant_count = session.exec(
-            select(func.count(StudyParticipant.id)).where(StudyParticipant.study_id == study.id)
-        ).first() or 0
+        participant_count = (
+            session.exec(
+                select(func.count(StudyParticipant.id)).where(
+                    StudyParticipant.study_id == study.id
+                )
+            ).first()
+            or 0
+        )
 
-        studies_for_dropdown.append({
-            "name": study.name,
-            "name_short": study.name_short,
-            "allow_unlisted_participants": study.allow_unlisted_participants,
-            "participant_count": participant_count,
-        })
+        studies_for_dropdown.append(
+            {
+                "name": study.name,
+                "name_short": study.name_short,
+                "allow_unlisted_participants": study.allow_unlisted_participants,
+                "participant_count": participant_count,
+            }
+        )
     selected_study = None
     current_participants = []
 
@@ -1882,7 +2113,9 @@ async def admin_participant_management(
         ).first()
 
         if not selected_study:
-            raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Study '{study_name_short}' not found"
+            )
 
         study_participants = session.exec(
             select(StudyParticipant)
@@ -1895,19 +2128,24 @@ async def admin_participant_management(
             if not participant:
                 continue
 
-            participant_activity_count = session.exec(
-                select(func.count(Activity.id)).where(
-                    Activity.study_id == selected_study.id,
-                    Activity.participant_id == participant.id
-                )
-            ).first() or 0
+            participant_activity_count = (
+                session.exec(
+                    select(func.count(Activity.id)).where(
+                        Activity.study_id == selected_study.id,
+                        Activity.participant_id == participant.id,
+                    )
+                ).first()
+                or 0
+            )
 
-            current_participants.append({
-                "id": participant.id,
-                "created_at": participant.created_at,
-                "assigned_at": association.created_at,
-                "activity_count": participant_activity_count,
-            })
+            current_participants.append(
+                {
+                    "id": participant.id,
+                    "created_at": participant.created_at,
+                    "assigned_at": association.created_at,
+                    "activity_count": participant_activity_count,
+                }
+            )
 
     # Render template manually to avoid Starlette TemplateResponse caching issues with wheel-installed packages.
     # When templates are installed from a wheel, Starlette's TemplateResponse cache fails with "unhashable type: dict".
@@ -1952,7 +2190,7 @@ async def assign_participants_to_study(
     study_name_short: str,
     payload: AssignParticipantsRequest,
     current_admin: str = Depends(verify_admin),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     """Assign a list of participants to a study, creating participant records when needed.
 
@@ -1962,9 +2200,13 @@ async def assign_participants_to_study(
     @param session Database session dependency.
     @returns Assignment summary and resulting study participant count.
     """
-    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
     normalized_ids = []
     seen = set()
@@ -1983,13 +2225,15 @@ async def assign_participants_to_study(
             select(Participant).where(Participant.id.in_(normalized_ids))
         ).all()
         if existing_participants:
-            existing_ids = sorted([participant.id for participant in existing_participants])
+            existing_ids = sorted(
+                [participant.id for participant in existing_participants]
+            )
             raise HTTPException(
                 status_code=400,
                 detail={
                     "message": "Some participants already exist and must_be_new is enabled",
                     "existing_participant_ids": existing_ids,
-                }
+                },
             )
 
     summary = {
@@ -2026,15 +2270,22 @@ async def assign_participants_to_study(
 
     session.commit()
 
-    total_after_assignment = session.exec(
-        select(func.count(StudyParticipant.id)).where(StudyParticipant.study_id == study.id)
-    ).first() or 0
+    total_after_assignment = (
+        session.exec(
+            select(func.count(StudyParticipant.id)).where(
+                StudyParticipant.study_id == study.id
+            )
+        ).first()
+        or 0
+    )
 
     logger.info(
         f"Admin '{current_admin}' assigned participants to study '{study_name_short}'. "
         f"Summary: {summary}, total_after_assignment={total_after_assignment}"
     )
-    assigned_count = summary["created_and_assigned"] + summary["already_existed_and_assigned"]
+    assigned_count = (
+        summary["created_and_assigned"] + summary["already_existed_and_assigned"]
+    )
     audit_admin_action(
         current_admin,
         (
@@ -2058,7 +2309,7 @@ async def remove_participant_from_study(
     study_name_short: str,
     participant_id: str,
     current_admin: str = Depends(verify_admin),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     """Remove participant association from a study.
 
@@ -2068,9 +2319,13 @@ async def remove_participant_from_study(
     @param session Database session dependency.
     @returns A confirmation object when association is deleted.
     """
-    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
     association = session.exec(
         select(StudyParticipant).where(
@@ -2091,7 +2346,10 @@ async def remove_participant_from_study(
     logger.info(
         f"Admin '{current_admin}' removed participant '{participant_id}' from study '{study_name_short}'."
     )
-    audit_admin_action(current_admin, f"removed participant '{participant_id}' from study '{study_name_short}'")
+    audit_admin_action(
+        current_admin,
+        f"removed participant '{participant_id}' from study '{study_name_short}'",
+    )
 
     return {
         "message": "Participant removed from study",
@@ -2099,15 +2357,20 @@ async def remove_participant_from_study(
         "participant_id": participant_id,
     }
 
+
 @app.get("/api/admin/export/{study_name_short}/activities")
 async def export_study_activities(
     request: Request,
     study_name_short: str,
     format: Optional[str] = Query("csv", description="Output format: 'csv' or 'json'"),
-    include_metadata: Optional[bool] = Query(True, description="Include metadata columns"),
-    include_path: Optional[bool] = Query(True, description="Include activity path columns"),
+    include_metadata: Optional[bool] = Query(
+        True, description="Include metadata columns"
+    ),
+    include_path: Optional[bool] = Query(
+        True, description="Include activity path columns"
+    ),
     current_admin: str = Depends(verify_admin),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     """
     Export activities for a specific study in CSV or JSON format.
@@ -2123,7 +2386,9 @@ async def export_study_activities(
     @returns A file-download response containing exported activities for the study.
     """
 
-    logger.info(f"Admin '{current_admin}' requested export of activities for study '{study_name_short}' in format '{format}'")
+    logger.info(
+        f"Admin '{current_admin}' requested export of activities for study '{study_name_short}' in format '{format}'"
+    )
 
     # Validate study exists
     study = session.exec(
@@ -2132,29 +2397,25 @@ async def export_study_activities(
 
     if not study:
         raise HTTPException(
-            status_code=404,
-            detail=f"Study '{study_name_short}' not found"
+            status_code=404, detail=f"Study '{study_name_short}' not found"
         )
 
     # Get all activities for this study with related data
     activities = session.exec(
-        select(
-            Activity,
-            Participant,
-            DayLabel,
-            Timeline
-        )
+        select(Activity, Participant, DayLabel, Timeline)
         .join(Participant, Activity.participant_id == Participant.id)
         .join(DayLabel, Activity.day_label_id == DayLabel.id)
         .join(Timeline, Activity.timeline_id == Timeline.id)
         .where(Activity.study_id == study.id)
-        .order_by(Activity.participant_id, Activity.day_label_id, Activity.start_minutes)
+        .order_by(
+            Activity.participant_id, Activity.day_label_id, Activity.start_minutes
+        )
     ).all()
 
     if not activities:
         raise HTTPException(
             status_code=404,
-            detail=f"No activities found for study '{study_name_short}'"
+            detail=f"No activities found for study '{study_name_short}'",
         )
 
     # Prepare the data with dereferenced fields
@@ -2180,14 +2441,12 @@ async def export_study_activities(
             "end_minutes": activity.end_minutes,
             "duration_minutes": duration_minutes,
             "category": activity.category,
-
             # Context data
             "participant_id": participant.id,
             "day_label": day_label.name,
             "timeline_name": timeline.name,
             "timeline_display_name": timeline.display_name,
             "timeline_mode": timeline.mode,
-
             # Study info
             "study_name": study.name,
             "study_name_short": study.name_short,
@@ -2202,14 +2461,16 @@ async def export_study_activities(
 
         # Add metadata if requested
         if include_metadata:
-            record.update({
-                "created_at": activity.created_at.isoformat(),
-                "data_collection_start": study.data_collection_start.isoformat(),
-                "data_collection_end": study.data_collection_end.isoformat(),
-                "participant_created_at": participant.created_at.isoformat(),
-                "timeline_description": timeline.description or "",
-                "timeline_min_coverage": timeline.min_coverage or 0,
-            })
+            record.update(
+                {
+                    "created_at": activity.created_at.isoformat(),
+                    "data_collection_start": study.data_collection_start.isoformat(),
+                    "data_collection_end": study.data_collection_end.isoformat(),
+                    "participant_created_at": participant.created_at.isoformat(),
+                    "timeline_description": timeline.description or "",
+                    "timeline_min_coverage": timeline.min_coverage or 0,
+                }
+            )
 
         # Add activity path components if requested
         if include_path:
@@ -2222,10 +2483,9 @@ async def export_study_activities(
                         key, value = part.split(":", 1)
                         path_parts[f"path_{key}"] = value
 
-            record.update({
-                "activity_path_full": activity.activity_path_frontend,
-                **path_parts
-            })
+            record.update(
+                {"activity_path_full": activity.activity_path_frontend, **path_parts}
+            )
 
         export_data.append(record)
 
@@ -2300,9 +2560,9 @@ def export_json(data: list, filename: str) -> Response:
             "export_timestamp": utc_now().isoformat(),
             "total_records": len(data),
             "format": "json",
-            "version": "1.0"
+            "version": "1.0",
         },
-        "data": data
+        "data": data,
     }
 
     content = json.dumps(response_data, indent=2, default=str)
@@ -2324,14 +2584,24 @@ def timelines_to_json(timelines: List[Timeline]) -> List[dict]:
         for timeline in timelines
     ]
 
+
 @app.get("/api/studies/{study_name_short}/participants/{participant_id}/activities")
 def get_participant_day_activities(
     study_name_short: str,
     participant_id: str,
-    day_label_name: Optional[str] = Query(None, description="Day label name (e.g., 'monday'). Either this or day_label_index must be provided"),
-    day_label_index: Optional[int] = Query(None, description="Day label display order/index. Either this or day_label_name must be provided"),
-    template_from_day_index: Optional[int] = Query(None, description="Optional: Day index to use as template source. Defaults to previous day (current_day_index - 1)"),
-    session: Session = Depends(get_session)
+    day_label_name: Optional[str] = Query(
+        None,
+        description="Day label name (e.g., 'monday'). Either this or day_label_index must be provided",
+    ),
+    day_label_index: Optional[int] = Query(
+        None,
+        description="Day label display order/index. Either this or day_label_name must be provided",
+    ),
+    template_from_day_index: Optional[int] = Query(
+        None,
+        description="Optional: Day index to use as template source. Defaults to previous day (current_day_index - 1)",
+    ),
+    session: Session = Depends(get_session),
 ):
     """
     Get all activities for a specific participant and day in a study.
@@ -2357,7 +2627,7 @@ def get_participant_day_activities(
     if day_label_name is None and day_label_index is None:
         raise HTTPException(
             status_code=400,
-            detail="Either day_label_name or day_label_index must be provided"
+            detail="Either day_label_name or day_label_index must be provided",
         )
 
     # Validate study exists
@@ -2365,7 +2635,9 @@ def get_participant_day_activities(
         select(Study).where(Study.name_short == study_name_short)
     ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
     # Check if participant is authorized for this study
     if not study.allow_unlisted_participants:
@@ -2373,14 +2645,16 @@ def get_participant_day_activities(
         study_participant = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study.id,
-                StudyParticipant.participant_id == participant_id
+                StudyParticipant.participant_id == participant_id,
             )
         ).first()
         if not study_participant:
-            logger.info(f"Unauthorized participant '{participant_id}' attempted to access data from study '{study_name_short}'")
+            logger.info(
+                f"Unauthorized participant '{participant_id}' attempted to access data from study '{study_name_short}'"
+            )
             raise HTTPException(
                 status_code=403,
-                detail=f"Participant '{participant_id}' not authorized for this study"
+                detail=f"Participant '{participant_id}' not authorized for this study",
             )
     else:
         # Study allows unlisted participants - ensure participant exists
@@ -2390,7 +2664,7 @@ def get_participant_day_activities(
         if not participant:
             raise HTTPException(
                 status_code=403,
-                detail=f"Participant '{participant_id}' does not exist for this study"
+                detail=f"Participant '{participant_id}' does not exist for this study",
             )
 
     # Find the target day label
@@ -2399,33 +2673,30 @@ def get_participant_day_activities(
         # Find by name
         day_label = session.exec(
             select(DayLabel).where(
-                DayLabel.study_id == study.id,
-                DayLabel.name == day_label_name
+                DayLabel.study_id == study.id, DayLabel.name == day_label_name
             )
         ).first()
         if not day_label:
             raise HTTPException(
                 status_code=404,
-                detail=f"Day label '{day_label_name}' not found for study '{study_name_short}'"
+                detail=f"Day label '{day_label_name}' not found for study '{study_name_short}'",
             )
     else:
         # Find by index
         day_label = session.exec(
             select(DayLabel).where(
-                DayLabel.study_id == study.id,
-                DayLabel.display_order == day_label_index
+                DayLabel.study_id == study.id, DayLabel.display_order == day_label_index
             )
         ).first()
         if not day_label:
             raise HTTPException(
                 status_code=404,
-                detail=f"Day label with index '{day_label_index}' not found for study '{study_name_short}'"
+                detail=f"Day label with index '{day_label_index}' not found for study '{study_name_short}'",
             )
 
-    study_timelines : List[Timeline] = get_timelines_for_study(study.id)
+    study_timelines: List[Timeline] = get_timelines_for_study(study.id)
     study_timelines_json = timelines_to_json(study_timelines)
     study_timelines_names = [t.name for t in study_timelines]
-
 
     # Get all activities for this participant and day label
     activities = session.exec(
@@ -2434,7 +2705,7 @@ def get_participant_day_activities(
         .where(
             Activity.study_id == study.id,
             Activity.participant_id == participant_id,
-            Activity.day_label_id == day_label.id
+            Activity.day_label_id == day_label.id,
         )
         .order_by(Activity.start_minutes, Activity.timeline_id)
     ).all()
@@ -2448,34 +2719,39 @@ def get_participant_day_activities(
             DayLabel.study_id == study.id,
         )
     ).all()
-    day_indices_with_data = sorted({int(day_index) for day_index in day_indices_with_data_rows})
+    day_indices_with_data = sorted(
+        {int(day_index) for day_index in day_indices_with_data_rows}
+    )
 
     # Structure the response in a frontend-friendly format
     response_activities = []
     for activity, timeline in activities:
-        start_time : str = get_time_for_minutes_from_midnight(activity.start_minutes).isoformat() # something like "08:30:00"
+        start_time: str = get_time_for_minutes_from_midnight(
+            activity.start_minutes
+        ).isoformat()  # something like "08:30:00"
         end_time = get_time_for_minutes_from_midnight(activity.end_minutes).isoformat()
-        response_activities.append({
-            # Activity data
-            "timeline_key": timeline.name,
-            "timeline_display_name": timeline.display_name,
-            "timeline_mode": timeline.mode,
-            "activity": activity.activity_name,
-            "activity_code": activity.activity_code,
-            "color": activity.color,
-            "parent_activity_code": activity.parent_activity_code,
-            "activity_path_frontend": activity.activity_path_frontend,
-            "start_minutes": activity.start_minutes,
-            "end_minutes": activity.end_minutes,
-            "start_time": start_time,
-            "end_time": end_time,
-            "duration": activity.end_minutes - activity.start_minutes,
-            "category": activity.category,
-
-            # Metadata
-            "created_at": activity.created_at.isoformat(),
-            "activity_id_backend": activity.id
-        })
+        response_activities.append(
+            {
+                # Activity data
+                "timeline_key": timeline.name,
+                "timeline_display_name": timeline.display_name,
+                "timeline_mode": timeline.mode,
+                "activity": activity.activity_name,
+                "activity_code": activity.activity_code,
+                "color": activity.color,
+                "parent_activity_code": activity.parent_activity_code,
+                "activity_path_frontend": activity.activity_path_frontend,
+                "start_minutes": activity.start_minutes,
+                "end_minutes": activity.end_minutes,
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration": activity.end_minutes - activity.start_minutes,
+                "category": activity.category,
+                # Metadata
+                "created_at": activity.created_at.isoformat(),
+                "activity_id_backend": activity.id,
+            }
+        )
 
     # ========== Get template activities ==========
     template_activities = []
@@ -2497,7 +2773,7 @@ def get_participant_day_activities(
         template_source_day_label = session.exec(
             select(DayLabel).where(
                 DayLabel.study_id == study.id,
-                DayLabel.display_order == target_template_index
+                DayLabel.display_order == target_template_index,
             )
         ).first()
 
@@ -2509,7 +2785,7 @@ def get_participant_day_activities(
                 .where(
                     Activity.study_id == study.id,
                     Activity.participant_id == participant_id,
-                    Activity.day_label_id == template_source_day_label.id
+                    Activity.day_label_id == template_source_day_label.id,
                 )
                 .order_by(Activity.start_minutes, Activity.timeline_id)
             ).all()
@@ -2519,38 +2795,44 @@ def get_participant_day_activities(
                 template_source_day_index = template_source_day_label.display_order
 
                 for activity, timeline in template_source_activities:
-                    start_time : str = get_time_for_minutes_from_midnight(activity.start_minutes).isoformat() # something like "08:30:00"
-                    end_time = get_time_for_minutes_from_midnight(activity.end_minutes).isoformat()
-                    template_activities.append({
-                        # Activity data
-                        "timeline_key": timeline.name,
-                        "timeline_display_name": timeline.display_name,
-                        "timeline_mode": timeline.mode,
-                        "activity": activity.activity_name,
-                        "activity_code": activity.activity_code,
-                        "color": activity.color,
-                        "parent_activity_code": activity.parent_activity_code,
-                        "activity_path_frontend": activity.activity_path_frontend,
-                        "start_minutes": activity.start_minutes,
-                        "end_minutes": activity.end_minutes,
-                        "start_time": start_time,
-                        "end_time": end_time,
-                        "duration": activity.end_minutes - activity.start_minutes,
-                        "category": activity.category,
+                    start_time: str = get_time_for_minutes_from_midnight(
+                        activity.start_minutes
+                    ).isoformat()  # something like "08:30:00"
+                    end_time = get_time_for_minutes_from_midnight(
+                        activity.end_minutes
+                    ).isoformat()
+                    template_activities.append(
+                        {
+                            # Activity data
+                            "timeline_key": timeline.name,
+                            "timeline_display_name": timeline.display_name,
+                            "timeline_mode": timeline.mode,
+                            "activity": activity.activity_name,
+                            "activity_code": activity.activity_code,
+                            "color": activity.color,
+                            "parent_activity_code": activity.parent_activity_code,
+                            "activity_path_frontend": activity.activity_path_frontend,
+                            "start_minutes": activity.start_minutes,
+                            "end_minutes": activity.end_minutes,
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "duration": activity.end_minutes - activity.start_minutes,
+                            "category": activity.category,
+                            # Metadata
+                            "created_at": activity.created_at.isoformat(),
+                            "activity_id_backend": None,  # No ID yet, since this is just a template and not an actual saved activity for the current day.
+                            # Template source information
+                            "is_template_from_previous_day": True,
+                            "template_source_day_label": template_source_day_label.name,
+                            "template_source_day_index": template_source_day_label.display_order,
+                        }
+                    )
 
-                        # Metadata
-                        "created_at": activity.created_at.isoformat(),
-                        "activity_id_backend": None,   # No ID yet, since this is just a template and not an actual saved activity for the current day.
-
-                        # Template source information
-                        "is_template_from_previous_day": True,
-                        "template_source_day_label": template_source_day_label.name,
-                        "template_source_day_index": template_source_day_label.display_order
-                    })
-
-    print(f"Returning activities for participant '{participant_id}', study '{study_name_short}', "
-          f"day label '{day_label.name}' (index: {day_label.display_order}): {len(response_activities)} activities, "
-          f"has_template: {has_template}")
+    print(
+        f"Returning activities for participant '{participant_id}', study '{study_name_short}', "
+        f"day label '{day_label.name}' (index: {day_label.display_order}): {len(response_activities)} activities, "
+        f"has_template: {has_template}"
+    )
 
     # Determine meta-data on the study, including the number of days
     study_days = session.exec(
@@ -2570,22 +2852,30 @@ def get_participant_day_activities(
         "timelines_in_study": study_timelines_json,
         "total_activities": len(response_activities),
         "total_timelines": len(study_timelines_names),
-        "total_timelines_with_activities": len(set([a['timeline_key'] for a in response_activities])),
+        "total_timelines_with_activities": len(
+            set([a["timeline_key"] for a in response_activities])
+        ),
         "activities": response_activities,
         # Template information
         "has_template": has_template,
-        "template_source_day_label": template_source_day_label.name if template_source_day_label else None,
+        "template_source_day_label": template_source_day_label.name
+        if template_source_day_label
+        else None,
         "template_source_day_index": template_source_day_index,
-        "template_activities": template_activities if has_template else []
+        "template_activities": template_activities if has_template else [],
     }
 
 
 @app.post("/api/template-activities")
 def copy_cross_user_template_activities(
     study: str = Query(..., description="Study short name"),
-    source_user: str = Query(..., description="Participant ID to copy template activities from"),
-    target_user: str = Query(..., description="Participant ID to copy template activities to"),
-    session: Session = Depends(get_session)
+    source_user: str = Query(
+        ..., description="Participant ID to copy template activities from"
+    ),
+    target_user: str = Query(
+        ..., description="Participant ID to copy template activities to"
+    ),
+    session: Session = Depends(get_session),
 ):
     """
     Copy all activities from source_user to target_user for a study, writing them directly into
@@ -2608,9 +2898,7 @@ def copy_cross_user_template_activities(
     from collections import defaultdict
 
     # Validate study exists
-    study_obj = session.exec(
-        select(Study).where(Study.name_short == study)
-    ).first()
+    study_obj = session.exec(select(Study).where(Study.name_short == study)).first()
     if not study_obj:
         raise HTTPException(status_code=404, detail=f"Study '{study}' not found")
 
@@ -2620,8 +2908,7 @@ def copy_cross_user_template_activities(
     ).first()
     if not source_participant:
         raise HTTPException(
-            status_code=404,
-            detail=f"Source participant '{source_user}' not found"
+            status_code=404, detail=f"Source participant '{source_user}' not found"
         )
 
     # For closed studies, source and target must be assigned to this study
@@ -2629,25 +2916,25 @@ def copy_cross_user_template_activities(
         source_association = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study_obj.id,
-                StudyParticipant.participant_id == source_user
+                StudyParticipant.participant_id == source_user,
             )
         ).first()
         if not source_association:
             raise HTTPException(
                 status_code=403,
-                detail=f"Source participant '{source_user}' is not authorized for study '{study}'"
+                detail=f"Source participant '{source_user}' is not authorized for study '{study}'",
             )
 
         target_association = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study_obj.id,
-                StudyParticipant.participant_id == target_user
+                StudyParticipant.participant_id == target_user,
             )
         ).first()
         if not target_association:
             raise HTTPException(
                 status_code=403,
-                detail=f"Target participant '{target_user}' is not authorized for closed study '{study}'"
+                detail=f"Target participant '{target_user}' is not authorized for closed study '{study}'",
             )
     else:
         # Open study: auto-create Participant and StudyParticipant for target_user if needed
@@ -2662,13 +2949,12 @@ def copy_cross_user_template_activities(
         target_study_assoc = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study_obj.id,
-                StudyParticipant.participant_id == target_user
+                StudyParticipant.participant_id == target_user,
             )
         ).first()
         if not target_study_assoc:
             target_study_assoc = StudyParticipant(
-                study_id=study_obj.id,
-                participant_id=target_user
+                study_id=study_obj.id, participant_id=target_user
             )
             session.add(target_study_assoc)
             session.flush()
@@ -2684,13 +2970,14 @@ def copy_cross_user_template_activities(
     ).all()
 
     # Find which day_label_ids target_user already has activities for → skip those
-    target_day_label_ids_with_data: set = set(session.exec(
-        select(Activity.day_label_id)
-        .where(
-            Activity.study_id == study_obj.id,
-            Activity.participant_id == target_user,
-        )
-    ).all())
+    target_day_label_ids_with_data: set = set(
+        session.exec(
+            select(Activity.day_label_id).where(
+                Activity.study_id == study_obj.id,
+                Activity.participant_id == target_user,
+            )
+        ).all()
+    )
 
     # Group source activities by day_label_id
     source_by_day: dict = defaultdict(list)
@@ -2731,13 +3018,16 @@ def copy_cross_user_template_activities(
     if all_relevant_ids:
         day_labels = session.exec(
             select(DayLabel).where(
-                DayLabel.study_id == study_obj.id,
-                DayLabel.id.in_(all_relevant_ids)
+                DayLabel.study_id == study_obj.id, DayLabel.id.in_(all_relevant_ids)
             )
         ).all()
         order_map = {dl.id: int(dl.display_order) for dl in day_labels}
-        copied_day_indices = sorted(order_map[d] for d in days_to_copy if d in order_map)
-        skipped_day_indices = sorted(order_map[d] for d in days_to_skip if d in order_map)
+        copied_day_indices = sorted(
+            order_map[d] for d in days_to_copy if d in order_map
+        )
+        skipped_day_indices = sorted(
+            order_map[d] for d in days_to_skip if d in order_map
+        )
 
     logger.info(
         "Copied cross-user template activities: study='%s', source='%s', target='%s', "
@@ -2769,9 +3059,7 @@ class ActiveOpenStudyResponse(BaseModel):
 
 
 @app.get("/api/active_open_study_names", response_model=List[ActiveOpenStudyResponse])
-async def get_active_open_study_names(
-    session: Session = Depends(get_session)
-):
+async def get_active_open_study_names(session: Session = Depends(get_session)):
     """
     Public endpoint (no authentication required) that returns a list of all studies
     that:
@@ -2790,11 +3078,13 @@ async def get_active_open_study_names(
 
         # Query for studies that match both criteria
         studies = session.exec(
-            select(Study).where(
-                Study.allow_unlisted_participants == True,
+            select(Study)
+            .where(
+                Study.allow_unlisted_participants,
                 Study.data_collection_start <= now,
-                Study.data_collection_end >= now
-            ).order_by(Study.name_short)  # Optional: order alphabetically
+                Study.data_collection_end >= now,
+            )
+            .order_by(Study.name_short)  # Optional: order alphabetically
         ).all()
 
         # Create response objects with the required fields
@@ -2802,7 +3092,7 @@ async def get_active_open_study_names(
             ActiveOpenStudyResponse(
                 name_short=study.name_short,
                 name=study.name,
-                description=study.description
+                description=study.description,
             )
             for study in studies
         ]
@@ -2815,10 +3105,8 @@ async def get_active_open_study_names(
         logger.error(f"Error fetching active open study names: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while fetching study information"
+            detail="Internal server error while fetching study information",
         )
-
-
 
 
 class TimelineConfigResponse(BaseModel):
@@ -2828,10 +3116,12 @@ class TimelineConfigResponse(BaseModel):
     mode: str  # "single-choice" or "multiple-choice"
     min_coverage: Optional[int] = None
 
+
 class DayLabelConfigResponse(BaseModel):
     name: str  # e.g., "monday", "typical_weekend"
     display_order: int
     display_name: Optional[str] = None
+
 
 class StudyConfigResponse(BaseModel):
     study_name: str
@@ -2851,12 +3141,21 @@ class StudyConfigResponse(BaseModel):
     day_labels: List[DayLabelConfigResponse]
     study_days_count: int
 
-@app.get("/api/studies/{study_name_short}/study-config", response_model=StudyConfigResponse)
+
+@app.get(
+    "/api/studies/{study_name_short}/study-config", response_model=StudyConfigResponse
+)
 def get_study_config(
     study_name_short: str,
-    lang: Optional[str] = Query(None, description="Optional language code for localized day labels/texts. Defaults to study default language."),
-    participant_id: Optional[str] = Query(None, description="Participant ID for authorization check. Required unless study is open for everyone."),
-    session: Session = Depends(get_session)
+    lang: Optional[str] = Query(
+        None,
+        description="Optional language code for localized day labels/texts. Defaults to study default language.",
+    ),
+    participant_id: Optional[str] = Query(
+        None,
+        description="Participant ID for authorization check. Required unless study is open for everyone.",
+    ),
+    session: Session = Depends(get_session),
 ):
     """
     Get the study configuration including timelines and day labels.
@@ -2883,8 +3182,7 @@ def get_study_config(
 
     if not study:
         raise HTTPException(
-            status_code=404,
-            detail=f"Study '{study_name_short}' not found"
+            status_code=404, detail=f"Study '{study_name_short}' not found"
         )
 
     # Check if participant_id is required
@@ -2893,23 +3191,25 @@ def get_study_config(
         if participant_id is None:
             raise HTTPException(
                 status_code=400,
-                detail=f"Participant ID is required for this study. "
-                       f"Please provide 'participant_id' query parameter."
+                detail="Participant ID is required for this study. "
+                "Please provide 'participant_id' query parameter.",
             )
 
         # Check if the participant is authorized for this study
         study_participant = session.exec(
             select(StudyParticipant).where(
                 StudyParticipant.study_id == study.id,
-                StudyParticipant.participant_id == participant_id
+                StudyParticipant.participant_id == participant_id,
             )
         ).first()
 
         if not study_participant:
-            logger.info(f"Unauthorized participant '{participant_id}' attempted to access study config for '{study_name_short}'")
+            logger.info(
+                f"Unauthorized participant '{participant_id}' attempted to access study config for '{study_name_short}'"
+            )
             raise HTTPException(
                 status_code=403,
-                detail=f"Participant '{participant_id}' not authorized for this study"
+                detail=f"Participant '{participant_id}' not authorized for this study",
             )
     else:
         # Study allows unlisted participants
@@ -2920,14 +3220,21 @@ def get_study_config(
                 select(Participant).where(Participant.id == participant_id)
             ).first()
             if not participant:
-                logger.debug(f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'")
+                logger.debug(
+                    f"Provided participant_id '{participant_id}' doesn't exist for open study '{study_name_short}'"
+                )
 
-    cfg_study = get_cfg_study_by_name_short(study_name_short, settings.studies_config_path)
+    cfg_study = get_cfg_study_by_name_short(
+        study_name_short, settings.studies_config_path
+    )
     normalized_lang = _normalize_language_code(lang)
     selected_language = normalized_lang or study.default_language
     supported_languages: List[str] = [study.default_language]
     if cfg_study:
-        supported_languages = [_normalize_language_code(language) or language for language in cfg_study.get_supported_languages()]
+        supported_languages = [
+            _normalize_language_code(language) or language
+            for language in cfg_study.get_supported_languages()
+        ]
         if selected_language not in supported_languages:
             selected_language = study.default_language
 
@@ -2958,7 +3265,7 @@ def get_study_config(
             display_name=timeline.display_name,
             description=timeline.description,
             mode=timeline.mode,
-            min_coverage=timeline.min_coverage
+            min_coverage=timeline.min_coverage,
         )
         for timeline in timelines
     ]
@@ -2967,20 +3274,34 @@ def get_study_config(
     for day_label in day_labels:
         display_name = day_label.display_name
         if cfg_study:
-            localized_display_name = cfg_study.get_day_label_display_name(day_label.name, selected_language)
+            localized_display_name = cfg_study.get_day_label_display_name(
+                day_label.name, selected_language
+            )
             if localized_display_name:
                 display_name = localized_display_name
         day_label_responses.append(
             DayLabelConfigResponse(
                 name=day_label.name,
                 display_order=day_label.display_order,
-                display_name=display_name
+                display_name=display_name,
             )
         )
 
-    study_text_intro = cfg_study.get_study_text("study_text_intro", selected_language) if cfg_study else None
-    study_text_end_completed = cfg_study.get_study_text("study_text_end_completed", selected_language) if cfg_study else None
-    study_text_end_skipped = cfg_study.get_study_text("study_text_end_skipped", selected_language) if cfg_study else None
+    study_text_intro = (
+        cfg_study.get_study_text("study_text_intro", selected_language)
+        if cfg_study
+        else None
+    )
+    study_text_end_completed = (
+        cfg_study.get_study_text("study_text_end_completed", selected_language)
+        if cfg_study
+        else None
+    )
+    study_text_end_skipped = (
+        cfg_study.get_study_text("study_text_end_skipped", selected_language)
+        if cfg_study
+        else None
+    )
 
     return StudyConfigResponse(
         study_name=study.name,

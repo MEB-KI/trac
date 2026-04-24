@@ -1,10 +1,11 @@
 # activities_config.py -- Parser for activities.json configuration file.
 
 from typing import List, Optional, Dict, Any, Set
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from pydantic import BaseModel, field_validator, model_validator, ConfigDict
 import json
 from pathlib import Path
 from functools import lru_cache
+
 
 class ActivityItem(BaseModel):
     name: str
@@ -15,14 +16,16 @@ class ActivityItem(BaseModel):
     color: Optional[str] = None
     examples: Optional[str] = None
     is_custom_input: Optional[bool] = False
-    childItems: List['ActivityItem'] = []
+    childItems: List["ActivityItem"] = []
 
     model_config = ConfigDict(validate_assignment=True)
+
 
 class ActivityCategory(BaseModel):
     name: str
     activities: List[ActivityItem]
     color: Optional[str] = None
+
 
 class TimelineConfig(BaseModel):
     name: str
@@ -31,20 +34,23 @@ class TimelineConfig(BaseModel):
     min_coverage: Optional[int] = None
     categories: List[ActivityCategory]
 
-    @field_validator('mode')
+    @field_validator("mode")
     @classmethod
     def validate_mode(cls, v: str) -> str:
-        valid_modes = ['single-choice', 'multiple-choice']
+        valid_modes = ["single-choice", "multiple-choice"]
         if v not in valid_modes:
             raise ValueError(f'Timeline mode must be one of {valid_modes}, got "{v}"')
         return v
 
-    @field_validator('min_coverage')
+    @field_validator("min_coverage")
     @classmethod
     def validate_min_coverage(cls, v: Optional[int]) -> Optional[int]:
         if v is not None and (v < 0 or v > 1440):
-            raise ValueError(f'min_coverage must be between 0 and 1440, got {v}') # day has 1440 minutes
+            raise ValueError(
+                f"min_coverage must be between 0 and 1440, got {v}"
+            )  # day has 1440 minutes
         return v
+
 
 class GeneralConfig(BaseModel):
     experimentID: Optional[str] = None
@@ -56,34 +62,41 @@ class GeneralConfig(BaseModel):
     primary_redirect_url: Optional[str] = None
     fallbackToCSV: Optional[bool] = None
 
+
 class ActivitiesConfig(BaseModel):
     general: GeneralConfig
     timeline: Dict[str, TimelineConfig]
 
-    @field_validator('timeline')
+    @field_validator("timeline")
     @classmethod
-    def validate_timeline_keys(cls, v: Dict[str, TimelineConfig]) -> Dict[str, TimelineConfig]:
+    def validate_timeline_keys(
+        cls, v: Dict[str, TimelineConfig]
+    ) -> Dict[str, TimelineConfig]:
         # Ensure at least one timeline exists
         if not v:
-            raise ValueError('At least one timeline must be defined')
+            raise ValueError("At least one timeline must be defined")
 
         # Validate timeline names don't contain invalid characters
         for timeline_name in v.keys():
             if not timeline_name.strip():
-                raise ValueError('Timeline name cannot be empty or whitespace')
-            if ' ' in timeline_name:
-                raise ValueError(f'Timeline name "{timeline_name}" cannot contain spaces')
+                raise ValueError("Timeline name cannot be empty or whitespace")
+            if " " in timeline_name:
+                raise ValueError(
+                    f'Timeline name "{timeline_name}" cannot contain spaces'
+                )
 
         return v
 
-    @model_validator(mode='after')
-    def validate_unique_activity_codes(self) -> 'ActivitiesConfig':
+    @model_validator(mode="after")
+    def validate_unique_activity_codes(self) -> "ActivitiesConfig":
         """Validate that all ActivityItem.code values are unique across all timelines"""
         seen_codes: Set[int] = set()
         duplicate_codes: Set[int] = set()
         duplicates_info: List[str] = []
 
-        def check_activity_codes(activities: List[ActivityItem], parent_path: str = "") -> None:
+        def check_activity_codes(
+            activities: List[ActivityItem], parent_path: str = ""
+        ) -> None:
             for activity in activities:
                 # Check current activity
                 if activity.code in seen_codes and activity.code not in duplicate_codes:
@@ -101,7 +114,9 @@ class ActivitiesConfig(BaseModel):
         # Check all timelines
         for timeline_name, timeline_config in self.timeline.items():
             for category in timeline_config.categories:
-                parent_path = f" in timeline '{timeline_name}', category '{category.name}'"
+                parent_path = (
+                    f" in timeline '{timeline_name}', category '{category.name}'"
+                )
                 check_activity_codes(category.activities, parent_path)
 
         if duplicate_codes:
@@ -112,8 +127,10 @@ class ActivitiesConfig(BaseModel):
 
         return self
 
+
 # Handle recursive ActivityItem
 ActivityItem.model_rebuild()
+
 
 def load_activities_config(config_path: str) -> ActivitiesConfig:
     """Load activities configuration from JSON file.
@@ -125,12 +142,16 @@ def load_activities_config(config_path: str) -> ActivitiesConfig:
     config_path = Path(config_path)
 
     if not config_path.exists():
-        raise FileNotFoundError(f"Activities configuration file not found at '{config_path}'")
+        raise FileNotFoundError(
+            f"Activities configuration file not found at '{config_path}'"
+        )
 
-    if config_path.suffix != '.json':
-        raise ValueError(f"Activities config must be JSON file, got: {config_path.suffix}")
+    if config_path.suffix != ".json":
+        raise ValueError(
+            f"Activities config must be JSON file, got: {config_path.suffix}"
+        )
 
-    with open(config_path, 'r', encoding='utf-8') as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     return ActivitiesConfig(**data)
@@ -139,6 +160,7 @@ def load_activities_config(config_path: str) -> ActivitiesConfig:
 # ============================================================================
 # Caching and Validation Helpers
 # ============================================================================
+
 
 @lru_cache(maxsize=10)
 def get_cached_activities_config(config_path: str) -> ActivitiesConfig:
@@ -172,7 +194,7 @@ def get_all_activity_codes(config: ActivitiesConfig) -> Dict[int, Dict[str, Any]
                 "timeline": context.get("timeline"),
                 "category": context.get("category"),
                 "is_child": context.get("is_child", False),
-                "parent_name": context.get("parent_name")
+                "parent_name": context.get("parent_name"),
             }
 
             # Recursively collect child items
@@ -185,10 +207,7 @@ def get_all_activity_codes(config: ActivitiesConfig) -> Dict[int, Dict[str, Any]
     # Collect codes from all timelines
     for timeline_name, timeline_config in config.timeline.items():
         for category in timeline_config.categories:
-            context = {
-                "timeline": timeline_name,
-                "category": category.name
-            }
+            context = {"timeline": timeline_name, "category": category.name}
             collect_codes(category.activities, context)
 
     return codes_info
@@ -250,7 +269,9 @@ def get_activity_info(config_path: str, code: int) -> Optional[Dict[str, Any]]:
     return all_codes_info.get(code)
 
 
-def validate_multiple_activity_codes(config_path: str, codes: List[int]) -> Dict[str, Any]:
+def validate_multiple_activity_codes(
+    config_path: str, codes: List[int]
+) -> Dict[str, Any]:
     """
     Validate multiple activity codes at once.
 
@@ -259,11 +280,7 @@ def validate_multiple_activity_codes(config_path: str, codes: List[int]) -> Dict
     @return Validation result with `valid`, `invalid`, and `all_valid` fields.
     """
     valid_codes = get_cached_activity_codes(config_path)
-    results = {
-        "valid": [],
-        "invalid": [],
-        "all_valid": True
-    }
+    results = {"valid": [], "invalid": [], "all_valid": True}
 
     for code in codes:
         if code in valid_codes:
@@ -273,6 +290,7 @@ def validate_multiple_activity_codes(config_path: str, codes: List[int]) -> Dict
             results["all_valid"] = False
 
     return results
+
 
 def get_num_activities_in_cfgfile_per_timeline(config_path: str) -> Dict[str, int]:
     """
@@ -289,7 +307,9 @@ def get_num_activities_in_cfgfile_per_timeline(config_path: str) -> Dict[str, in
         for activity in activities:
             count += 1  # Count current activity
             if activity.childItems:
-                count += count_activities(activity.childItems)  # Count child items recursively
+                count += count_activities(
+                    activity.childItems
+                )  # Count child items recursively
         return count
 
     for timeline_name, timeline_config in config.timeline.items():
@@ -299,6 +319,7 @@ def get_num_activities_in_cfgfile_per_timeline(config_path: str) -> Dict[str, in
         timeline_counts[timeline_name] = total_count
 
     return timeline_counts
+
 
 def get_num_categories_in_cfgfile_per_timeline(config_path: str) -> Dict[str, int]:
     """
@@ -320,10 +341,10 @@ def get_num_categories_in_cfgfile_per_timeline(config_path: str) -> Dict[str, in
 def compute_activity_path_from_config(
     timeline_key: str,
     category_name: str,
-    activity: 'ActivityItem',
+    activity: "ActivityItem",
     parent_name: Optional[str] = None,
     short: bool = False,
-    no_duplicate_parts: bool = False
+    no_duplicate_parts: bool = False,
 ) -> str:
     """Compute the frontend_path string for an ActivityItem from the config file.
 
@@ -364,7 +385,9 @@ def compute_activity_path_from_config(
     return " > ".join(parts)
 
 
-def get_activities_cfg_text(config: ActivitiesConfig, short: bool = False, no_duplicate_parts: bool = False) -> str:
+def get_activities_cfg_text(
+    config: ActivitiesConfig, short: bool = False, no_duplicate_parts: bool = False
+) -> str:
     """Build a condensed multi-line text representation of all activities in the config.
 
     Format::
@@ -388,17 +411,30 @@ def get_activities_cfg_text(config: ActivitiesConfig, short: bool = False, no_du
         for category in timeline_cfg.categories:
             lines.append(f"  Category: {category.name}")
             for activity in category.activities:
-                path = compute_activity_path_from_config(timeline_key, category.name, activity, short=short, no_duplicate_parts=no_duplicate_parts)
+                path = compute_activity_path_from_config(
+                    timeline_key,
+                    category.name,
+                    activity,
+                    short=short,
+                    no_duplicate_parts=no_duplicate_parts,
+                )
                 lines.append(f"    {activity.code}  {path}")
                 for child in activity.childItems:
                     child_path = compute_activity_path_from_config(
-                        timeline_key, category.name, child, parent_name=activity.name, short=short, no_duplicate_parts=no_duplicate_parts
+                        timeline_key,
+                        category.name,
+                        child,
+                        parent_name=activity.name,
+                        short=short,
+                        no_duplicate_parts=no_duplicate_parts,
                     )
                     lines.append(f"      {child.code}  {child_path}")
     return "\n".join(lines)
 
 
-def get_activities_cfg_text_for_path(config_path: str, short: bool = False, no_duplicate_parts: bool = False) -> str:
+def get_activities_cfg_text_for_path(
+    config_path: str, short: bool = False, no_duplicate_parts: bool = False
+) -> str:
     """Convenience wrapper: load (cached) config from *config_path* and return its condensed text.
 
     @param config_path Path to the activities JSON configuration file.
@@ -406,4 +442,6 @@ def get_activities_cfg_text_for_path(config_path: str, short: bool = False, no_d
     @return Multi-line condensed text of all activities.
     """
     config = get_cached_activities_config(config_path)
-    return get_activities_cfg_text(config, short=short, no_duplicate_parts = no_duplicate_parts)
+    return get_activities_cfg_text(
+        config, short=short, no_duplicate_parts=no_duplicate_parts
+    )

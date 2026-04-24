@@ -8,9 +8,14 @@ from pathlib import Path
 import re
 from functools import lru_cache
 import logging
-from .activities_config import ActivitiesConfig, load_activities_config, get_activity_codes_set
+from .activities_config import (
+    ActivitiesConfig,
+    load_activities_config,
+    get_activity_codes_set,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class CfgFileDayLabel(BaseModel):
     name: str
@@ -42,7 +47,7 @@ class CfgFileStudy(BaseModel):
     day_labels: List[CfgFileDayLabel]
     study_participant_ids: List[str] = []
     allow_unlisted_participants: bool = True
-    default_language: str = "en" # default to English if not given
+    default_language: str = "en"  # default to English if not given
     supported_languages: Optional[List[str]] = None
     activities_json_file: Optional[Union[str, Dict[str, str]]] = None
     activities_json_files: Optional[Dict[str, str]] = None
@@ -51,8 +56,10 @@ class CfgFileStudy(BaseModel):
     study_text_end_completed: Optional[Dict[str, str]] = None
     study_text_end_skipped: Optional[Dict[str, str]] = None
     data_collection_start: datetime  # UTC-aware datetime, parsed from ISO 8601 string
-    data_collection_end: datetime    # UTC-aware datetime, parsed from ISO 8601 string
-    activities_logged_by_userid: Dict[str, Dict[str, List[CfgFileLoggedActivity]]] = Field(default_factory=dict)
+    data_collection_end: datetime  # UTC-aware datetime, parsed from ISO 8601 string
+    activities_logged_by_userid: Dict[str, Dict[str, List[CfgFileLoggedActivity]]] = (
+        Field(default_factory=dict)
+    )
 
     def get_activities_json_files(self) -> Dict[str, str]:
         if isinstance(self.activities_json_files, dict) and self.activities_json_files:
@@ -61,7 +68,10 @@ class CfgFileStudy(BaseModel):
         if isinstance(self.activities_json_file, dict) and self.activities_json_file:
             return self.activities_json_file
 
-        if isinstance(self.activities_json_file, str) and self.activities_json_file.strip():
+        if (
+            isinstance(self.activities_json_file, str)
+            and self.activities_json_file.strip()
+        ):
             return {self.default_language: self.activities_json_file}
 
         return {}
@@ -78,7 +88,9 @@ class CfgFileStudy(BaseModel):
                 if language not in deduplicated_languages:
                     deduplicated_languages.append(language)
             return deduplicated_languages
-        available_languages = set(self.get_activities_json_files().keys()) | set(self.get_activities_json_data().keys())
+        available_languages = set(self.get_activities_json_files().keys()) | set(
+            self.get_activities_json_data().keys()
+        )
         return sorted(available_languages)
 
     def get_supported_activities_json_files(self) -> Dict[str, str]:
@@ -99,140 +111,190 @@ class CfgFileStudy(BaseModel):
             if language in data_by_lang
         }
 
-    def get_activities_json_file_for_language(self, language: Optional[str] = None) -> Optional[str]:
+    def get_activities_json_file_for_language(
+        self, language: Optional[str] = None
+    ) -> Optional[str]:
         files_by_lang = self.get_supported_activities_json_files()
         if not files_by_lang:
             return None
 
         target_language = language or self.default_language
-        return files_by_lang.get(target_language) or files_by_lang.get(self.default_language) or files_by_lang.get("en")
+        return (
+            files_by_lang.get(target_language)
+            or files_by_lang.get(self.default_language)
+            or files_by_lang.get("en")
+        )
 
-    def get_day_label_display_name(self, day_label_name: str, language: Optional[str] = None) -> Optional[str]:
+    def get_day_label_display_name(
+        self, day_label_name: str, language: Optional[str] = None
+    ) -> Optional[str]:
         target_language = language or self.default_language
         for day_label in self.day_labels:
             if day_label.name != day_label_name:
                 continue
             display_names = day_label.get_display_names(self.default_language)
-            return display_names.get(target_language) or display_names.get(self.default_language) or display_names.get("en")
+            return (
+                display_names.get(target_language)
+                or display_names.get(self.default_language)
+                or display_names.get("en")
+            )
         return None
 
-    def get_study_text(self, field_name: str, language: Optional[str] = None) -> Optional[str]:
+    def get_study_text(
+        self, field_name: str, language: Optional[str] = None
+    ) -> Optional[str]:
         target_language = language or self.default_language
         text_map = getattr(self, field_name, None)
         if not isinstance(text_map, dict) or not text_map:
             return None
-        return text_map.get(target_language) or text_map.get(self.default_language) or text_map.get("en")
+        return (
+            text_map.get(target_language)
+            or text_map.get(self.default_language)
+            or text_map.get("en")
+        )
 
-    def get_logged_activities_by_participant(self) -> Dict[str, Dict[str, List[CfgFileLoggedActivity]]]:
+    def get_logged_activities_by_participant(
+        self,
+    ) -> Dict[str, Dict[str, List[CfgFileLoggedActivity]]]:
         return self.activities_logged_by_userid
 
-    @model_validator(mode='after')
-    def validate_name_short(self) -> 'CfgFileStudy':
+    @model_validator(mode="after")
+    def validate_name_short(self) -> "CfgFileStudy":
         if not self.name_short:
-            raise ValueError('name_short cannot be empty')
+            raise ValueError("name_short cannot be empty")
 
         # Check for URL-friendly characters only: lowercase a-z, numbers 0-9, underscore
-        if not re.match(r'^[a-z0-9_]+$', self.name_short):
+        if not re.match(r"^[a-z0-9_]+$", self.name_short):
             raise ValueError(
                 f'name_short "{self.name_short}" can only contain lowercase letters (a-z), numbers (0-9), and underscores (_). '
-                f'No uppercase letters, spaces, hyphens, or special characters allowed.'
+                f"No uppercase letters, spaces, hyphens, or special characters allowed."
             )
 
         # Check length
         if len(self.name_short) < 2:
-            raise ValueError(f'name_short "{self.name_short}" must be at least 2 characters long')
+            raise ValueError(
+                f'name_short "{self.name_short}" must be at least 2 characters long'
+            )
         if len(self.name_short) > 50:
-            raise ValueError(f'name_short "{self.name_short}" cannot exceed 50 characters')
+            raise ValueError(
+                f'name_short "{self.name_short}" cannot exceed 50 characters'
+            )
 
         return self
 
-    @model_validator(mode='after')
-    def validate_iso8601_dates(self) -> 'CfgFileStudy':
+    @model_validator(mode="after")
+    def validate_iso8601_dates(self) -> "CfgFileStudy":
         # Ensure both datetimes are UTC-aware.
         # Pydantic v2 on Python 3.11+ parses ISO 8601 strings with 'Z' suffix
         # (e.g. "2024-01-01T00:00:00Z") into timezone-aware datetimes automatically.
         # If somehow a naive datetime slips through, treat it as UTC.
-        if self.data_collection_start is not None and self.data_collection_start.tzinfo is None:
-            self.data_collection_start = self.data_collection_start.replace(tzinfo=timezone.utc)
-        if self.data_collection_end is not None and self.data_collection_end.tzinfo is None:
-            self.data_collection_end = self.data_collection_end.replace(tzinfo=timezone.utc)
+        if (
+            self.data_collection_start is not None
+            and self.data_collection_start.tzinfo is None
+        ):
+            self.data_collection_start = self.data_collection_start.replace(
+                tzinfo=timezone.utc
+            )
+        if (
+            self.data_collection_end is not None
+            and self.data_collection_end.tzinfo is None
+        ):
+            self.data_collection_end = self.data_collection_end.replace(
+                tzinfo=timezone.utc
+            )
         return self
 
-    @model_validator(mode='after')
-    def validate_default_language(self) -> 'CfgFileStudy':
+    @model_validator(mode="after")
+    def validate_default_language(self) -> "CfgFileStudy":
         """Validate that default_language is a 2-letter lowercase ASCII string."""
         import re
 
         if not isinstance(self.default_language, str):
             raise ValueError("default_language must be a string")
 
-        if not re.match(r'^[a-z]{2}$', self.default_language):
+        if not re.match(r"^[a-z]{2}$", self.default_language):
             raise ValueError(
                 f'default_language "{self.default_language}" is invalid. '
-                f'Must be a 2-letter lowercase ASCII string (a-z).'
+                f"Must be a 2-letter lowercase ASCII string (a-z)."
             )
 
         return self
 
-
-    @model_validator(mode='after')
-    def validate_multilingual_activity_and_daylabel_config(self) -> 'CfgFileStudy':
+    @model_validator(mode="after")
+    def validate_multilingual_activity_and_daylabel_config(self) -> "CfgFileStudy":
         files_by_lang = self.get_activities_json_files()
         data_by_lang = self.get_activities_json_data()
         if not files_by_lang and not data_by_lang:
-            raise ValueError('One of activities_json_files / activities_json_file or activities_json_data must be configured and non-empty')
+            raise ValueError(
+                "One of activities_json_files / activities_json_file or activities_json_data must be configured and non-empty"
+            )
 
         for language, file_path in files_by_lang.items():
-            if not isinstance(language, str) or not re.match(r'^[a-z]{2}$', language):
+            if not isinstance(language, str) or not re.match(r"^[a-z]{2}$", language):
                 raise ValueError(
                     f'activities language key "{language}" is invalid. '
-                    f'Must be a 2-letter lowercase ASCII string (a-z).'
+                    f"Must be a 2-letter lowercase ASCII string (a-z)."
                 )
             if not isinstance(file_path, str) or file_path.strip() == "":
-                raise ValueError(f'activities_json file for language "{language}" must be a non-empty string')
+                raise ValueError(
+                    f'activities_json file for language "{language}" must be a non-empty string'
+                )
 
         for language, json_payload in data_by_lang.items():
-            if not isinstance(language, str) or not re.match(r'^[a-z]{2}$', language):
+            if not isinstance(language, str) or not re.match(r"^[a-z]{2}$", language):
                 raise ValueError(
                     f'activities data language key "{language}" is invalid. '
-                    f'Must be a 2-letter lowercase ASCII string (a-z).'
+                    f"Must be a 2-letter lowercase ASCII string (a-z)."
                 )
             if not isinstance(json_payload, dict) or not json_payload:
-                raise ValueError(f'activities_json_data for language "{language}" must be a non-empty object')
+                raise ValueError(
+                    f'activities_json_data for language "{language}" must be a non-empty object'
+                )
 
-        available_activity_languages = set(files_by_lang.keys()) | set(data_by_lang.keys())
+        available_activity_languages = set(files_by_lang.keys()) | set(
+            data_by_lang.keys()
+        )
 
         if self.default_language not in available_activity_languages:
             raise ValueError(
                 f'default_language "{self.default_language}" must be present in activities configuration languages: '
-                f'{sorted(available_activity_languages)}'
+                f"{sorted(available_activity_languages)}"
             )
 
         if self.supported_languages is not None:
-            if not isinstance(self.supported_languages, list) or len(self.supported_languages) == 0:
-                raise ValueError('supported_languages must be a non-empty array of language codes')
+            if (
+                not isinstance(self.supported_languages, list)
+                or len(self.supported_languages) == 0
+            ):
+                raise ValueError(
+                    "supported_languages must be a non-empty array of language codes"
+                )
 
             for language in self.supported_languages:
-                if not isinstance(language, str) or not re.match(r'^[a-z]{2}$', language):
+                if not isinstance(language, str) or not re.match(
+                    r"^[a-z]{2}$", language
+                ):
                     raise ValueError(
                         f'supported_languages entry "{language}" is invalid. '
-                        f'Must be a 2-letter lowercase ASCII string (a-z).'
+                        f"Must be a 2-letter lowercase ASCII string (a-z)."
                     )
 
             if len(set(self.supported_languages)) != len(self.supported_languages):
-                raise ValueError('supported_languages must not contain duplicates')
+                raise ValueError("supported_languages must not contain duplicates")
 
             if self.default_language not in self.supported_languages:
                 raise ValueError(
                     f'default_language "{self.default_language}" must be included in supported_languages: '
-                    f'{self.supported_languages}'
+                    f"{self.supported_languages}"
                 )
 
-            missing_activity_configs = sorted(set(self.supported_languages) - available_activity_languages)
+            missing_activity_configs = sorted(
+                set(self.supported_languages) - available_activity_languages
+            )
             if missing_activity_configs:
                 raise ValueError(
-                    f'supported_languages contains languages without activities configuration (file or embedded data): '
-                    f'{missing_activity_configs}'
+                    f"supported_languages contains languages without activities configuration (file or embedded data): "
+                    f"{missing_activity_configs}"
                 )
 
         required_languages = set(self.get_supported_languages())
@@ -242,7 +304,7 @@ class CfgFileStudy(BaseModel):
             if missing_languages:
                 raise ValueError(
                     f'day_labels entry "{day_label.name}" is missing translated display names for languages '
-                    f'{missing_languages}. If an activities file exists for a language, day_labels must also define that language.'
+                    f"{missing_languages}. If an activities file exists for a language, day_labels must also define that language."
                 )
 
             extra_languages = sorted(set(display_names.keys()) - required_languages)
@@ -255,12 +317,18 @@ class CfgFileStudy(BaseModel):
                     extra_languages,
                 )
 
-        for text_field_name in ["study_text_intro", "study_text_end_completed", "study_text_end_skipped"]:
+        for text_field_name in [
+            "study_text_intro",
+            "study_text_end_completed",
+            "study_text_end_skipped",
+        ]:
             text_map = getattr(self, text_field_name, None)
             if text_map is None:
                 continue
             if not isinstance(text_map, dict):
-                raise ValueError(f'{text_field_name} must be an object mapping language codes to text')
+                raise ValueError(
+                    f"{text_field_name} must be an object mapping language codes to text"
+                )
             for language, text_value in text_map.items():
                 if language not in required_languages:
                     logger.warning(
@@ -271,12 +339,14 @@ class CfgFileStudy(BaseModel):
                         language,
                     )
                 if not isinstance(text_value, str) or text_value.strip() == "":
-                    raise ValueError(f'{text_field_name}["{language}"] must be a non-empty string')
+                    raise ValueError(
+                        f'{text_field_name}["{language}"] must be a non-empty string'
+                    )
 
             missing_languages = sorted(required_languages - set(text_map.keys()))
             if missing_languages:
                 raise ValueError(
-                    f'{text_field_name} is missing translations for supported_languages: {missing_languages}'
+                    f"{text_field_name} is missing translations for supported_languages: {missing_languages}"
                 )
 
         return self
@@ -293,7 +363,9 @@ def _resolve_activities_path(raw_path: str, base_dir: Path) -> Path:
     return (base_dir / candidate).resolve()
 
 
-def _validate_multilingual_activity_code_sets(cfg_studies: CfgFileStudies, config_dir: Path) -> None:
+def _validate_multilingual_activity_code_sets(
+    cfg_studies: CfgFileStudies, config_dir: Path
+) -> None:
     for study in cfg_studies.studies:
         files_by_lang = study.get_supported_activities_json_files()
         data_by_lang = study.get_supported_activities_json_data()
@@ -316,7 +388,11 @@ def _validate_multilingual_activity_code_sets(cfg_studies: CfgFileStudies, confi
                 )
             codes_by_lang[language] = get_activity_codes_set(activities_cfg)
 
-        reference_language = study.default_language if study.default_language in codes_by_lang else sorted(codes_by_lang.keys())[0]
+        reference_language = (
+            study.default_language
+            if study.default_language in codes_by_lang
+            else sorted(codes_by_lang.keys())[0]
+        )
         reference_codes = codes_by_lang[reference_language]
 
         mismatch_details: List[str] = []
@@ -351,13 +427,15 @@ def load_studies_config(config_path: str) -> CfgFileStudies:
     config_path = Path(config_path)
 
     if not config_path.exists():
-        raise FileNotFoundError(f"Studies configuration file not found at '{config_path}'")
+        raise FileNotFoundError(
+            f"Studies configuration file not found at '{config_path}'"
+        )
 
-    if config_path.suffix in ['.yaml', '.yml']:
-        with open(config_path, 'r') as f:
+    if config_path.suffix in [".yaml", ".yml"]:
+        with open(config_path, "r") as f:
             data = yaml.safe_load(f)
-    elif config_path.suffix == '.json':
-        with open(config_path, 'r') as f:
+    elif config_path.suffix == ".json":
+        with open(config_path, "r") as f:
             data = json.load(f)
     else:
         raise ValueError(f"Unsupported config file format: {config_path.suffix}")
@@ -373,11 +451,12 @@ def get_cached_studies_config(config_path: str) -> CfgFileStudies:
     return load_studies_config(config_path)
 
 
-def get_cfg_study_by_name_short(study_name_short: str, config_path: str) -> Optional[CfgFileStudy]:
+def get_cfg_study_by_name_short(
+    study_name_short: str, config_path: str
+) -> Optional[CfgFileStudy]:
     """Get a single study definition from the studies config by short name."""
     studies_config = get_cached_studies_config(config_path)
     for study in studies_config.studies:
         if study.name_short == study_name_short:
             return study
     return None
-

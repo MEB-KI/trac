@@ -11,8 +11,7 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-
-def get_time_for_minutes_from_midnight(minutes_from_midnight : int) -> time:
+def get_time_for_minutes_from_midnight(minutes_from_midnight: int) -> time:
     """
     Convert minutes from midnight to a time object.
 

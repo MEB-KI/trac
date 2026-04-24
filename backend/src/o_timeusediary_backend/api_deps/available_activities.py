@@ -25,7 +25,9 @@ def _normalize_language_code(language: Optional[str]) -> Optional[str]:
     return primary_subtag or None
 
 
-def _lookup_languages(requested_language: Optional[str], default_language: Optional[str]) -> List[str]:
+def _lookup_languages(
+    requested_language: Optional[str], default_language: Optional[str]
+) -> List[str]:
     lookup: List[str] = []
     for candidate in [requested_language, default_language, "en"]:
         normalized = _normalize_language_code(candidate)
@@ -34,9 +36,13 @@ def _lookup_languages(requested_language: Optional[str], default_language: Optio
     return lookup
 
 
-def _get_blob_by_language(session: Session, study_id: int) -> Dict[str, StudyActivityConfigBlob]:
+def _get_blob_by_language(
+    session: Session, study_id: int
+) -> Dict[str, StudyActivityConfigBlob]:
     blobs = session.exec(
-        select(StudyActivityConfigBlob).where(StudyActivityConfigBlob.study_id == study_id)
+        select(StudyActivityConfigBlob).where(
+            StudyActivityConfigBlob.study_id == study_id
+        )
     ).all()
     return {
         _normalize_language_code(blob.language): blob
@@ -65,15 +71,23 @@ def get_study_activities_config_model(
             continue
         return ActivitiesConfig(**blob.activities_json_data), "db_blob", language
 
-    cfg_study = get_cfg_study_by_name_short(study.name_short, settings.studies_config_path)
+    cfg_study = get_cfg_study_by_name_short(
+        study.name_short, settings.studies_config_path
+    )
     file_path_for_lang = None
     if cfg_study:
-        file_path_for_lang = cfg_study.get_activities_json_file_for_language(normalized_lang)
+        file_path_for_lang = cfg_study.get_activities_json_file_for_language(
+            normalized_lang
+        )
     if not file_path_for_lang:
         file_path_for_lang = study.activities_json_url
 
     config = load_activities_config(file_path_for_lang)
-    selected_language = _normalize_language_code(normalized_lang) or _normalize_language_code(study.default_language) or "en"
+    selected_language = (
+        _normalize_language_code(normalized_lang)
+        or _normalize_language_code(study.default_language)
+        or "en"
+    )
     return config, "file", selected_language
 
 
@@ -82,10 +96,16 @@ def get_study_activities_config_model_by_short_name(
     study_name_short: str,
     lang: Optional[str] = None,
 ) -> Tuple[Study, ActivitiesConfig, str, str]:
-    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
-    config, source, selected_language = get_study_activities_config_model(session, study, lang)
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+    config, source, selected_language = get_study_activities_config_model(
+        session, study, lang
+    )
     return study, config, source, selected_language
 
 
@@ -94,7 +114,9 @@ def get_valid_activity_codes_for_study(
     study_name_short: str,
     lang: Optional[str] = None,
 ) -> set[int]:
-    _, config, _, _ = get_study_activities_config_model_by_short_name(session, study_name_short, lang)
+    _, config, _, _ = get_study_activities_config_model_by_short_name(
+        session, study_name_short, lang
+    )
     return get_activity_codes_set(config)
 
 
@@ -104,7 +126,9 @@ def get_activity_info_for_study_code(
     activity_code: int,
     lang: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    _, config, _, _ = get_study_activities_config_model_by_short_name(session, study_name_short, lang)
+    _, config, _, _ = get_study_activities_config_model_by_short_name(
+        session, study_name_short, lang
+    )
     return get_all_activity_codes(config).get(activity_code)
 
 
