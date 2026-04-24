@@ -4,15 +4,20 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activity buttons to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activity buttons to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function clickTimelineAtPercent(page, targetPercent) {
-  const timeline = page.locator('.timeline-container[data-active="true"] .timeline').first();
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
   await expect(timeline).toBeVisible();
 
   const box = await timeline.boundingBox();
@@ -25,14 +30,18 @@ async function clickTimelineAtPercent(page, targetPercent) {
 
 async function placeSingleActivity(page) {
   await waitForActivitiesLoaded(page);
-  const firstActivity = page.locator(
-    '#activitiesContainer .activity-button:visible:not(.has-child-items):not(.custom-input)'
-  ).first();
+  const firstActivity = page
+    .locator(
+      '#activitiesContainer .activity-button:visible:not(.has-child-items):not(.custom-input)'
+    )
+    .first();
 
   await firstActivity.click();
   await clickTimelineAtPercent(page, 25);
 
-  await expect(page.locator('.timeline-container[data-active="true"] .activity-block')).toHaveCount(1);
+  await expect(
+    page.locator('.timeline-container[data-active="true"] .activity-block')
+  ).toHaveCount(1);
 }
 
 async function submitCurrentDayAndWaitFor(page, expectedDayName) {
@@ -51,7 +60,8 @@ async function submitCurrentDayAndWaitFor(page, expectedDayName) {
       break;
     }
 
-    const maybeUpdatedTitle = (await currentDayDisplay.getAttribute('title')) || '';
+    const maybeUpdatedTitle =
+      (await currentDayDisplay.getAttribute('title')) || '';
     if (maybeUpdatedTitle.includes(expectedDayName)) {
       break;
     }
@@ -60,28 +70,44 @@ async function submitCurrentDayAndWaitFor(page, expectedDayName) {
   }
 
   await expect
-    .poll(async () => {
-      const currentUrl = page.url();
-      return Number(new URL(currentUrl).searchParams.get('day_label_index') || 0);
-    }, {
-      timeout: 30000,
-      message: 'Waiting for day_label_index=1 after submission',
-    })
+    .poll(
+      async () => {
+        const currentUrl = page.url();
+        return Number(
+          new URL(currentUrl).searchParams.get('day_label_index') || 0
+        );
+      },
+      {
+        timeout: 30000,
+        message: 'Waiting for day_label_index=1 after submission',
+      }
+    )
     .toBe(1);
 
-  await expect(currentDayDisplay).toHaveAttribute('title', new RegExp(expectedDayName), {
-    timeout: 30000,
-  });
+  await expect(currentDayDisplay).toHaveAttribute(
+    'title',
+    new RegExp(expectedDayName),
+    {
+      timeout: 30000,
+    }
+  );
 }
 
-test('shows previous-day switch buttons when days with saved data exist', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+test('shows previous-day switch buttons when days with saved data exist', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
 
-  await expect(page.locator('#currentDayDisplay')).toHaveAttribute('title', /Monday/);
+  await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
+    'title',
+    /Monday/
+  );
 
   // Create data on Monday and submit to move to Tuesday.
   await placeSingleActivity(page);
@@ -89,12 +115,17 @@ test('shows previous-day switch buttons when days with saved data exist', async 
 
   // Now Tuesday should offer switch buttons for already-saved days (Monday).
   await expect
-    .poll(async () => {
-      return page.evaluate(() => window.timelineManager?.dayIndicesWithData || []);
-    }, {
-      timeout: 30000,
-      message: 'Waiting for backend-provided dayIndicesWithData',
-    })
+    .poll(
+      async () => {
+        return page.evaluate(
+          () => window.timelineManager?.dayIndicesWithData || []
+        );
+      },
+      {
+        timeout: 30000,
+        message: 'Waiting for backend-provided dayIndicesWithData',
+      }
+    )
     .toContain(0);
 
   const switchRow = page.locator('#previousDaysSwitchRow');

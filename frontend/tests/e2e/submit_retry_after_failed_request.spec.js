@@ -4,18 +4,25 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activity buttons to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activity buttons to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function clickHourMarkerClosestToPercent(page, targetPercent) {
-  const activeTimelineContainer = page.locator('.timeline-container[data-active="true"]');
+  const activeTimelineContainer = page.locator(
+    '.timeline-container[data-active="true"]'
+  );
   await expect(activeTimelineContainer).toBeVisible();
 
-  const markerLocator = activeTimelineContainer.locator('.timeline .hour-marker');
+  const markerLocator = activeTimelineContainer.locator(
+    '.timeline .hour-marker'
+  );
   await expect(markerLocator.first()).toBeVisible();
 
   const closestIndex = await markerLocator.evaluateAll((markers, percent) => {
@@ -26,7 +33,11 @@ async function clickHourMarkerClosestToPercent(page, targetPercent) {
       const styleAttr = marker.getAttribute('style') || '';
       const leftMatch = styleAttr.match(/left\s*:\s*([\d.]+)%/i);
       const topMatch = styleAttr.match(/top\s*:\s*([\d.]+)%/i);
-      const markerPercent = leftMatch ? parseFloat(leftMatch[1]) : topMatch ? parseFloat(topMatch[1]) : NaN;
+      const markerPercent = leftMatch
+        ? parseFloat(leftMatch[1])
+        : topMatch
+          ? parseFloat(topMatch[1])
+          : NaN;
 
       if (!Number.isNaN(markerPercent)) {
         const distance = Math.abs(markerPercent - percent);
@@ -55,14 +66,19 @@ async function selectActivityByCodeOrFirst(page, code) {
   await waitForActivitiesLoaded(page);
 
   if (code) {
-    const byCode = page.locator(`#activitiesContainer .activity-button[data-code="${code}"]`);
+    const byCode = page.locator(
+      `#activitiesContainer .activity-button[data-code="${code}"]`
+    );
     if (await byCode.count()) {
       await byCode.first().click();
       return;
     }
   }
 
-  await page.locator('#activitiesContainer .activity-button:visible').first().click();
+  await page
+    .locator('#activitiesContainer .activity-button:visible')
+    .first()
+    .click();
 }
 
 async function addActivityAtPercent(page, { code, percent }) {
@@ -77,10 +93,16 @@ async function goToSecondaryTimeline(page) {
   await nextBtn.click();
 
   await expect
-    .poll(async () => page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]), {
-      timeout: 10000,
-      message: 'Waiting to switch to secondary timeline',
-    })
+    .poll(
+      async () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
+      {
+        timeout: 10000,
+        message: 'Waiting to switch to secondary timeline',
+      }
+    )
     .toBe('secondary');
 }
 
@@ -104,29 +126,36 @@ async function openSubmitConfirmation(page) {
   await expect(confirmationModal).toBeVisible();
 }
 
-test('failed submit auto-retries and proceeds without manual retry', async ({ page }) => {
+test('failed submit auto-retries and proceeds without manual retry', async ({
+  page,
+}) => {
   let submitAttempts = 0;
 
-  await page.route('**/studies/**/participants/**/day_labels/**/activities', async (route) => {
-    submitAttempts += 1;
+  await page.route(
+    '**/studies/**/participants/**/day_labels/**/activities',
+    async (route) => {
+      submitAttempts += 1;
 
-    if (submitAttempts === 1) {
+      if (submitAttempts === 1) {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'temporary submit failure' }),
+        });
+        return;
+      }
+
       await route.fulfill({
-        status: 500,
+        status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ detail: 'temporary submit failure' }),
+        body: JSON.stringify({ ok: true }),
       });
-      return;
     }
+  );
 
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: true }),
-    });
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
   });
-
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await expect(page.locator('#continueBtn')).toBeVisible();

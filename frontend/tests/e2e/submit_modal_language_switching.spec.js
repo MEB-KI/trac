@@ -19,18 +19,25 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activity buttons to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activity buttons to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function clickHourMarkerAtPercent(page, targetPercent) {
-  const activeTimelineContainer = page.locator('.timeline-container[data-active="true"]');
+  const activeTimelineContainer = page.locator(
+    '.timeline-container[data-active="true"]'
+  );
   await expect(activeTimelineContainer).toBeVisible();
 
-  const markerLocator = activeTimelineContainer.locator('.timeline .hour-marker');
+  const markerLocator = activeTimelineContainer.locator(
+    '.timeline .hour-marker'
+  );
   await expect(markerLocator.first()).toBeVisible();
 
   const closestIndex = await markerLocator.evaluateAll((markers, pct) => {
@@ -59,7 +66,10 @@ async function clickHourMarkerAtPercent(page, targetPercent) {
 
 async function placeActivityOnTimeline(page) {
   await waitForActivitiesLoaded(page);
-  await page.locator('#activitiesContainer .activity-button:visible').first().click();
+  await page
+    .locator('#activitiesContainer .activity-button:visible')
+    .first()
+    .click();
   await clickHourMarkerAtPercent(page, 50);
 }
 
@@ -69,7 +79,10 @@ async function goToSecondaryTimeline(page) {
   await nextBtn.click();
   await expect
     .poll(
-      () => page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]),
+      () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
       { timeout: 10000, message: 'Waiting to switch to secondary timeline' }
     )
     .toBe('secondary');
@@ -93,26 +106,33 @@ async function openSubmitConfirmation(page) {
 // Test
 // ---------------------------------------------------------------------------
 
-test('submit modal uses correct language for each day after language switch', async ({ page }) => {
+test('submit modal uses correct language for each day after language switch', async ({
+  page,
+}) => {
   // Stub the POST-activities submit endpoint so the test does not depend on
   // a writable backend. GET calls are left to pass through so study config and
   // activity definitions still load from the real backend.
-  await page.route('**/studies/**/participants/**/day_labels/**/activities', async (route) => {
-    if (route.request().method() === 'POST') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ ok: true }),
-      });
-    } else {
-      await route.continue();
+  await page.route(
+    '**/studies/**/participants/**/day_labels/**/activities',
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+      } else {
+        await route.continue();
+      }
     }
-  });
+  );
 
   // -------------------------------------------------------------------------
   // Day 1 – English (Monday)
   // -------------------------------------------------------------------------
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
@@ -132,9 +152,13 @@ test('submit modal uses correct language for each day after language switch', as
 
   // Submit and advance to day 2
   await confirmModal.locator('#confirmOk').click();
-  await expect(page.locator('#currentDayDisplay')).toHaveAttribute('title', /Tuesday|Tisdag/, {
-    timeout: 30000,
-  });
+  await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
+    'title',
+    /Tuesday|Tisdag/,
+    {
+      timeout: 30000,
+    }
+  );
 
   // -------------------------------------------------------------------------
   // Day 2 – Swedish (Tuesday) – switch language via the language selector
@@ -159,13 +183,19 @@ test('submit modal uses correct language for each day after language switch', as
   await expect(confirmModal.locator('h3')).toContainText('Skicka in data för');
   await expect(confirmModal.locator('h3')).toContainText('Tisdag');
   // Verify the submit button text is in Swedish
-  await expect(confirmModal.locator('#confirmOk')).toContainText('Skicka in dag');
+  await expect(confirmModal.locator('#confirmOk')).toContainText(
+    'Skicka in dag'
+  );
 
   // Submit and advance to day 3
   await confirmModal.locator('#confirmOk').click();
-  await expect(page.locator('#currentDayDisplay')).toHaveAttribute('title', /Wednesday|Onsdag/, {
-    timeout: 30000,
-  });
+  await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
+    'title',
+    /Wednesday|Onsdag/,
+    {
+      timeout: 30000,
+    }
+  );
 
   // -------------------------------------------------------------------------
   // Day 3 – English again (Wednesday) – switch language back

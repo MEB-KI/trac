@@ -12,10 +12,14 @@ async function waitForActivitiesLoaded(page) {
 }
 
 async function clickHourMarkerClosestTo50Percent(page) {
-  const activeTimelineContainer = page.locator('.timeline-container[data-active="true"]');
+  const activeTimelineContainer = page.locator(
+    '.timeline-container[data-active="true"]'
+  );
   await expect(activeTimelineContainer).toBeVisible();
 
-  const markerLocator = activeTimelineContainer.locator('.timeline .hour-marker');
+  const markerLocator = activeTimelineContainer.locator(
+    '.timeline .hour-marker'
+  );
   await expect(markerLocator.first()).toBeVisible();
 
   const markerCount = await markerLocator.count();
@@ -64,8 +68,12 @@ async function placeAnyActivityOnActiveTimeline(page) {
   await clickHourMarkerClosestTo50Percent(page);
 }
 
-test('study-config SV localization: intro text and day labels are shown in Swedish', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=sv', { waitUntil: 'domcontentloaded' });
+test('study-config SV localization: intro text and day labels are shown in Swedish', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=sv', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
 

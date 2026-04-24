@@ -4,22 +4,29 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activities to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activities to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function getCurrentTimelineKey(page) {
-  return page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]);
+  return page.evaluate(
+    () => window.timelineManager.keys[window.timelineManager.currentIndex]
+  );
 }
 
 async function switchToTimelineKey(page, timelineKey) {
   const current = await getCurrentTimelineKey(page);
   if (current === timelineKey) return;
 
-  const timelineContainer = page.locator(`.timeline-container:has(#${timelineKey})`).first();
+  const timelineContainer = page
+    .locator(`.timeline-container:has(#${timelineKey})`)
+    .first();
   await expect(timelineContainer).toBeVisible({ timeout: 10000 });
   await timelineContainer.click();
 
@@ -57,7 +64,9 @@ async function goToSecondaryTimeline(page) {
 async function clickTimelineAtPercent(page, targetPercent) {
   await page.waitForTimeout(350);
 
-  const timeline = page.locator('.timeline-container[data-active="true"] .timeline').first();
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
   await expect(timeline).toBeVisible();
 
   const box = await timeline.boundingBox();
@@ -87,19 +96,26 @@ async function selectFirstVisibleActivity(page) {
     return;
   }
 
-  await page.locator('#activitiesContainer .activity-button:visible').first().click();
+  await page
+    .locator('#activitiesContainer .activity-button:visible')
+    .first()
+    .click();
   await expect
     .poll(async () => page.evaluate(() => !!window.selectedActivity), {
       timeout: 3000,
-      message: 'Waiting for selected activity state after fallback button click',
+      message:
+        'Waiting for selected activity state after fallback button click',
     })
     .toBeTruthy();
 }
 
 async function addActivityAtPercentAndGetId(page, percent) {
   const before = await page.evaluate(() => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-    const ids = (window.timelineManager.activities[key] || []).map((a) => String(a.id));
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
+    const ids = (window.timelineManager.activities[key] || []).map((a) =>
+      String(a.id)
+    );
     return { key, ids };
   });
 
@@ -107,21 +123,31 @@ async function addActivityAtPercentAndGetId(page, percent) {
   await clickTimelineAtPercent(page, percent);
 
   await expect
-    .poll(async () => {
-      return page.evaluate((beforeIds) => {
-        const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-        const ids = (window.timelineManager.activities[key] || []).map((a) => String(a.id));
-        return ids.find((id) => !beforeIds.includes(id)) || null;
-      }, before.ids);
-    }, {
-      timeout: 5000,
-      message: 'Waiting for newly placed activity to appear in timeline state',
-    })
+    .poll(
+      async () => {
+        return page.evaluate((beforeIds) => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          const ids = (window.timelineManager.activities[key] || []).map((a) =>
+            String(a.id)
+          );
+          return ids.find((id) => !beforeIds.includes(id)) || null;
+        }, before.ids);
+      },
+      {
+        timeout: 5000,
+        message:
+          'Waiting for newly placed activity to appear in timeline state',
+      }
+    )
     .not.toBeNull();
 
   const after = await page.evaluate((beforeIds) => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-    const ids = (window.timelineManager.activities[key] || []).map((a) => String(a.id));
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
+    const ids = (window.timelineManager.activities[key] || []).map((a) =>
+      String(a.id)
+    );
     const newId = ids.find((id) => !beforeIds.includes(id));
     return { key, ids, newId };
   }, before.ids);
@@ -130,8 +156,17 @@ async function addActivityAtPercentAndGetId(page, percent) {
   return after.newId;
 }
 
-async function resizeBlockLeftThenRight(page, blockId, leftDragPx = -25, rightDragPx = 25) {
-  const block = page.locator(`.timeline-container[data-active="true"] .activity-block[data-id="${blockId}"]`).first();
+async function resizeBlockLeftThenRight(
+  page,
+  blockId,
+  leftDragPx = -25,
+  rightDragPx = 25
+) {
+  const block = page
+    .locator(
+      `.timeline-container[data-active="true"] .activity-block[data-id="${blockId}"]`
+    )
+    .first();
   await expect(block).toBeVisible();
 
   const box = await block.boundingBox();
@@ -150,15 +185,22 @@ async function resizeBlockLeftThenRight(page, blockId, leftDragPx = -25, rightDr
   const y2 = box2.y + box2.height / 2;
   await page.mouse.move(box2.x + box2.width - 1, y2);
   await page.mouse.down();
-  await page.mouse.move(box2.x + box2.width - 1 + rightDragPx, y2, { steps: 8 });
+  await page.mouse.move(box2.x + box2.width - 1 + rightDragPx, y2, {
+    steps: 8,
+  });
   await page.mouse.up();
 }
 
 async function getActivityStateById(page, timelineKey, activityId) {
-  return page.evaluate(({ key, id }) => {
-    const activity = (window.timelineManager.activities[key] || []).find((a) => String(a.id) === String(id));
-    return activity || null;
-  }, { key: timelineKey, id: activityId });
+  return page.evaluate(
+    ({ key, id }) => {
+      const activity = (window.timelineManager.activities[key] || []).find(
+        (a) => String(a.id) === String(id)
+      );
+      return activity || null;
+    },
+    { key: timelineKey, id: activityId }
+  );
 }
 
 async function submitCurrentDay(page, expectedNextDayName) {
@@ -185,18 +227,29 @@ async function submitCurrentDay(page, expectedNextDayName) {
     await page.waitForTimeout(700);
   }
 
-  await expect(currentDayDisplay).toHaveAttribute('title', new RegExp(expectedNextDayName), {
-    timeout: 30000,
-  });
+  await expect(currentDayDisplay).toHaveAttribute(
+    'title',
+    new RegExp(expectedNextDayName),
+    {
+      timeout: 30000,
+    }
+  );
 }
 
-test('resize activities across timelines keeps minute/time-format integrity and Tuesday templates', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+test('resize activities across timelines keeps minute/time-format integrity and Tuesday templates', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
-  await expect(page.locator('#currentDayDisplay')).toHaveAttribute('title', /Monday/);
+  await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
+    'title',
+    /Monday/
+  );
 
   const p1 = await addActivityAtPercentAndGetId(page, 25);
   await resizeBlockLeftThenRight(page, p1, -25, 25);
@@ -273,7 +326,11 @@ test('resize activities across timelines keeps minute/time-format integrity and 
 
   await resizeBlockLeftThenRight(page, primaryFirstTemplateId, -15, 20);
 
-  const resizedTemplate = await getActivityStateById(page, 'primary', primaryFirstTemplateId);
+  const resizedTemplate = await getActivityStateById(
+    page,
+    'primary',
+    primaryFirstTemplateId
+  );
   expect(resizedTemplate).toBeTruthy();
   expect(resizedTemplate.blockLength).toBeGreaterThanOrEqual(30);
   expect(resizedTemplate.startTime).toMatch(/^\d{2}:\d{2}(\(\+1\))?$/);

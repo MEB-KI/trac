@@ -7,18 +7,28 @@ test.use({ viewport: DESKTOP_VIEWPORT });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activities to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activities to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function waitForActiveTimelineLayout(page, expectedLayout) {
   await expect
     .poll(
-      async () => page.locator('.timeline-container[data-active="true"] .timeline').first().getAttribute('data-layout'),
-      { timeout: 30000, message: `Waiting for active timeline layout=${expectedLayout}` }
+      async () =>
+        page
+          .locator('.timeline-container[data-active="true"] .timeline')
+          .first()
+          .getAttribute('data-layout'),
+      {
+        timeout: 30000,
+        message: `Waiting for active timeline layout=${expectedLayout}`,
+      }
     )
     .toBe(expectedLayout);
 }
@@ -27,7 +37,9 @@ async function selectFirstPlaceableActivity(page) {
   await waitForActivitiesLoaded(page);
 
   const button = page
-    .locator('#activitiesContainer .activity-button:visible:not(.has-child-items):not(.custom-input)')
+    .locator(
+      '#activitiesContainer .activity-button:visible:not(.has-child-items):not(.custom-input)'
+    )
     .first();
 
   await expect(button).toBeVisible({ timeout: 10000 });
@@ -42,7 +54,9 @@ async function selectFirstPlaceableActivity(page) {
 }
 
 async function clickActiveTimelineAtPercent(page, percent) {
-  const timeline = page.locator('.timeline-container[data-active="true"] .timeline').first();
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
   await expect(timeline).toBeVisible({ timeout: 10000 });
 
   const box = await timeline.boundingBox();
@@ -53,10 +67,14 @@ async function clickActiveTimelineAtPercent(page, percent) {
   await page.mouse.click(x, y);
 }
 
-test('delete in mobile persists after resizing to desktop without submit', async ({ page }) => {
+test('delete in mobile persists after resizing to desktop without submit', async ({
+  page,
+}) => {
   const pid = `e2e-delete-resize-${Date.now()}`;
 
-  await page.goto(`index.html?study_name=default&lang=en&pid=${pid}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`index.html?study_name=default&lang=en&pid=${pid}`, {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await page.locator('#continueBtn').click();
@@ -66,20 +84,28 @@ test('delete in mobile persists after resizing to desktop without submit', async
   await clickActiveTimelineAtPercent(page, 50);
 
   await expect
-    .poll(async () => page.evaluate(() => {
-      const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-      return (window.timelineManager.activities[key] || []).length;
-    }), {
-      timeout: 5000,
-      message: 'Waiting for created activity in timeline state',
-    })
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          return (window.timelineManager.activities[key] || []).length;
+        }),
+      {
+        timeout: 5000,
+        message: 'Waiting for created activity in timeline state',
+      }
+    )
     .toBe(1);
 
   await page.evaluate(() => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
     const timelineActivities = window.timelineManager.activities[key] || [];
     if (!timelineActivities.length) {
-      throw new Error('No activity found to prepare numeric-id regression check');
+      throw new Error(
+        'No activity found to prepare numeric-id regression check'
+      );
     }
     timelineActivities[0].id = 424242;
   });
@@ -88,24 +114,36 @@ test('delete in mobile persists after resizing to desktop without submit', async
   await expect(page).toHaveURL(/index\.html/);
   await waitForActiveTimelineLayout(page, 'vertical');
 
-  const mobileBlock = page.locator('.timeline-container[data-active="true"] .activity-block[data-id="424242"]').first();
+  const mobileBlock = page
+    .locator(
+      '.timeline-container[data-active="true"] .activity-block[data-id="424242"]'
+    )
+    .first();
   await expect(mobileBlock).toBeVisible({ timeout: 10000 });
 
   await mobileBlock.hover();
   await page.keyboard.press('Delete');
 
   await expect
-    .poll(async () => page.evaluate(() => {
-      const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-      return (window.timelineManager.activities[key] || []).length;
-    }), {
-      timeout: 5000,
-      message: 'Waiting for deleted activity to be removed from timeline state',
-    })
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          return (window.timelineManager.activities[key] || []).length;
+        }),
+      {
+        timeout: 5000,
+        message:
+          'Waiting for deleted activity to be removed from timeline state',
+      }
+    )
     .toBe(0);
 
   await expect(
-    page.locator('.timeline-container[data-active="true"] .activity-block[data-id="424242"]')
+    page.locator(
+      '.timeline-container[data-active="true"] .activity-block[data-id="424242"]'
+    )
   ).toHaveCount(0);
 
   await page.setViewportSize(DESKTOP_VIEWPORT);
@@ -113,16 +151,24 @@ test('delete in mobile persists after resizing to desktop without submit', async
   await waitForActiveTimelineLayout(page, 'horizontal');
 
   await expect
-    .poll(async () => page.evaluate(() => {
-      const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-      return (window.timelineManager.activities[key] || []).length;
-    }), {
-      timeout: 5000,
-      message: 'Deleted activity must stay removed after mobile->desktop reload',
-    })
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          return (window.timelineManager.activities[key] || []).length;
+        }),
+      {
+        timeout: 5000,
+        message:
+          'Deleted activity must stay removed after mobile->desktop reload',
+      }
+    )
     .toBe(0);
 
   await expect(
-    page.locator('.timeline-container[data-active="true"] .activity-block[data-id="424242"]')
+    page.locator(
+      '.timeline-container[data-active="true"] .activity-block[data-id="424242"]'
+    )
   ).toHaveCount(0);
 });

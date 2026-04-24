@@ -8,8 +8,15 @@ test.use({ viewport: DESKTOP_VIEWPORT });
 async function waitForActiveTimelineLayout(page, expectedLayout) {
   await expect
     .poll(
-      async () => page.locator('.timeline-container[data-active="true"] .timeline').first().getAttribute('data-layout'),
-      { timeout: 30000, message: `Waiting for active timeline layout=${expectedLayout}` }
+      async () =>
+        page
+          .locator('.timeline-container[data-active="true"] .timeline')
+          .first()
+          .getAttribute('data-layout'),
+      {
+        timeout: 30000,
+        message: `Waiting for active timeline layout=${expectedLayout}`,
+      }
     )
     .toBe(expectedLayout);
 }
@@ -39,7 +46,9 @@ async function waitForActivitiesLoaded(page) {
 async function ensureSleepingActivityAvailable(page) {
   await waitForActivitiesLoaded(page);
 
-  let sleepingCount = await page.locator('.activity-button[data-code="1101"]').count();
+  let sleepingCount = await page
+    .locator('.activity-button[data-code="1101"]')
+    .count();
   if (sleepingCount > 0) {
     return;
   }
@@ -54,18 +63,26 @@ async function ensureSleepingActivityAvailable(page) {
   }
 
   await expect
-    .poll(async () => page.locator('.activity-button[data-code="1101"]').count(), {
-      timeout: 15000,
-      message: 'Waiting for Sleeping activity button (code 1101) after timeline switch',
-    })
+    .poll(
+      async () => page.locator('.activity-button[data-code="1101"]').count(),
+      {
+        timeout: 15000,
+        message:
+          'Waiting for Sleeping activity button (code 1101) after timeline switch',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function clickHourMarkerClosestTo50PercentDesktop(page) {
-  const activeTimelineContainer = page.locator('.timeline-container[data-active="true"]');
+  const activeTimelineContainer = page.locator(
+    '.timeline-container[data-active="true"]'
+  );
   await expect(activeTimelineContainer).toBeVisible();
 
-  const markerLocator = activeTimelineContainer.locator('.timeline .hour-marker');
+  const markerLocator = activeTimelineContainer.locator(
+    '.timeline .hour-marker'
+  );
   await expect(markerLocator.first()).toBeVisible();
 
   const closestIndex = await markerLocator.evaluateAll((markers) => {
@@ -102,7 +119,9 @@ async function clickHourMarkerClosestTo50PercentDesktop(page) {
 async function addSleepingOnDesktopTimeline(page) {
   await ensureSleepingActivityAvailable(page);
 
-  const sleepingButton = page.locator('#activitiesContainer .activity-button[data-code="1101"]');
+  const sleepingButton = page.locator(
+    '#activitiesContainer .activity-button[data-code="1101"]'
+  );
 
   if (await sleepingButton.count()) {
     await sleepingButton.first().click();
@@ -118,8 +137,12 @@ async function addSleepingOnDesktopTimeline(page) {
   await clickHourMarkerClosestTo50PercentDesktop(page);
 }
 
-test('issue42: switching desktop/mobile keeps added activity', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+test('issue42: switching desktop/mobile keeps added activity', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await expect(page.locator('#continueBtn')).toBeVisible();
@@ -134,8 +157,12 @@ test('issue42: switching desktop/mobile keeps added activity', async ({ page }) 
   await waitForActiveTimelineLayout(page, 'horizontal');
   await expectSleepingInActiveTimeline(page);
 
-  const primaryActivitiesDesktopBeforeResize = page.locator('#primary .activities');
-  await expect(primaryActivitiesDesktopBeforeResize).toContainText('Sleeping', { timeout: 30000 });
+  const primaryActivitiesDesktopBeforeResize = page.locator(
+    '#primary .activities'
+  );
+  await expect(primaryActivitiesDesktopBeforeResize).toContainText('Sleeping', {
+    timeout: 30000,
+  });
 
   await page.setViewportSize(MOBILE_VIEWPORT);
   await page.waitForTimeout(1200);
@@ -144,7 +171,9 @@ test('issue42: switching desktop/mobile keeps added activity', async ({ page }) 
   await expectSleepingInActiveTimeline(page);
 
   const primaryActivitiesMobile = page.locator('#primary .activities');
-  await expect(primaryActivitiesMobile).toContainText('Sleeping', { timeout: 30000 });
+  await expect(primaryActivitiesMobile).toContainText('Sleeping', {
+    timeout: 30000,
+  });
 
   await page.setViewportSize(DESKTOP_VIEWPORT);
   await page.waitForTimeout(1200);
@@ -152,6 +181,10 @@ test('issue42: switching desktop/mobile keeps added activity', async ({ page }) 
   await waitForActiveTimelineLayout(page, 'horizontal');
   await expectSleepingInActiveTimeline(page);
 
-  const primaryActivitiesDesktopAfterResize = page.locator('#primary .activities');
-  await expect(primaryActivitiesDesktopAfterResize).toContainText('Sleeping', { timeout: 30000 });
+  const primaryActivitiesDesktopAfterResize = page.locator(
+    '#primary .activities'
+  );
+  await expect(primaryActivitiesDesktopAfterResize).toContainText('Sleeping', {
+    timeout: 30000,
+  });
 });

@@ -7,8 +7,15 @@ test.use({ viewport: MOBILE_VIEWPORT });
 async function waitForActiveTimelineLayout(page, expectedLayout) {
   await expect
     .poll(
-      async () => page.locator('.timeline-container[data-active="true"] .timeline').first().getAttribute('data-layout'),
-      { timeout: 30000, message: `Waiting for active timeline layout=${expectedLayout}` }
+      async () =>
+        page
+          .locator('.timeline-container[data-active="true"] .timeline')
+          .first()
+          .getAttribute('data-layout'),
+      {
+        timeout: 30000,
+        message: `Waiting for active timeline layout=${expectedLayout}`,
+      }
     )
     .toBe(expectedLayout);
 }
@@ -68,7 +75,9 @@ async function ensureSleepingActivityAvailable(page) {
   await openActivitiesModal(page);
   await expandGeneralActivitiesInModal(page);
 
-  const sleepingByCode = page.locator('#modalActivitiesContainer .activity-button[data-code="1101"]');
+  const sleepingByCode = page.locator(
+    '#modalActivitiesContainer .activity-button[data-code="1101"]'
+  );
   if (await sleepingByCode.count()) {
     return;
   }
@@ -87,17 +96,28 @@ async function ensureSleepingActivityAvailable(page) {
   await expandGeneralActivitiesInModal(page);
 
   await expect
-    .poll(async () => page.locator('#modalActivitiesContainer .activity-button[data-code="1101"]').count(), {
-      timeout: 15000,
-      message: 'Waiting for Sleeping activity button (code 1101) in mobile modal',
-    })
+    .poll(
+      async () =>
+        page
+          .locator(
+            '#modalActivitiesContainer .activity-button[data-code="1101"]'
+          )
+          .count(),
+      {
+        timeout: 15000,
+        message:
+          'Waiting for Sleeping activity button (code 1101) in mobile modal',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function selectSleepingActivity(page) {
   await ensureSleepingActivityAvailable(page);
 
-  const sleepingByCode = page.locator('#modalActivitiesContainer .activity-button[data-code="1101"]');
+  const sleepingByCode = page.locator(
+    '#modalActivitiesContainer .activity-button[data-code="1101"]'
+  );
   if (await sleepingByCode.count()) {
     await sleepingByCode.first().evaluate((button) => button.click());
     await closeActivitiesModal(page);
@@ -128,10 +148,14 @@ async function placeAnyActivityOnActiveTimeline(page) {
 }
 
 async function clickHourMarkerClosestTo50PercentMobile(page) {
-  const activeTimelineContainer = page.locator('.timeline-container[data-active="true"]');
+  const activeTimelineContainer = page.locator(
+    '.timeline-container[data-active="true"]'
+  );
   await expect(activeTimelineContainer).toBeVisible();
 
-  const markerLocator = activeTimelineContainer.locator('.timeline .hour-marker');
+  const markerLocator = activeTimelineContainer.locator(
+    '.timeline .hour-marker'
+  );
   await expect(markerLocator.first()).toBeVisible();
 
   const markerCount = await markerLocator.count();
@@ -173,8 +197,12 @@ async function placeSleepingOnActiveTimeline(page) {
   await clickHourMarkerClosestTo50PercentMobile(page);
 }
 
-test('mobile: instructions -> add Sleeping at ~50% -> next timeline/day shows Tuesday and template', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+test('mobile: instructions -> add Sleeping at ~50% -> next timeline/day shows Tuesday and template', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await expect(page.locator('#continueBtn')).toBeVisible();
@@ -193,7 +221,8 @@ test('mobile: instructions -> add Sleeping at ~50% -> next timeline/day shows Tu
   await expect(nextBtn).toBeEnabled();
   await nextBtn.click();
 
-  const dayTitleAfterFirstNext = (await currentDayDisplay.getAttribute('title')) || '';
+  const dayTitleAfterFirstNext =
+    (await currentDayDisplay.getAttribute('title')) || '';
 
   if (!dayTitleAfterFirstNext.includes('Tuesday')) {
     await placeAnyActivityOnActiveTimeline(page);
@@ -209,7 +238,8 @@ test('mobile: instructions -> add Sleeping at ~50% -> next timeline/day shows Tu
         break;
       }
 
-      const maybeUpdatedTitle = (await currentDayDisplay.getAttribute('title')) || '';
+      const maybeUpdatedTitle =
+        (await currentDayDisplay.getAttribute('title')) || '';
       if (maybeUpdatedTitle.includes('Tuesday')) {
         break;
       }
@@ -218,8 +248,12 @@ test('mobile: instructions -> add Sleeping at ~50% -> next timeline/day shows Tu
     }
   }
 
-  await expect(currentDayDisplay).toHaveAttribute('title', /Tuesday/, { timeout: 30000 });
+  await expect(currentDayDisplay).toHaveAttribute('title', /Tuesday/, {
+    timeout: 30000,
+  });
 
   const primaryActivitiesContainer = page.locator('#primary .activities');
-  await expect(primaryActivitiesContainer).toContainText('Sleeping', { timeout: 30000 });
+  await expect(primaryActivitiesContainer).toContainText('Sleeping', {
+    timeout: 30000,
+  });
 });

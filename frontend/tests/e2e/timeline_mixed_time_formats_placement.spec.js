@@ -2,16 +2,23 @@ const { test, expect } = require('@playwright/test');
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
-test('can place new activity when existing entries use legacy date-prefixed times', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+test('can place new activity when existing entries use legacy date-prefixed times', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
-  await expect(page.locator('.timeline-container[data-active="true"] .timeline').first()).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.locator('.timeline-container[data-active="true"] .timeline').first()
+  ).toBeVisible({ timeout: 30000 });
 
   const result = await page.evaluate(() => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
     window.timelineManager.activities[key] = [
       {
         id: 'legacy_1',
@@ -80,14 +87,22 @@ test('can place new activity when existing entries use legacy date-prefixed time
     };
 
     const beforeCount = window.timelineManager.activities[key].length;
-    const timeline = window.timelineManager.activeTimeline
-      || document.querySelector('.timeline-container[data-active="true"] .timeline');
+    const timeline =
+      window.timelineManager.activeTimeline ||
+      document.querySelector(
+        '.timeline-container[data-active="true"] .timeline'
+      );
     if (!timeline) {
-      return { beforeCount, count: beforeCount, newest: null, error: 'no-active-timeline' };
+      return {
+        beforeCount,
+        count: beforeCount,
+        newest: null,
+        error: 'no-active-timeline',
+      };
     }
     const rect = timeline.getBoundingClientRect();
-    const clientX = rect.left + (rect.width * 0.1);
-    const clientY = rect.top + (rect.height * 0.5);
+    const clientX = rect.left + rect.width * 0.1;
+    const clientY = rect.top + rect.height * 0.5;
 
     timeline.dispatchEvent(
       new MouseEvent('click', {

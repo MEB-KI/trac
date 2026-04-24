@@ -4,10 +4,13 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activities to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activities to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
@@ -34,7 +37,10 @@ async function selectFirstVisibleActivity(page) {
   if (await placeable.count()) {
     await placeable.first().click();
   } else {
-    await page.locator('#activitiesContainer .activity-button:visible').first().click();
+    await page
+      .locator('#activitiesContainer .activity-button:visible')
+      .first()
+      .click();
   }
 
   await expect
@@ -46,7 +52,9 @@ async function selectFirstVisibleActivity(page) {
 }
 
 async function clickActiveTimelineAtPercent(page, targetPercent) {
-  const timeline = page.locator('.timeline-container[data-active="true"] .timeline').first();
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
   await expect(timeline).toBeVisible();
 
   const box = await timeline.boundingBox();
@@ -59,8 +67,11 @@ async function clickActiveTimelineAtPercent(page, targetPercent) {
 
 async function addActivityAtPercentAndGetId(page, percent) {
   const before = await page.evaluate(() => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-    const ids = (window.timelineManager.activities[key] || []).map((a) => String(a.id));
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
+    const ids = (window.timelineManager.activities[key] || []).map((a) =>
+      String(a.id)
+    );
     return { key, ids };
   });
 
@@ -68,33 +79,47 @@ async function addActivityAtPercentAndGetId(page, percent) {
   await clickActiveTimelineAtPercent(page, percent);
 
   await expect
-    .poll(async () => {
-      return page.evaluate((beforeIds) => {
-        const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-        const ids = (window.timelineManager.activities[key] || []).map((a) => String(a.id));
-        return ids.find((id) => !beforeIds.includes(id)) || null;
-      }, before.ids);
-    }, {
-      timeout: 5000,
-      message: 'Waiting for newly placed activity to appear in timeline state',
-    })
+    .poll(
+      async () => {
+        return page.evaluate((beforeIds) => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          const ids = (window.timelineManager.activities[key] || []).map((a) =>
+            String(a.id)
+          );
+          return ids.find((id) => !beforeIds.includes(id)) || null;
+        }, before.ids);
+      },
+      {
+        timeout: 5000,
+        message:
+          'Waiting for newly placed activity to appear in timeline state',
+      }
+    )
     .not.toBeNull();
 
   return page.evaluate((beforeIds) => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-    const ids = (window.timelineManager.activities[key] || []).map((a) => String(a.id));
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
+    const ids = (window.timelineManager.activities[key] || []).map((a) =>
+      String(a.id)
+    );
     return ids.find((id) => !beforeIds.includes(id)) || null;
   }, before.ids);
 }
 
-test('reload preserves unsaved timeline activities from local draft state', async ({ page }) => {
+test('reload preserves unsaved timeline activities from local draft state', async ({
+  page,
+}) => {
   const pid = `reload_draft_${Date.now()}`;
   const url = `index.html?study_name=default&lang=en&day_label_index=0&pid=${pid}`;
 
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await enterDiaryIfNeeded(page);
 
-  const timeline = page.locator('.timeline-container[data-active="true"] .timeline').first();
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
   await expect(timeline).toBeVisible();
   await waitForActivitiesLoaded(page);
 
@@ -102,7 +127,9 @@ test('reload preserves unsaved timeline activities from local draft state', asyn
   expect(activityId).toBeTruthy();
 
   const block = page
-    .locator(`.timeline-container[data-active="true"] .activity-block[data-id="${activityId}"]`)
+    .locator(
+      `.timeline-container[data-active="true"] .activity-block[data-id="${activityId}"]`
+    )
     .first();
   await expect(block).toBeVisible();
 
@@ -111,20 +138,27 @@ test('reload preserves unsaved timeline activities from local draft state', asyn
   await expect(timeline).toBeVisible();
 
   const restoredBlock = page
-    .locator(`.timeline-container[data-active="true"] .activity-block[data-id="${activityId}"]`)
+    .locator(
+      `.timeline-container[data-active="true"] .activity-block[data-id="${activityId}"]`
+    )
     .first();
   await expect(restoredBlock).toBeVisible();
 
   await expect
-    .poll(async () => {
-      return page.evaluate((id) => {
-        const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-        const activities = window.timelineManager.activities[key] || [];
-        return activities.some((a) => String(a.id) === String(id));
-      }, activityId);
-    }, {
-      timeout: 5000,
-      message: 'Waiting for restored activity to appear in timeline state after reload',
-    })
+    .poll(
+      async () => {
+        return page.evaluate((id) => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          const activities = window.timelineManager.activities[key] || [];
+          return activities.some((a) => String(a.id) === String(id));
+        }, activityId);
+      },
+      {
+        timeout: 5000,
+        message:
+          'Waiting for restored activity to appear in timeline state after reload',
+      }
+    )
     .toBeTruthy();
 });

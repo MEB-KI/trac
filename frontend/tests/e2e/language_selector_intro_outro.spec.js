@@ -1,7 +1,11 @@
 const { test, expect } = require('@playwright/test');
 
-test('language selector lists supported languages and applies study intro/outro text', async ({ page }) => {
-  await page.goto('index.html?study_name=9yearolds&lang=sv', { waitUntil: 'domcontentloaded' });
+test('language selector lists supported languages and applies study intro/outro text', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=9yearolds&lang=sv', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
 
@@ -12,7 +16,9 @@ test('language selector lists supported languages and applies study intro/outro 
   const options = await languageSelect.locator('option').allTextContents();
   expect(options).toEqual(expect.arrayContaining(['EN', 'SV']));
 
-  await expect(page.locator('#study-custom-message-intro')).toContainText('Vänligen fyll i denna studie för 9-åringar');
+  await expect(page.locator('#study-custom-message-intro')).toContainText(
+    'Vänligen fyll i denna studie för 9-åringar'
+  );
 
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
@@ -23,5 +29,7 @@ test('language selector lists supported languages and applies study intro/outro 
 
   await expect(page).toHaveURL(/pages\/thank-you\.html/);
   await expect(page).toHaveURL(/completion_status=skipped/);
-  await expect(page.locator('#study-custom-message-end')).toContainText('Du har hoppat över att fylla i tidsanvändningsdelen av studien');
+  await expect(page.locator('#study-custom-message-end')).toContainText(
+    'Du har hoppat över att fylla i tidsanvändningsdelen av studien'
+  );
 });

@@ -4,10 +4,13 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activity buttons to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activity buttons to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
@@ -23,7 +26,10 @@ async function clickHourMarkerClosestToPercent(page, targetPercent) {
 
   await activeTimeline.click({
     position: {
-      x: Math.max(1, Math.min(box.width - 1, (box.width * clampedPercent) / 100)),
+      x: Math.max(
+        1,
+        Math.min(box.width - 1, (box.width * clampedPercent) / 100)
+      ),
       y: Math.max(1, Math.min(box.height - 1, box.height / 2)),
     },
     force: true,
@@ -41,7 +47,9 @@ async function clickActivityButtonByText(page, textPattern) {
 }
 
 async function selectDirectSimple(page) {
-  const byCode = page.locator('#activitiesContainer .activity-button[data-code="1101"]');
+  const byCode = page.locator(
+    '#activitiesContainer .activity-button[data-code="1101"]'
+  );
   if (await byCode.count()) {
     await byCode.first().click();
     return;
@@ -104,14 +112,18 @@ async function selectFromSubmenuCustom(page, customText) {
 }
 
 async function addSelectedActivityAtPercent(page, percent) {
-  const countBefore = await page.evaluate(() => (window.timelineManager?.activities?.primary || []).length);
+  const countBefore = await page.evaluate(
+    () => (window.timelineManager?.activities?.primary || []).length
+  );
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await clickHourMarkerClosestToPercent(page, percent + attempt);
 
     const placed = await page
       .waitForFunction(
-        (previousCount) => (window.timelineManager?.activities?.primary || []).length > previousCount,
+        (previousCount) =>
+          (window.timelineManager?.activities?.primary || []).length >
+          previousCount,
         countBefore,
         { timeout: 2500 }
       )
@@ -170,17 +182,25 @@ async function moveToSecondaryTimeline(page) {
     await nextBtn.click();
     await page.waitForTimeout(700);
 
-    const currentKey = await page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]);
+    const currentKey = await page.evaluate(
+      () => window.timelineManager.keys[window.timelineManager.currentIndex]
+    );
     if (currentKey === 'secondary') {
       return;
     }
   }
 
   await expect
-    .poll(async () => page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]), {
-      timeout: 10000,
-      message: 'Waiting to switch to secondary timeline',
-    })
+    .poll(
+      async () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
+      {
+        timeout: 10000,
+        message: 'Waiting to switch to secondary timeline',
+      }
+    )
     .toBe('secondary');
 }
 
@@ -200,7 +220,8 @@ async function submitCurrentDay(page, expectedNextDayName) {
       break;
     }
 
-    const maybeUpdatedTitle = (await currentDayDisplay.getAttribute('title')) || '';
+    const maybeUpdatedTitle =
+      (await currentDayDisplay.getAttribute('title')) || '';
     if (maybeUpdatedTitle.includes(expectedNextDayName)) {
       break;
     }
@@ -208,13 +229,21 @@ async function submitCurrentDay(page, expectedNextDayName) {
     await page.waitForTimeout(700);
   }
 
-  await expect(currentDayDisplay).toHaveAttribute('title', new RegExp(expectedNextDayName), {
-    timeout: 30000,
-  });
+  await expect(currentDayDisplay).toHaveAttribute(
+    'title',
+    new RegExp(expectedNextDayName),
+    {
+      timeout: 30000,
+    }
+  );
 }
 
-test('primary timeline supports direct/custom/submenu activities and templates to next day', async ({ page }) => {
-  const pid = `e2e-activity-types-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+test('primary timeline supports direct/custom/submenu activities and templates to next day', async ({
+  page,
+}) => {
+  const pid = `e2e-activity-types-${Date.now()}-${Math.floor(
+    Math.random() * 1_000_000
+  )}`;
   const directCustomText = 'Other custom activity';
   const submenuCustomText = 'Mario Kart';
   const expectedDay1AndDay2Activities = [
@@ -233,7 +262,10 @@ test('primary timeline supports direct/custom/submenu activities and templates t
   await page.locator('#continueBtn').click();
 
   await expect(page).toHaveURL(/index\.html/);
-  await expect(page.locator('#currentDayDisplay')).toHaveAttribute('title', /Monday/);
+  await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
+    'title',
+    /Monday/
+  );
 
   await waitForActivitiesLoaded(page);
 
@@ -257,7 +289,9 @@ test('primary timeline supports direct/custom/submenu activities and templates t
   const primaryActivitiesContainer = page.locator('#primary .activities');
   await expect(primaryActivitiesContainer).toContainText('Sleeping');
   await expect(primaryActivitiesContainer).toContainText(directCustomText);
-  await expect(primaryActivitiesContainer).toContainText(/Travelling|Travelling:\s*walking/);
+  await expect(primaryActivitiesContainer).toContainText(
+    /Travelling|Travelling:\s*walking/
+  );
   await expect(primaryActivitiesContainer).toContainText(/Gaming|Mario Kart/);
 
   await moveToSecondaryTimeline(page);
@@ -267,6 +301,10 @@ test('primary timeline supports direct/custom/submenu activities and templates t
   const day2PrimaryActivitiesContainer = page.locator('#primary .activities');
   await expect(day2PrimaryActivitiesContainer).toContainText('Sleeping');
   await expect(day2PrimaryActivitiesContainer).toContainText(directCustomText);
-  await expect(day2PrimaryActivitiesContainer).toContainText(/Travelling|Travelling:\s*walking/);
-  await expect(day2PrimaryActivitiesContainer).toContainText(/Gaming|Mario Kart/);
+  await expect(day2PrimaryActivitiesContainer).toContainText(
+    /Travelling|Travelling:\s*walking/
+  );
+  await expect(day2PrimaryActivitiesContainer).toContainText(
+    /Gaming|Mario Kart/
+  );
 });

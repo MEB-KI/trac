@@ -4,18 +4,25 @@ test.use({ viewport: { width: 1600, height: 900 } });
 
 async function waitForActivitiesLoaded(page) {
   await expect
-    .poll(async () => page.locator('#activitiesContainer .activity-button').count(), {
-      timeout: 30000,
-      message: 'Waiting for activity buttons to load',
-    })
+    .poll(
+      async () => page.locator('#activitiesContainer .activity-button').count(),
+      {
+        timeout: 30000,
+        message: 'Waiting for activity buttons to load',
+      }
+    )
     .toBeGreaterThan(0);
 }
 
 async function clickHourMarkerClosestToPercent(page, targetPercent) {
-  const activeTimelineContainer = page.locator('.timeline-container[data-active="true"]');
+  const activeTimelineContainer = page.locator(
+    '.timeline-container[data-active="true"]'
+  );
   await expect(activeTimelineContainer).toBeVisible();
 
-  const markerLocator = activeTimelineContainer.locator('.timeline .hour-marker');
+  const markerLocator = activeTimelineContainer.locator(
+    '.timeline .hour-marker'
+  );
   await expect(markerLocator.first()).toBeVisible();
 
   const closestIndex = await markerLocator.evaluateAll((markers, percent) => {
@@ -26,7 +33,11 @@ async function clickHourMarkerClosestToPercent(page, targetPercent) {
       const styleAttr = marker.getAttribute('style') || '';
       const leftMatch = styleAttr.match(/left\s*:\s*([\d.]+)%/i);
       const topMatch = styleAttr.match(/top\s*:\s*([\d.]+)%/i);
-      const markerPercent = leftMatch ? parseFloat(leftMatch[1]) : topMatch ? parseFloat(topMatch[1]) : NaN;
+      const markerPercent = leftMatch
+        ? parseFloat(leftMatch[1])
+        : topMatch
+          ? parseFloat(topMatch[1])
+          : NaN;
 
       if (!Number.isNaN(markerPercent)) {
         const distance = Math.abs(markerPercent - percent);
@@ -55,14 +66,19 @@ async function selectActivityByCodeOrFirst(page, code) {
   await waitForActivitiesLoaded(page);
 
   if (code) {
-    const byCode = page.locator(`#activitiesContainer .activity-button[data-code="${code}"]`);
+    const byCode = page.locator(
+      `#activitiesContainer .activity-button[data-code="${code}"]`
+    );
     if (await byCode.count()) {
       await byCode.first().click();
       return;
     }
   }
 
-  await page.locator('#activitiesContainer .activity-button:visible').first().click();
+  await page
+    .locator('#activitiesContainer .activity-button:visible')
+    .first()
+    .click();
 }
 
 async function addActivityAtPercent(page, { code, percent }) {
@@ -79,17 +95,25 @@ async function goToSecondaryTimeline(page) {
     await nextBtn.click();
     await page.waitForTimeout(700); // Account for button debounce
 
-    const currentKey = await page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]);
+    const currentKey = await page.evaluate(
+      () => window.timelineManager.keys[window.timelineManager.currentIndex]
+    );
     if (currentKey === 'secondary') {
       return;
     }
   }
 
   await expect
-    .poll(async () => page.evaluate(() => window.timelineManager.keys[window.timelineManager.currentIndex]), {
-      timeout: 10000,
-      message: 'Waiting to switch to secondary timeline after retries',
-    })
+    .poll(
+      async () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
+      {
+        timeout: 10000,
+        message: 'Waiting to switch to secondary timeline after retries',
+      }
+    )
     .toBe('secondary');
 }
 
@@ -117,20 +141,31 @@ async function submitCurrentDay(page, expectedNextDayName) {
     await page.waitForTimeout(700);
   }
 
-  await expect(currentDayDisplay).toHaveAttribute('title', new RegExp(expectedNextDayName), {
-    timeout: 30000,
-  });
+  await expect(currentDayDisplay).toHaveAttribute(
+    'title',
+    new RegExp(expectedNextDayName),
+    {
+      timeout: 30000,
+    }
+  );
 }
 
-test('day2 template keeps both timelines populated and separated', async ({ page }) => {
-  await page.goto('index.html?study_name=default&lang=en', { waitUntil: 'domcontentloaded' });
+test('day2 template keeps both timelines populated and separated', async ({
+  page,
+}) => {
+  await page.goto('index.html?study_name=default&lang=en', {
+    waitUntil: 'domcontentloaded',
+  });
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
   await expect(page.locator('#continueBtn')).toBeVisible();
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
 
-  await expect(page.locator('#currentDayDisplay')).toHaveAttribute('title', /Monday/);
+  await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
+    'title',
+    /Monday/
+  );
 
   await addActivityAtPercent(page, { code: 1101, percent: 70 });
 
@@ -167,26 +202,37 @@ test('day2 template keeps both timelines populated and separated', async ({ page
   await goToSecondaryTimeline(page);
 
   await expect
-    .poll(async () => {
-      return page.evaluate(() => {
-        const key = window.timelineManager.keys[window.timelineManager.currentIndex];
-        const timelineEl = document.getElementById(key);
-        const visibleBlocks = timelineEl ? timelineEl.querySelectorAll('.activity-block').length : 0;
-        const dataBlocks = (window.timelineManager.activities[key] || []).length;
-        return { key, visibleBlocks, dataBlocks };
-      });
-    }, {
-      timeout: 10000,
-      message: 'Secondary timeline should keep template activities visible and in state',
-    })
+    .poll(
+      async () => {
+        return page.evaluate(() => {
+          const key =
+            window.timelineManager.keys[window.timelineManager.currentIndex];
+          const timelineEl = document.getElementById(key);
+          const visibleBlocks = timelineEl
+            ? timelineEl.querySelectorAll('.activity-block').length
+            : 0;
+          const dataBlocks = (window.timelineManager.activities[key] || [])
+            .length;
+          return { key, visibleBlocks, dataBlocks };
+        });
+      },
+      {
+        timeout: 10000,
+        message:
+          'Secondary timeline should keep template activities visible and in state',
+      }
+    )
     .toMatchObject({ key: 'secondary' });
 
   const secondaryState = await page.evaluate(() => {
-    const key = window.timelineManager.keys[window.timelineManager.currentIndex];
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
     const timelineEl = document.getElementById(key);
     return {
       key,
-      visibleBlocks: timelineEl ? timelineEl.querySelectorAll('.activity-block').length : 0,
+      visibleBlocks: timelineEl
+        ? timelineEl.querySelectorAll('.activity-block').length
+        : 0,
       dataBlocks: (window.timelineManager.activities[key] || []).length,
     };
   });
