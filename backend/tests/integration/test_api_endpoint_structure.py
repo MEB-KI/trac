@@ -244,6 +244,9 @@ async def test_admin_endpoints_are_available_with_auth_and_expected_structure(
             "activities_logged_by_userid",
             "study_participant_ids",
             "activities_json_data",
+            "require_consent",
+            "study_text_consent",
+            "study_text_end_noconsent",
         ]:
             assert key in exported_study
 
