@@ -101,3 +101,33 @@ def test_validate_import_payload_accepts_activities_json_files_only(tmp_path):
         assert "en" in validated["raw_activities_by_lang"]
     finally:
         settings.studies_config_path = previous_studies_config_path
+
+
+def test_import_study_payload_require_consent_defaults_to_false():
+    payload = _base_payload()
+    payload["activities_json_data"] = {"en": _minimal_activities_payload([100])}
+    study_payload = ImportStudiesConfigStudy(**payload)
+    assert study_payload.require_consent is False
+
+
+def test_import_study_payload_require_consent_can_be_true():
+    payload = _base_payload()
+    payload["require_consent"] = True
+    payload["activities_json_data"] = {"en": _minimal_activities_payload([100])}
+    study_payload = ImportStudiesConfigStudy(**payload)
+    assert study_payload.require_consent is True
+
+
+def test_import_study_payload_accepts_study_text_consent_and_noconsent():
+    payload = _base_payload()
+    payload["require_consent"] = True
+    payload["study_text_consent"] = {"en": "Please consent.", "de": "Bitte zustimmen."}
+    payload["study_text_end_noconsent"] = {"en": "No consent given."}
+    payload["activities_json_data"] = {"en": _minimal_activities_payload([100])}
+    study_payload = ImportStudiesConfigStudy(**payload)
+    assert study_payload.require_consent is True
+    assert study_payload.study_text_consent == {
+        "en": "Please consent.",
+        "de": "Bitte zustimmen.",
+    }
+    assert study_payload.study_text_end_noconsent == {"en": "No consent given."}

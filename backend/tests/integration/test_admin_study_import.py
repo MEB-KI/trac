@@ -304,3 +304,90 @@ async def test_admin_import_accepts_activities_json_files_only():
         )
         assert activities_response.status_code == 200
         assert "timeline" in activities_response.json()
+
+
+@pytest.mark.asyncio
+async def test_admin_export_includes_require_consent_and_consent_texts():
+    """Export of the 'default' study (which has require_consent=True in studies_config.json)
+    must include require_consent, study_text_consent, and study_text_end_noconsent."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        export_response = await client.get(
+            f"{BASE_URL}/api/admin/export/studies-runtime-config",
+            params={"study_name": "default"},
+            auth=ADMIN_AUTH,
+        )
+        assert export_response.status_code == 200
+        export_data = export_response.json()
+        studies = export_data["studies_config"]["studies"]
+        assert studies, "Expected at least one study in export"
+
+        exported_study = studies[0]
+        assert "require_consent" in exported_study
+        assert exported_study["require_consent"] is True
+        assert "study_text_consent" in exported_study
+        assert exported_study["study_text_consent"] is not None
+        assert "study_text_end_noconsent" in exported_study
+
+
+@pytest.mark.asyncio
+async def test_admin_export_require_consent_roundtrip():
+    """Import a study with require_consent=True and consent texts, then verify the
+    export reflects require_consent correctly from the database."""
+    study_name_short = f"it_consent_{uuid.uuid4().hex[:8]}"
+    activities_payload = _load_activities_template()
+
+    payload = {
+        "mode": "create_only",
+        "transaction_mode": "all_or_nothing",
+        "studies": [
+            {
+                "name": f"Consent Roundtrip Study {study_name_short}",
+                "name_short": study_name_short,
+                "description": "Study with consent for roundtrip test",
+                "day_labels": [
+                    {
+                        "name": "monday",
+                        "display_order": 0,
+                        "display_names": {"en": "Monday"},
+                    }
+                ],
+                "study_participant_ids": [],
+                "allow_unlisted_participants": True,
+                "require_consent": True,
+                "study_text_consent": {"en": "Please consent to participate."},
+                "study_text_end_noconsent": {"en": "You did not consent."},
+                "default_language": "en",
+                "supported_languages": ["en"],
+                "activities_json_data": {"en": activities_payload},
+                "data_collection_start": "2024-01-01T00:00:00Z",
+                "data_collection_end": "2028-12-31T23:59:59Z",
+            }
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        import_response = await client.post(
+            f"{BASE_URL}/api/admin/studies/import-config",
+            json=payload,
+            auth=ADMIN_AUTH,
+        )
+        assert import_response.status_code == 200
+        import_data = import_response.json()
+        assert import_data["summary"]["created"] == 1
+
+        export_response = await client.get(
+            f"{BASE_URL}/api/admin/export/studies-runtime-config",
+            params={"study_name": study_name_short},
+            auth=ADMIN_AUTH,
+        )
+        assert export_response.status_code == 200
+        export_data = export_response.json()
+        exported_study = export_data["studies_config"]["studies"][0]
+
+        assert exported_study["require_consent"] is True
+        # study_text_consent and study_text_end_noconsent are not stored in the DB;
+        # they are read from studies_config.json. For a freshly imported study that
+        # has no entry in the config file, they will be None in the export.
+        assert "study_text_consent" in exported_study
+        assert "study_text_end_noconsent" in exported_study
+

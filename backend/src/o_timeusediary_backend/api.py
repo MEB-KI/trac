@@ -1971,6 +1971,8 @@ async def export_runtime_studies_config(
             study_text_intro = cfg_study.study_text_intro
             study_text_end_completed = cfg_study.study_text_end_completed
             study_text_end_skipped = cfg_study.study_text_end_skipped
+            study_text_end_noconsent = cfg_study.study_text_end_noconsent
+            study_text_consent = cfg_study.study_text_consent
             if not activities_json_files and blob_by_lang:
                 activities_json_files = {
                     language: f"db_blob://{study.name_short}/{language}"
@@ -1992,6 +1994,8 @@ async def export_runtime_studies_config(
             study_text_intro = None
             study_text_end_completed = None
             study_text_end_skipped = None
+            study_text_end_noconsent = None
+            study_text_consent = None
 
         activity_configs_for_study: Dict = {}
         for lang, activity_file_path in activities_json_files.items():
@@ -2018,6 +2022,7 @@ async def export_runtime_studies_config(
                 "day_labels": day_labels_export,
                 "study_participant_ids": participant_ids,
                 "allow_unlisted_participants": study.allow_unlisted_participants,
+                "require_consent": study.require_consent,
                 "default_language": study.default_language,
                 "supported_languages": supported_languages,
                 "activities_json_files": activities_json_files,
@@ -2025,6 +2030,8 @@ async def export_runtime_studies_config(
                 "study_text_intro": study_text_intro,
                 "study_text_end_completed": study_text_end_completed,
                 "study_text_end_skipped": study_text_end_skipped,
+                "study_text_end_noconsent": study_text_end_noconsent,
+                "study_text_consent": study_text_consent,
                 "data_collection_start": study.data_collection_start,
                 "data_collection_end": study.data_collection_end,
                 "activities_logged_by_userid": logged_activities,
