@@ -40,6 +40,21 @@
         "fr": "Vous avez ignoré la partie de déclaration du temps. Si vous avez fourni certaines informations, nous essaierons de les utiliser. Merci !",
         "es": "Ha omitido la parte de registro del tiempo. Si proporcionó alguna información, intentaremos utilizarla. ¡Gracias!"
       },
+      "require_consent": true,
+      "study_text_consent": {
+        "en": "# Study Consent Page\n\nBy continuing, you agree that:\n- your answers are collected for scientific time use research\n- the data may be analyzed in aggregated form\n- you can stop at any time before submitting",
+        "sv": "# Sida för samtycke till studien\n\nGenom att fortsätta godkänner du att:\n- dina svar samlas in för vetenskaplig tidsanvändningsforskning\n- uppgifterna kan analyseras i samlad form\n- du kan avbryta när som helst innan du skickar in",
+        "de": "# Einwilligungsseite für die Studie\n\nWenn Sie fortfahren, stimmen Sie zu, dass:\n- Ihre Antworten für wissenschaftliche Forschung zur Zeitnutzung erhoben werden\n- die Daten in zusammengefasster Form ausgewertet werden können\n- Sie jederzeit vor dem Absenden abbrechen können"
+      },
+      "study_text_end_noconsent": {
+        "en": "You did not give consent and your data will not be used in this study.",
+        "sv": "Du gav inte ditt samtycke och dina data kommer inte att användas i denna studie.",
+        "de": "Sie haben keine Einwilligung gegeben und Ihre Daten werden in dieser Studie nicht verwendet.",
+        "pl": "Nie wyraziłeś(-aś) zgody i Twoje dane nie będą wykorzystane w tym badaniu.",
+        "fi": "Et antanut suostumusta, eikä tietojasi käytetä tässä tutkimuksessa.",
+        "fr": "Vous n'avez pas donné votre consentement et vos données ne seront pas utilisées dans cette étude.",
+        "es": "No ha dado su consentimiento y sus datos no se utilizarán en este estudio."
+      },
       "study_participant_ids": [],
       "allow_unlisted_participants": true,
       "default_language": "en",
@@ -92,6 +107,20 @@
         "fr": "Vous avez ignoré la partie de déclaration du temps. Si vous avez fourni certaines informations, nous essaierons de les utiliser. Merci !",
         "es": "Ha omitido la parte de registro del tiempo. Si proporcionó alguna información, intentaremos utilizarla. ¡Gracias!"
       },
+      "require_consent": true,
+      "study_text_consent": {
+        "en": "# Study Consent Page\n\nBy continuing, you agree that:\n- your answers are collected for scientific time use research\n- the data may be analyzed in aggregated form\n- you can stop at any time before submitting",
+        "sv": "# Sida för samtycke till studien\n\nGenom att fortsätta godkänner du att:\n- dina svar samlas in för vetenskaplig tidsanvändningsforskning\n- uppgifterna kan analyseras i samlad form\n- du kan avbryta när som helst innan du skickar in"
+      },
+      "study_text_end_noconsent": {
+        "en": "You did not give consent and your data will not be used in this study.",
+        "sv": "Du gav inte ditt samtycke och dina data kommer inte att användas i denna studie.",
+        "de": "Sie haben keine Einwilligung gegeben und Ihre Daten werden in dieser Studie nicht verwendet.",
+        "pl": "Nie wyraziłeś(-aś) zgody i Twoje dane nie będą wykorzystane w tym badaniu.",
+        "fi": "Et antanut suostumusta, eikä tietojasi käytetä tässä tutkimuksessa.",
+        "fr": "Vous n'avez pas donné votre consentement et vos données ne seront pas utilisées dans cette étude.",
+        "es": "No ha dado su consentimiento y sus datos no se utilizarán en este estudio."
+      },
       "study_participant_ids": [],
       "allow_unlisted_participants": true,
       "default_language": "en",
@@ -143,6 +172,20 @@
         "fi": "Ohitit tutkimuksen ajankäyttöosan täyttämisen. Jos annoit joitakin tietoja, yritämme käyttää niitä. Kiitos!",
         "fr": "Vous avez ignoré le remplissage de la partie de l'étude sur l'utilisation du temps. Si vous avez fourni certaines informations, nous essaierons de les utiliser. Merci !",
         "es": "Ha omitido completar la parte del estudio sobre el uso del tiempo. Si proporcionó alguna información, intentaremos utilizarla. ¡Gracias!"
+      },
+      "require_consent": true,
+      "study_text_consent": {
+        "en": "# Study Consent Page\n\nBy continuing, you agree that:\n- your answers are collected for scientific time use research\n- the data may be analyzed in aggregated form\n- you can stop at any time before submitting",
+        "sv": "# Sida för samtycke till studien\n\nGenom att fortsätta godkänner du att:\n- dina svar samlas in för vetenskaplig tidsanvändningsforskning\n- uppgifterna kan analyseras i samlad form\n- du kan avbryta när som helst innan du skickar in"
+      },
+      "study_text_end_noconsent": {
+        "en": "You did not give consent and your data will not be used in this study.",
+        "sv": "Du gav inte ditt samtycke och dina data kommer inte att användas i denna studie.",
+        "de": "Sie haben keine Einwilligung gegeben und Ihre Daten werden in dieser Studie nicht verwendet.",
+        "pl": "Nie wyraziłeś(-aś) zgody i Twoje dane nie będą wykorzystane w tym badaniu.",
+        "fi": "Et antanut suostumusta, eikä tietojasi käytetä tässä tutkimuksessa.",
+        "fr": "Vous n'avez pas donné votre consentement et vos données ne seront pas utilisées dans cette étude.",
+        "es": "No ha dado su consentimiento y sus datos no se utilizarán en este estudio."
       },
       "study_participant_ids": [],
       "allow_unlisted_participants": true,

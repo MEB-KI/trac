@@ -1138,11 +1138,18 @@ class ImportStudiesConfigStudy(BaseModel):
     supported_languages: List[str]
     activities_json_data: Optional[Dict[str, Dict]] = None
     activities_json_files: Optional[Dict[str, str]] = None
+    require_consent: bool = False
     study_text_intro: Optional[Dict[str, str]] = None
     study_text_end_completed: Optional[Dict[str, str]] = None
     study_text_end_skipped: Optional[Dict[str, str]] = None
+    study_text_end_noconsent: Optional[Dict[str, str]] = None
+    study_text_consent: Optional[Dict[str, str]] = None
     data_collection_start: datetime
     data_collection_end: datetime
+
+
+class UpdateConsentRequest(BaseModel):
+    consent_given: bool
 
 
 class ImportStudiesConfigRequest(BaseModel):
@@ -3128,6 +3135,7 @@ class StudyConfigResponse(BaseModel):
     study_name_short: str
     description: str
     allow_unlisted_participants: bool
+    require_consent: bool = False
     data_collection_start: datetime
     data_collection_end: datetime
     default_language: str
@@ -3137,6 +3145,10 @@ class StudyConfigResponse(BaseModel):
     study_text_intro: Optional[str] = None
     study_text_end_completed: Optional[str] = None
     study_text_end_skipped: Optional[str] = None
+    study_text_end_noconsent: Optional[str] = None
+    study_text_consent: Optional[str] = None
+    consent_given: Optional[bool] = None
+    consent_decided_at: Optional[datetime] = None
     timelines: List[TimelineConfigResponse]
     day_labels: List[DayLabelConfigResponse]
     study_days_count: int
@@ -3302,12 +3314,37 @@ def get_study_config(
         if cfg_study
         else None
     )
+    study_text_end_noconsent = (
+        cfg_study.get_study_text("study_text_end_noconsent", selected_language)
+        if cfg_study
+        else None
+    )
+    study_text_consent = (
+        cfg_study.get_study_text("study_text_consent", selected_language)
+        if cfg_study
+        else None
+    )
+    require_consent = bool(getattr(cfg_study, "require_consent", False))
+
+    consent_given = None
+    consent_decided_at = None
+    if participant_id is not None:
+        study_participant = session.exec(
+            select(StudyParticipant).where(
+                StudyParticipant.study_id == study.id,
+                StudyParticipant.participant_id == participant_id,
+            )
+        ).first()
+        if study_participant:
+            consent_given = study_participant.consent_given
+            consent_decided_at = study_participant.consent_decided_at
 
     return StudyConfigResponse(
         study_name=study.name,
         study_name_short=study.name_short,
         description=study.description,
         allow_unlisted_participants=study.allow_unlisted_participants,
+        require_consent=require_consent,
         data_collection_start=study.data_collection_start,
         data_collection_end=study.data_collection_end,
         default_language=study.default_language,
@@ -3317,7 +3354,64 @@ def get_study_config(
         study_text_intro=study_text_intro,
         study_text_end_completed=study_text_end_completed,
         study_text_end_skipped=study_text_end_skipped,
+        study_text_end_noconsent=study_text_end_noconsent,
+        study_text_consent=study_text_consent,
+        consent_given=consent_given,
+        consent_decided_at=consent_decided_at,
         timelines=timeline_responses,
         day_labels=day_label_responses,
         study_days_count=len(day_labels),
     )
+
+
+@app.post(
+    "/api/studies/{study_name_short}/participants/{participant_id}/consent"
+)
+async def set_participant_consent(
+    study_name_short: str,
+    participant_id: str,
+    payload: UpdateConsentRequest,
+    session: Session = Depends(get_session),
+):
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    participant = session.get(Participant, participant_id)
+    if not participant:
+        participant = Participant(id=participant_id)
+        session.add(participant)
+        session.flush()
+
+    association = session.exec(
+        select(StudyParticipant).where(
+            StudyParticipant.study_id == study.id,
+            StudyParticipant.participant_id == participant_id,
+        )
+    ).first()
+
+    if association is None:
+        if not study.allow_unlisted_participants:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Participant '{participant_id}' not authorized for this study",
+            )
+
+        association = StudyParticipant(
+            study_id=study.id,
+            participant_id=participant_id,
+        )
+        session.add(association)
+
+    association.consent_given = payload.consent_given
+    association.consent_decided_at = utc_now()
+    session.commit()
+
+    return {
+        "study_name_short": study_name_short,
+        "participant_id": participant_id,
+        "consent_given": association.consent_given,
+        "consent_decided_at": association.consent_decided_at,
+    }

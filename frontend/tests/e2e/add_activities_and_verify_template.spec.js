@@ -1,4 +1,7 @@
 const { test, expect } = require('@playwright/test');
+const {
+  enterStudyIfNeeded,
+} = require('./e2e_helpers.js');
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -131,11 +134,7 @@ test('instructions -> add Sleeping at ~50% -> next timeline/day shows Tuesday', 
     waitUntil: 'domcontentloaded',
   });
 
-  await expect(page).toHaveURL(/pages\/instructions\.html/);
-  await expect(page.locator('#continueBtn')).toBeVisible();
-  await page.locator('#continueBtn').click();
-
-  await expect(page).toHaveURL(/index\.html/);
+  await enterStudyIfNeeded(page);
 
   const currentDayDisplay = page.locator('#currentDayDisplay');
   await expect(currentDayDisplay).toBeVisible();

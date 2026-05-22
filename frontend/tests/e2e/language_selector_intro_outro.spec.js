@@ -1,11 +1,14 @@
 const { test, expect } = require('@playwright/test');
+const { enterConsentAndInstructionsIfNeeded } = require('./e2e_helpers.js');
 
 test('language selector lists supported languages and applies study intro/outro text', async ({
   page,
 }) => {
-  await page.goto('index.html?study_name=9yearolds&lang=sv', {
+  await page.goto('pages/instructions.html?study_name=9yearolds&lang=sv', {
     waitUntil: 'domcontentloaded',
   });
+
+  await enterConsentAndInstructionsIfNeeded(page).catch(() => undefined);
 
   await expect(page).toHaveURL(/pages\/instructions\.html/);
 

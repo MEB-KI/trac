@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { enterStudyIfNeeded } = require('./e2e_helpers.js');
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 
@@ -204,11 +205,7 @@ test('mobile: instructions -> add Sleeping at ~50% -> next timeline/day shows Tu
     waitUntil: 'domcontentloaded',
   });
 
-  await expect(page).toHaveURL(/pages\/instructions\.html/);
-  await expect(page.locator('#continueBtn')).toBeVisible();
-  await page.locator('#continueBtn').click();
-
-  await expect(page).toHaveURL(/index\.html/);
+  await enterStudyIfNeeded(page);
   await waitForActiveTimelineLayout(page, 'vertical');
 
   const currentDayDisplay = page.locator('#currentDayDisplay');

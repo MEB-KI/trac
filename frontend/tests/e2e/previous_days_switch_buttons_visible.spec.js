@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { enterStudyIfNeeded } = require('./e2e_helpers.js');
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -100,9 +101,7 @@ test('shows previous-day switch buttons when days with saved data exist', async 
     waitUntil: 'domcontentloaded',
   });
 
-  await expect(page).toHaveURL(/pages\/instructions\.html/);
-  await page.locator('#continueBtn').click();
-  await expect(page).toHaveURL(/index\.html/);
+  await enterStudyIfNeeded(page);
 
   await expect(page.locator('#currentDayDisplay')).toHaveAttribute(
     'title',
