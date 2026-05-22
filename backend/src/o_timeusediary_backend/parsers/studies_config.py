@@ -52,9 +52,12 @@ class CfgFileStudy(BaseModel):
     activities_json_file: Optional[Union[str, Dict[str, str]]] = None
     activities_json_files: Optional[Dict[str, str]] = None
     activities_json_data: Optional[Dict[str, Dict[str, Any]]] = None
+    require_consent: bool = False
     study_text_intro: Optional[Dict[str, str]] = None
     study_text_end_completed: Optional[Dict[str, str]] = None
     study_text_end_skipped: Optional[Dict[str, str]] = None
+    study_text_end_noconsent: Optional[Dict[str, str]] = None
+    study_text_consent: Optional[Dict[str, str]] = None
     data_collection_start: datetime  # UTC-aware datetime, parsed from ISO 8601 string
     data_collection_end: datetime  # UTC-aware datetime, parsed from ISO 8601 string
     activities_logged_by_userid: Dict[str, Dict[str, List[CfgFileLoggedActivity]]] = (
@@ -321,6 +324,8 @@ class CfgFileStudy(BaseModel):
             "study_text_intro",
             "study_text_end_completed",
             "study_text_end_skipped",
+            "study_text_end_noconsent",
+            "study_text_consent",
         ]:
             text_map = getattr(self, text_field_name, None)
             if text_map is None:

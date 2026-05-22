@@ -244,10 +244,17 @@ class StudyParticipant(SQLModel, table=True):
     """Link table for study-participant associations"""
 
     __tablename__ = "study_participants"
+    __table_args__ = (
+        UniqueConstraint("study_id", "participant_id", name="uq_study_participant"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     study_id: int = Field(foreign_key="studies.id")
     participant_id: str = Field(foreign_key="participants.id")
+    consent_given: Optional[bool] = Field(default=None)
+    consent_decided_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

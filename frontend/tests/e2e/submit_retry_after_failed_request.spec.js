@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { enterStudyIfNeeded } = require('./e2e_helpers.js');
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -157,10 +158,7 @@ test('failed submit auto-retries and proceeds without manual retry', async ({
     waitUntil: 'domcontentloaded',
   });
 
-  await expect(page).toHaveURL(/pages\/instructions\.html/);
-  await expect(page.locator('#continueBtn')).toBeVisible();
-  await page.locator('#continueBtn').click();
-  await expect(page).toHaveURL(/index\.html/);
+  await enterStudyIfNeeded(page);
 
   await addActivityAtPercent(page, { code: 1101, percent: 70 });
   await goToSecondaryTimeline(page);
