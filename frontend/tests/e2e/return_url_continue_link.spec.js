@@ -101,6 +101,84 @@ test('thank-you page shows assigned external task link for confirmation_type non
     'https://example.org/payment?src=playwright&survey_token=tok-1'
   );
 
+  const callbackLink = page.locator(
+    '#study-custom-message-end a.continue-link',
+    { hasText: 'Callback Task' }
+  );
+  await expect(callbackLink).toBeVisible();
+  await expect(callbackLink).toHaveAttribute(
+    'href',
+    'https://example.org/callback?token=cb-1'
+  );
+});
+
+test('thank-you page confirms callback external task and hides it afterwards', async ({
+  page,
+}) => {
+  let callbackConfirmed = false;
+
+  await page.route('**/api/studies/pw_callback/study-config**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        study_name: 'Playwright Callback Study',
+        study_name_short: 'pw_callback',
+        description: 'Mocked callback study config',
+        allow_unlisted_participants: false,
+        require_consent: false,
+        data_collection_start: '2024-01-01T00:00:00Z',
+        data_collection_end: '2028-12-31T23:59:59Z',
+        default_language: 'en',
+        activities_json_url: '/unused.json',
+        supported_languages: ['en'],
+        selected_language: 'en',
+        study_text_end_completed: 'Thanks for finishing the TRAC study.',
+        study_text_end_skipped: 'Skipped.',
+        study_text_end_noconsent: 'No consent.',
+        external_tasks: [
+          {
+            task_key: 'callback_task',
+            name: 'Callback Task',
+            description: 'Return here after the provider redirects back.',
+            confirmation_type: 'callback',
+            assigned_token: 'cb-1',
+            continuation_url: 'https://example.org/callback?token=cb-1',
+            is_confirmed: callbackConfirmed,
+            confirmed_at: callbackConfirmed ? '2026-05-26T10:00:00Z' : null,
+          },
+        ],
+        timelines: [],
+        day_labels: [],
+        study_days_count: 1,
+      }),
+    });
+  });
+
+  await page.route(
+    '**/api/studies/pw_callback/participants/p1/external-tasks/confirm',
+    async (route) => {
+      callbackConfirmed = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          study_name_short: 'pw_callback',
+          participant_id: 'p1',
+          task_key: 'callback_task',
+          confirmation_type: 'callback',
+          is_confirmed: true,
+          confirmed_at: '2026-05-26T10:00:00Z',
+        }),
+      });
+    }
+  );
+
+  await page.goto(
+    'pages/thank-you.html?study_name=pw_callback&pid=p1&lang=en&completion_status=completed&callback_task_key=callback_task&callback_token=cb-1',
+    { waitUntil: 'domcontentloaded' }
+  );
+
   await expect(page.locator('#study-custom-message-end')).not.toContainText(
     'Callback Task'
   );

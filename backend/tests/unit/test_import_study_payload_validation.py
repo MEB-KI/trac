@@ -262,3 +262,19 @@ def test_build_external_task_continuation_url_uses_configured_token_query_param(
     continuation_url = _build_external_task_continuation_url(external_task, "tok-1")
 
     assert continuation_url == "https://example.org/payment?src=trac&survey_token=tok-1"
+
+
+def test_build_external_task_continuation_url_replaces_existing_token_param():
+    external_task = StudyExternalTask(
+        study_id=1,
+        task_key="callback_task",
+        name="Callback Task",
+        url="https://example.org/callback?token=old&src=trac",
+        confirmation_type="callback",
+        tokens=["cb-1"],
+        config={},
+    )
+
+    continuation_url = _build_external_task_continuation_url(external_task, "cb-1")
+
+    assert continuation_url == "https://example.org/callback?src=trac&token=cb-1"

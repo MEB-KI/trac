@@ -483,11 +483,15 @@ async def test_admin_export_external_tasks_roundtrip():
                         "participant_id": "p1",
                         "assigned_token": "tok-1",
                         "assignment_order": 0,
+                        "is_confirmed": False,
+                        "confirmed_at": None,
                     },
                     {
                         "participant_id": "p2",
                         "assigned_token": "tok-2",
                         "assignment_order": 1,
+                        "is_confirmed": False,
+                        "confirmed_at": None,
                     },
                 ],
             }
@@ -570,14 +574,111 @@ async def test_study_config_returns_participant_external_tasks_for_none_confirma
         assert study_config_response.status_code == 200
 
         study_config_data = study_config_response.json()
-        assert study_config_data["external_tasks"] == [
+        external_tasks_by_key = {
+            task["task_key"]: task for task in study_config_data["external_tasks"]
+        }
+
+        assert set(external_tasks_by_key.keys()) == {"payment", "callback_only"}
+
+        assert external_tasks_by_key["payment"] == {
+            "task_key": "payment",
+            "name": "Payment Survey",
+            "description": "Complete payment handoff.",
+            "confirmation_type": "none",
+            "assigned_token": "tok-1",
+            "continuation_url": "https://example.org/payment?src=trac&survey_token=tok-1",
+            "is_confirmed": False,
+            "confirmed_at": None,
+        }
+
+        assert external_tasks_by_key["callback_only"] == {
+            "task_key": "callback_only",
+            "name": "Callback Task",
+            "description": "Should not be shown yet.",
+            "confirmation_type": "callback",
+            "assigned_token": "cb-1",
+            "continuation_url": "https://example.org/callback?token=cb-1",
+            "is_confirmed": False,
+            "confirmed_at": None,
+        }
+
+
+@pytest.mark.asyncio
+async def test_callback_external_task_confirmation_updates_assignment_state():
+    study_name_short = f"it_external_cb_{uuid.uuid4().hex[:8]}"
+    activities_payload = _load_activities_template()
+
+    payload = {
+        "mode": "create_only",
+        "transaction_mode": "all_or_nothing",
+        "studies": [
             {
-                "task_key": "payment",
-                "name": "Payment Survey",
-                "description": "Complete payment handoff.",
-                "confirmation_type": "none",
-                "assigned_token": "tok-1",
-                "continuation_url": "https://example.org/payment?src=trac&survey_token=tok-1",
+                "name": f"Callback External Task Study {study_name_short}",
+                "name_short": study_name_short,
+                "description": "Study with callback external task confirmation",
+                "day_labels": [
+                    {
+                        "name": "monday",
+                        "display_order": 0,
+                        "display_names": {"en": "Monday"},
+                    }
+                ],
+                "study_participant_ids": ["p1"],
+                "allow_unlisted_participants": False,
+                "external_tasks": [
+                    {
+                        "task_key": "callback_payment",
+                        "name": "Callback Payment",
+                        "description": "Return here after payment.",
+                        "url": "https://example.org/payment-callback?src=trac",
+                        "confirmation_type": "callback",
+                        "tokens": ["cb-1"],
+                        "config": {},
+                    }
+                ],
+                "default_language": "en",
+                "supported_languages": ["en"],
+                "activities_json_data": {"en": activities_payload},
+                "data_collection_start": "2024-01-01T00:00:00Z",
+                "data_collection_end": "2028-12-31T23:59:59Z",
             }
-        ]
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        import_response = await client.post(
+            f"{BASE_URL}/api/admin/studies/import-config",
+            json=payload,
+            auth=ADMIN_AUTH,
+        )
+        assert import_response.status_code == 200
+
+        study_config_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config",
+            params={"participant_id": "p1"},
+        )
+        assert study_config_response.status_code == 200
+        callback_task = study_config_response.json()["external_tasks"][0]
+        assert callback_task["is_confirmed"] is False
+
+        confirm_response = await client.post(
+            f"{BASE_URL}/api/studies/{study_name_short}/participants/p1/external-tasks/confirm",
+            json={
+                "task_key": "callback_payment",
+                "assigned_token": "cb-1",
+            },
+        )
+        assert confirm_response.status_code == 200
+        confirm_data = confirm_response.json()
+        assert confirm_data["is_confirmed"] is True
+        assert confirm_data["confirmed_at"] is not None
+
+        refreshed_study_config_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config",
+            params={"participant_id": "p1"},
+        )
+        assert refreshed_study_config_response.status_code == 200
+        refreshed_task = refreshed_study_config_response.json()["external_tasks"][0]
+        assert refreshed_task["is_confirmed"] is True
+        assert refreshed_task["confirmed_at"] is not None
 

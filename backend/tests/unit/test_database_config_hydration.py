@@ -323,3 +323,5 @@ def test_create_config_file_studies_in_database_persists_external_tasks(
 
         assert [assignment.participant_id for assignment in assignments] == ["p1", "p2"]
         assert [assignment.assigned_token for assignment in assignments] == ["tok-1", "tok-2"]
+    assert [assignment.is_confirmed for assignment in assignments] == [False, False]
+    assert [assignment.confirmed_at for assignment in assignments] == [None, None]

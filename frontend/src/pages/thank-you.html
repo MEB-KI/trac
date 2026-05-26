@@ -232,6 +232,64 @@
             return urlParams.get('completion_status') || 'completed';
         }
 
+        function getCallbackParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskKey = (urlParams.get('callback_task_key') || '').trim();
+            const assignedToken = (urlParams.get('callback_token') || '').trim();
+
+            if (!taskKey || !assignedToken) {
+                return null;
+            }
+
+            return { taskKey, assignedToken };
+        }
+
+        async function confirmCallbackExternalTask(studyConfig) {
+            const callbackParams = getCallbackParams();
+            if (!callbackParams) {
+                return null;
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const studyName = urlParams.get('study_name') || studyConfig?.study_name_short || 'default';
+            const participantId = urlParams.get('pid');
+            if (!participantId) {
+                return null;
+            }
+
+            const apiBaseUrl = window.TUD_SETTINGS?.API_BASE_URL || '/api';
+            const response = await fetch(
+                `${apiBaseUrl}/studies/${studyName}/participants/${participantId}/external-tasks/confirm`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        task_key: callbackParams.taskKey,
+                        assigned_token: callbackParams.assignedToken,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to confirm callback external task: ${response.status}`);
+            }
+
+            const confirmationResult = await response.json();
+            const matchedTask = Array.isArray(studyConfig?.external_tasks)
+                ? studyConfig.external_tasks.find((task) => task.task_key === confirmationResult.task_key)
+                : null;
+
+            if (matchedTask) {
+                matchedTask.is_confirmed = true;
+                matchedTask.confirmed_at = confirmationResult.confirmed_at;
+            }
+
+            return confirmationResult;
+        }
+
         function appendFollowUpLink({ href, text, description = '', className = 'continue-link' }) {
             const customEndElement = document.getElementById('study-custom-message-end');
             if (!customEndElement || !href || !text) {
@@ -306,7 +364,8 @@
 
             externalTasks.forEach((externalTask) => {
                 if (
-                    externalTask?.confirmation_type !== 'none' ||
+                    (externalTask?.confirmation_type !== 'none' && externalTask?.confirmation_type !== 'callback') ||
+                    externalTask?.is_confirmed === true ||
                     typeof externalTask?.continuation_url !== 'string' ||
                     externalTask.continuation_url.trim() === ''
                 ) {
@@ -341,6 +400,12 @@
 
             await i18n.init(language);
             i18n.applyTranslations();
+
+            try {
+                await confirmCallbackExternalTask(studyConfig);
+            } catch (error) {
+                console.warn('Could not confirm callback external task:', error.message);
+            }
 
             applyStudyOutroText(studyConfig, language);
             applyExternalTasks(studyConfig);
