@@ -682,3 +682,101 @@ async def test_callback_external_task_confirmation_updates_assignment_state():
         assert refreshed_task["is_confirmed"] is True
         assert refreshed_task["confirmed_at"] is not None
 
+
+@pytest.mark.asyncio
+async def test_study_config_tracks_instruction_completion_and_study_completion_state():
+    study_name_short = f"it_completion_{uuid.uuid4().hex[:8]}"
+    activities_payload = _load_activities_template()
+
+    timeline_key = next(iter(activities_payload["timeline"].keys()))
+    timeline_cfg = activities_payload["timeline"][timeline_key]
+    first_category = timeline_cfg["categories"][0]
+    first_activity = first_category["activities"][0]
+
+    payload = {
+        "mode": "create_only",
+        "transaction_mode": "all_or_nothing",
+        "studies": [
+            {
+                "name": f"Completion State Study {study_name_short}",
+                "name_short": study_name_short,
+                "description": "Study completion state integration test",
+                "day_labels": [
+                    {
+                        "name": "monday",
+                        "display_order": 0,
+                        "display_names": {"en": "Monday"},
+                    },
+                    {
+                        "name": "tuesday",
+                        "display_order": 1,
+                        "display_names": {"en": "Tuesday"},
+                    },
+                ],
+                "study_participant_ids": ["p1"],
+                "allow_unlisted_participants": False,
+                "default_language": "en",
+                "supported_languages": ["en"],
+                "activities_json_data": {"en": activities_payload},
+                "data_collection_start": "2024-01-01T00:00:00Z",
+                "data_collection_end": "2028-12-31T23:59:59Z",
+            }
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        import_response = await client.post(
+            f"{BASE_URL}/api/admin/studies/import-config",
+            json=payload,
+            auth=ADMIN_AUTH,
+        )
+        assert import_response.status_code == 200
+
+        initial_study_config_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config",
+            params={"participant_id": "p1"},
+        )
+        assert initial_study_config_response.status_code == 200
+        initial_study_config = initial_study_config_response.json()
+        assert initial_study_config["instructions_completed"] is False
+        assert initial_study_config["instructions_completed_at"] is None
+        assert initial_study_config["participant_has_completed_study"] is False
+
+        instructions_response = await client.post(
+            f"{BASE_URL}/api/studies/{study_name_short}/participants/p1/instructions/complete",
+            json={"completed": True},
+        )
+        assert instructions_response.status_code == 200
+        instructions_data = instructions_response.json()
+        assert instructions_data["instructions_completed"] is True
+        assert instructions_data["instructions_completed_at"] is not None
+
+        for day_label in ["monday", "tuesday"]:
+            submit_response = await client.post(
+                f"{BASE_URL}/api/studies/{study_name_short}/participants/p1/day_labels/{day_label}/activities",
+                json={
+                    "activities": [
+                        {
+                            "timeline_key": timeline_key,
+                            "activity": first_activity["name"],
+                            "category": first_category["name"],
+                            "start_minutes": 0,
+                            "end_minutes": 10,
+                            "mode": timeline_cfg["mode"],
+                            "code": first_activity["code"],
+                        }
+                    ]
+                },
+            )
+            assert submit_response.status_code == 200
+
+        completed_study_config_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config",
+            params={"participant_id": "p1"},
+        )
+        assert completed_study_config_response.status_code == 200
+        completed_study_config = completed_study_config_response.json()
+        assert completed_study_config["instructions_completed"] is True
+        assert completed_study_config["instructions_completed_at"] is not None
+        assert completed_study_config["participant_has_completed_study"] is True
+

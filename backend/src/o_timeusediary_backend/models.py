@@ -343,6 +343,10 @@ class StudyParticipant(SQLModel, table=True):
     consent_decided_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
+    instructions_completed: bool = Field(default=False)
+    instructions_completed_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

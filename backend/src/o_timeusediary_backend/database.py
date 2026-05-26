@@ -112,6 +112,37 @@ def _ensure_external_task_assignment_confirmation_columns() -> None:
             )
 
 
+def _ensure_study_participant_instruction_columns() -> None:
+    inspector = inspect(engine)
+    if "study_participants" not in inspector.get_table_names():
+        return
+
+    existing_columns = {
+        column["name"] for column in inspector.get_columns("study_participants")
+    }
+
+    with engine.begin() as connection:
+        if "instructions_completed" not in existing_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE study_participants ADD COLUMN instructions_completed BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            logger.info(
+                "Added missing study_participants.instructions_completed column"
+            )
+
+        if "instructions_completed_at" not in existing_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE study_participants ADD COLUMN instructions_completed_at TIMESTAMP WITH TIME ZONE"
+                )
+            )
+            logger.info(
+                "Added missing study_participants.instructions_completed_at column"
+            )
+
+
 def _hydrate_study_texts_from_config(session: Session, study: Study, study_config) -> bool:
     updated = False
 
@@ -407,6 +438,7 @@ def create_db_and_tables(do_report_contents: bool = False):
     _ensure_study_text_columns()
     _ensure_is_paused_column()
     _ensure_external_task_assignment_confirmation_columns()
+    _ensure_study_participant_instruction_columns()
     create_config_file_studies_in_database(settings.studies_config_path)
     if do_report_contents:
         report_on_db_contents()
