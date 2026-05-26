@@ -201,7 +201,7 @@ Because TRAC collects research data from study participants over the internet, y
 - **Use HTTPS** for all traffic. Never run the app over plain HTTP in production.
 - **Set strong, unique passwords** for the database user and the admin interface.
 - **Restrict `TUD_ALLOWED_ORIGINS`** to only the exact origin(s) from which the frontend is served.
-- **Protect the admin interface** — it is served at `<TUD_ROOTPATH>/admin/` and is protected by HTTP Basic Auth. Make sure the admin password is strong and that it is only transmitted over HTTPS.
+- **Protect the admin interface** — it is served at `<TUD_ROOTPATH>/admin/`. Make sure the admin password is strong and that it is only transmitted over HTTPS.
 - Follow general web-server hardening best practices (secure headers, rate limiting, firewall rules, etc.) appropriate for your server software and environment.
 
 
@@ -340,7 +340,7 @@ The E2E test command uses the `e2e` service in `docker-compose.dev.yml`, which i
 
 
 
-### Howto make a release
+### How to make a Release
 
 * record changes in `CHANGES` file
 * bump version of backend in `backend/src/o-timeusediary_backend/__init__.py`
