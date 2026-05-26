@@ -137,6 +137,10 @@ class StudyExternalTaskAssignment(SQLModel, table=True):
     participant_id: str = Field(foreign_key="participants.id", index=True)
     assigned_token: str = Field(index=True)
     assignment_order: int = Field(default=0, index=True)
+    is_confirmed: bool = Field(default=False, index=True)
+    confirmed_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

@@ -143,7 +143,6 @@ def _get_participant_external_tasks(
         .where(
             StudyExternalTask.study_id == study.id,
             StudyExternalTaskAssignment.participant_id == participant_id,
-            StudyExternalTask.confirmation_type == "none",
         )
         .order_by(
             StudyExternalTaskAssignment.assignment_order,
@@ -161,9 +160,22 @@ def _get_participant_external_tasks(
             continuation_url=_build_external_task_continuation_url(
                 external_task, assignment.assigned_token
             ),
+            is_confirmed=assignment.is_confirmed,
+            confirmed_at=assignment.confirmed_at,
         )
         for assignment, external_task in assigned_rows
     ]
+
+
+def _get_study_participant_association(
+    session: Session, study: Study, participant_id: str
+) -> Optional[StudyParticipant]:
+    return session.exec(
+        select(StudyParticipant).where(
+            StudyParticipant.study_id == study.id,
+            StudyParticipant.participant_id == participant_id,
+        )
+    ).first()
 
 
 # Initialize templates with absolute path
@@ -1112,6 +1124,8 @@ async def admin_overview(
                             "participant_id": assignment.participant_id,
                             "assigned_token": assignment.assigned_token,
                             "assignment_order": assignment.assignment_order,
+                            "is_confirmed": assignment.is_confirmed,
+                            "confirmed_at": assignment.confirmed_at,
                         }
                         for assignment in assignment_rows
                     ],
@@ -2254,6 +2268,8 @@ async def export_runtime_studies_config(
                                 "participant_id": assignment.participant_id,
                                 "assigned_token": assignment.assigned_token,
                                 "assignment_order": assignment.assignment_order,
+                                "is_confirmed": assignment.is_confirmed,
+                                "confirmed_at": assignment.confirmed_at,
                             }
                             for assignment in session.exec(
                                 select(StudyExternalTaskAssignment)
@@ -3428,6 +3444,8 @@ class ParticipantExternalTaskResponse(BaseModel):
     confirmation_type: str
     assigned_token: str
     continuation_url: str
+    is_confirmed: bool = False
+    confirmed_at: Optional[datetime] = None
 
 
 class StudyConfigResponse(BaseModel):
@@ -3450,6 +3468,7 @@ class StudyConfigResponse(BaseModel):
     consent_given: Optional[bool] = None
     consent_decided_at: Optional[datetime] = None
     external_tasks: List[ParticipantExternalTaskResponse] = []
+    all_external_tasks_confirmed: bool = False
     timelines: List[TimelineConfigResponse]
     day_labels: List[DayLabelConfigResponse]
     study_days_count: int
@@ -3632,18 +3651,18 @@ def get_study_config(
     consent_given = None
     consent_decided_at = None
     if participant_id is not None:
-        study_participant = session.exec(
-            select(StudyParticipant).where(
-                StudyParticipant.study_id == study.id,
-                StudyParticipant.participant_id == participant_id,
-            )
-        ).first()
+        study_participant = _get_study_participant_association(
+            session, study, participant_id
+        )
         if study_participant:
             consent_given = study_participant.consent_given
             consent_decided_at = study_participant.consent_decided_at
 
     participant_external_tasks = _get_participant_external_tasks(
         session, study, participant_id
+    )
+    all_external_tasks_confirmed = bool(participant_external_tasks) and all(
+        external_task.is_confirmed for external_task in participant_external_tasks
     )
 
     return StudyConfigResponse(
@@ -3666,10 +3685,82 @@ def get_study_config(
         consent_given=consent_given,
         consent_decided_at=consent_decided_at,
         external_tasks=participant_external_tasks,
+        all_external_tasks_confirmed=all_external_tasks_confirmed,
         timelines=timeline_responses,
         day_labels=day_label_responses,
         study_days_count=len(day_labels),
     )
+
+
+class ConfirmExternalTaskCallbackPayload(BaseModel):
+    task_key: str
+    assigned_token: str
+
+
+@app.post(
+    "/api/studies/{study_name_short}/participants/{participant_id}/external-tasks/confirm"
+)
+def confirm_external_task_callback(
+    study_name_short: str,
+    participant_id: str,
+    payload: ConfirmExternalTaskCallbackPayload,
+    session: Session = Depends(get_session),
+):
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    if not study.allow_unlisted_participants:
+        study_participant = _get_study_participant_association(
+            session, study, participant_id
+        )
+        if not study_participant:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Participant '{participant_id}' not authorized for this study",
+            )
+
+    assignment_row = session.exec(
+        select(StudyExternalTaskAssignment, StudyExternalTask)
+        .join(
+            StudyExternalTask,
+            StudyExternalTask.id == StudyExternalTaskAssignment.external_task_id,
+        )
+        .where(
+            StudyExternalTask.study_id == study.id,
+            StudyExternalTask.task_key == payload.task_key,
+            StudyExternalTask.confirmation_type == "callback",
+            StudyExternalTaskAssignment.participant_id == participant_id,
+            StudyExternalTaskAssignment.assigned_token == payload.assigned_token,
+        )
+    ).first()
+
+    if not assignment_row:
+        raise HTTPException(
+            status_code=404,
+            detail="No matching callback external task assignment found",
+        )
+
+    assignment, external_task = assignment_row
+    if not assignment.is_confirmed:
+        assignment.is_confirmed = True
+        assignment.confirmed_at = utc_now()
+        session.add(assignment)
+        session.commit()
+        session.refresh(assignment)
+
+    return {
+        "study_name_short": study_name_short,
+        "participant_id": participant_id,
+        "task_key": external_task.task_key,
+        "confirmation_type": external_task.confirmation_type,
+        "is_confirmed": assignment.is_confirmed,
+        "confirmed_at": assignment.confirmed_at,
+    }
 
 
 @app.post(

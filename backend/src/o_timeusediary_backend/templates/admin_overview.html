@@ -793,6 +793,7 @@
                                             <th>Order</th>
                                             <th>Participant</th>
                                             <th>Assigned Token</th>
+                                            <th>Confirmed</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -801,6 +802,13 @@
                                             <td>{{ assignment.assignment_order }}</td>
                                             <td>{{ assignment.participant_id }}</td>
                                             <td>{{ assignment.assigned_token }}</td>
+                                            <td>
+                                                {% if assignment.is_confirmed %}
+                                                yes{% if assignment.confirmed_at %} ({{ assignment.confirmed_at.strftime('%Y-%m-%d %H:%M') }}){% endif %}
+                                                {% else %}
+                                                no
+                                                {% endif %}
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
