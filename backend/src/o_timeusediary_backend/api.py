@@ -178,6 +178,22 @@ def _get_study_participant_association(
     ).first()
 
 
+def _is_participant_study_complete(
+    session: Session, study: Study, participant_id: Optional[str], study_days_count: int
+) -> bool:
+    if not participant_id or study_days_count <= 0:
+        return False
+
+    completed_day_count = session.exec(
+        select(func.count(func.distinct(Activity.day_label_id))).where(
+            Activity.study_id == study.id,
+            Activity.participant_id == participant_id,
+        )
+    ).first()
+
+    return int(completed_day_count or 0) >= study_days_count
+
+
 # Initialize templates with absolute path
 current_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(current_dir / "templates"))
@@ -3467,6 +3483,9 @@ class StudyConfigResponse(BaseModel):
     study_text_consent: Optional[str] = None
     consent_given: Optional[bool] = None
     consent_decided_at: Optional[datetime] = None
+    instructions_completed: bool = False
+    instructions_completed_at: Optional[datetime] = None
+    participant_has_completed_study: bool = False
     external_tasks: List[ParticipantExternalTaskResponse] = []
     all_external_tasks_confirmed: bool = False
     timelines: List[TimelineConfigResponse]
@@ -3650,6 +3669,8 @@ def get_study_config(
 
     consent_given = None
     consent_decided_at = None
+    instructions_completed = False
+    instructions_completed_at = None
     if participant_id is not None:
         study_participant = _get_study_participant_association(
             session, study, participant_id
@@ -3657,12 +3678,20 @@ def get_study_config(
         if study_participant:
             consent_given = study_participant.consent_given
             consent_decided_at = study_participant.consent_decided_at
+            instructions_completed = bool(study_participant.instructions_completed)
+            instructions_completed_at = study_participant.instructions_completed_at
 
     participant_external_tasks = _get_participant_external_tasks(
         session, study, participant_id
     )
     all_external_tasks_confirmed = bool(participant_external_tasks) and all(
         external_task.is_confirmed for external_task in participant_external_tasks
+    )
+    participant_has_completed_study = _is_participant_study_complete(
+        session=session,
+        study=study,
+        participant_id=participant_id,
+        study_days_count=len(day_labels),
     )
 
     return StudyConfigResponse(
@@ -3684,6 +3713,9 @@ def get_study_config(
         study_text_consent=study_text_consent,
         consent_given=consent_given,
         consent_decided_at=consent_decided_at,
+        instructions_completed=instructions_completed,
+        instructions_completed_at=instructions_completed_at,
+        participant_has_completed_study=participant_has_completed_study,
         external_tasks=participant_external_tasks,
         all_external_tasks_confirmed=all_external_tasks_confirmed,
         timelines=timeline_responses,
@@ -3695,6 +3727,10 @@ def get_study_config(
 class ConfirmExternalTaskCallbackPayload(BaseModel):
     task_key: str
     assigned_token: str
+
+
+class CompleteInstructionsPayload(BaseModel):
+    completed: bool = True
 
 
 @app.post(
@@ -3760,6 +3796,59 @@ def confirm_external_task_callback(
         "confirmation_type": external_task.confirmation_type,
         "is_confirmed": assignment.is_confirmed,
         "confirmed_at": assignment.confirmed_at,
+    }
+
+
+@app.post(
+    "/api/studies/{study_name_short}/participants/{participant_id}/instructions/complete"
+)
+def complete_participant_instructions(
+    study_name_short: str,
+    participant_id: str,
+    payload: CompleteInstructionsPayload,
+    session: Session = Depends(get_session),
+):
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    participant = session.exec(
+        select(Participant).where(Participant.id == participant_id)
+    ).first()
+    if not participant:
+        if not study.allow_unlisted_participants:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Participant '{participant_id}' not authorized for this study",
+            )
+        participant = Participant(id=participant_id)
+        session.add(participant)
+        session.flush()
+
+    association = _get_study_participant_association(session, study, participant_id)
+    if not association:
+        if not study.allow_unlisted_participants:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Participant '{participant_id}' not authorized for this study",
+            )
+        association = StudyParticipant(study_id=study.id, participant_id=participant_id)
+
+    association.instructions_completed = bool(payload.completed)
+    association.instructions_completed_at = utc_now() if payload.completed else None
+    session.add(association)
+    session.commit()
+    session.refresh(association)
+
+    return {
+        "study_name_short": study_name_short,
+        "participant_id": participant_id,
+        "instructions_completed": association.instructions_completed,
+        "instructions_completed_at": association.instructions_completed_at,
     }
 
 
