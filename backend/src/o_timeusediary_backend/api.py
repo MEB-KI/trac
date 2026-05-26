@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import csv
 import json
-from sqlmodel import Session, select
+from sqlmodel import Session, delete, select
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from fastapi.templating import Jinja2Templates
 from .parsers.activities_config import (
@@ -2658,6 +2658,79 @@ async def remove_participant_from_study(
         "message": "Participant removed from study",
         "study_name_short": study_name_short,
         "participant_id": participant_id,
+    }
+
+
+@app.delete("/api/admin/studies/{study_name_short}")
+async def delete_study(
+    study_name_short: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Delete a study and all study-scoped data.
+
+    This is intended for administrative cleanup (e.g., integration test artifacts).
+    Shared participant rows are preserved because they may belong to other studies.
+    """
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    external_task_ids = session.exec(
+        select(StudyExternalTask.id).where(StudyExternalTask.study_id == study.id)
+    ).all()
+
+    available_activity_ids = session.exec(
+        select(StudyAvailableActivity.id).where(StudyAvailableActivity.study_id == study.id)
+    ).all()
+
+    if external_task_ids:
+        session.exec(
+            delete(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id.in_(external_task_ids)
+            )
+        )
+
+    if available_activity_ids:
+        session.exec(
+            delete(StudyAvailableActivityI18n).where(
+                StudyAvailableActivityI18n.activity_id.in_(available_activity_ids)
+            )
+        )
+
+    session.exec(delete(Activity).where(Activity.study_id == study.id))
+    session.exec(
+        delete(StudyParticipant).where(StudyParticipant.study_id == study.id)
+    )
+    session.exec(
+        delete(StudyActivityConfigBlob).where(StudyActivityConfigBlob.study_id == study.id)
+    )
+    session.exec(
+        delete(StudyAvailableActivity).where(StudyAvailableActivity.study_id == study.id)
+    )
+    session.exec(
+        delete(StudyAvailableCategory).where(StudyAvailableCategory.study_id == study.id)
+    )
+    session.exec(
+        delete(StudyAvailableTimeline).where(StudyAvailableTimeline.study_id == study.id)
+    )
+    session.exec(delete(StudyExternalTask).where(StudyExternalTask.study_id == study.id))
+    session.exec(delete(Timeline).where(Timeline.study_id == study.id))
+    session.exec(delete(DayLabel).where(DayLabel.study_id == study.id))
+    session.exec(delete(Study).where(Study.id == study.id))
+
+    session.commit()
+
+    logger.info("Admin '%s' deleted study '%s'", current_admin, study_name_short)
+    audit_admin_action(current_admin, f"deleted study '{study_name_short}'")
+
+    return {
+        "message": "Study deleted",
+        "study_name_short": study_name_short,
     }
 
 

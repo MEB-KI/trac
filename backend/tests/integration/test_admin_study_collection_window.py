@@ -26,6 +26,28 @@ def _parse_dt(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+@pytest.fixture
+def created_studies_for_cleanup():
+    created_studies = []
+    yield created_studies
+
+    if not created_studies:
+        return
+
+    unique_names = list(dict.fromkeys(created_studies))
+    with httpx.Client(timeout=60.0) as client:
+        for study_name_short in reversed(unique_names):
+            delete_response = client.delete(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}",
+                auth=ADMIN_AUTH,
+            )
+            if delete_response.status_code not in (200, 404):
+                raise AssertionError(
+                    f"Unexpected cleanup status for study '{study_name_short}': "
+                    f"{delete_response.status_code}"
+                )
+
+
 async def _create_study_for_window_tests(
     client: httpx.AsyncClient, study_name_short: str
 ) -> None:
@@ -70,11 +92,14 @@ async def _create_study_for_window_tests(
 
 
 @pytest.mark.asyncio
-async def test_admin_collection_window_update_and_pause_behavior():
+async def test_admin_collection_window_update_and_pause_behavior(
+    created_studies_for_cleanup,
+):
     study_name_short = f"it_window_{uuid.uuid4().hex[:8]}"
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         await _create_study_for_window_tests(client, study_name_short)
+        created_studies_for_cleanup.append(study_name_short)
 
         unauthorized_response = await client.patch(
             f"{BASE_URL}/api/admin/studies/{study_name_short}/collection-window",
@@ -148,11 +173,12 @@ async def test_admin_collection_window_update_and_pause_behavior():
 
 
 @pytest.mark.asyncio
-async def test_admin_pause_and_unpause_study():
+async def test_admin_pause_and_unpause_study(created_studies_for_cleanup):
     study_name_short = f"it_pause_{uuid.uuid4().hex[:8]}"
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         await _create_study_for_window_tests(client, study_name_short)
+        created_studies_for_cleanup.append(study_name_short)
 
         # Pause requires auth
         unauth = await client.patch(

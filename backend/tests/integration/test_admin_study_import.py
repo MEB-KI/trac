@@ -22,8 +22,33 @@ def _load_activities_template() -> dict:
     return json.loads(activities_file.read_text(encoding="utf-8"))
 
 
+@pytest.fixture
+def created_studies_for_cleanup():
+    created_studies = []
+    yield created_studies
+
+    if not created_studies:
+        return
+
+    unique_names = list(dict.fromkeys(created_studies))
+    with httpx.Client(timeout=60.0) as client:
+        for study_name_short in reversed(unique_names):
+            delete_response = client.delete(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}",
+                auth=ADMIN_AUTH,
+            )
+            # Ignore already-deleted studies, but fail on unexpected server errors.
+            if delete_response.status_code not in (200, 404):
+                raise AssertionError(
+                    f"Unexpected cleanup status for study '{study_name_short}': "
+                    f"{delete_response.status_code}"
+                )
+
+
 @pytest.mark.asyncio
-async def test_admin_import_study_config_with_embedded_activities_data():
+async def test_admin_import_study_config_with_embedded_activities_data(
+    created_studies_for_cleanup,
+):
     study_name_short = f"it_blob_{uuid.uuid4().hex[:8]}"
     activities_payload = _load_activities_template()
 
@@ -79,6 +104,7 @@ async def test_admin_import_study_config_with_embedded_activities_data():
         import_data = import_response.json()
         assert import_data["summary"]["created"] == 1
         assert import_data["summary"]["failed"] == 0
+        created_studies_for_cleanup.append(study_name_short)
 
         study_config_response = await client.get(
             f"{BASE_URL}/api/studies/{study_name_short}/study-config"
@@ -132,7 +158,9 @@ async def test_admin_import_study_config_with_embedded_activities_data():
 
 
 @pytest.mark.asyncio
-async def test_admin_import_roundtrip_from_runtime_config_export_uses_embedded_activities_data():
+async def test_admin_import_roundtrip_from_runtime_config_export_uses_embedded_activities_data(
+    created_studies_for_cleanup,
+):
     roundtrip_study_name_short = f"it_roundtrip_{uuid.uuid4().hex[:8]}"
 
     async with httpx.AsyncClient(timeout=60.0) as client:
@@ -176,6 +204,7 @@ async def test_admin_import_roundtrip_from_runtime_config_export_uses_embedded_a
         import_data = import_response.json()
         assert import_data["summary"]["created"] == 1
         assert import_data["summary"]["failed"] == 0
+        created_studies_for_cleanup.append(roundtrip_study_name_short)
 
         activities_config_response = None
         for _ in range(5):
@@ -208,6 +237,70 @@ async def test_admin_import_roundtrip_from_runtime_config_export_uses_embedded_a
         assert summary_data["available_category_count"] > 0
         assert summary_data["available_activity_count"] > 0
         assert summary_data["available_activity_i18n_count"] > 0
+
+
+@pytest.mark.asyncio
+async def test_admin_can_delete_study_and_study_config_returns_not_found():
+    study_name_short = f"it_delete_{uuid.uuid4().hex[:8]}"
+    activities_payload = _load_activities_template()
+
+    payload = {
+        "mode": "create_only",
+        "transaction_mode": "all_or_nothing",
+        "studies": [
+            {
+                "name": f"Delete Study {study_name_short}",
+                "name_short": study_name_short,
+                "description": "Study deletion integration test",
+                "day_labels": [
+                    {
+                        "name": "monday",
+                        "display_order": 0,
+                        "display_names": {"en": "Monday"},
+                    }
+                ],
+                "study_participant_ids": ["p1"],
+                "allow_unlisted_participants": True,
+                "default_language": "en",
+                "supported_languages": ["en"],
+                "activities_json_data": {"en": activities_payload},
+                "data_collection_start": "2024-01-01T00:00:00Z",
+                "data_collection_end": "2028-12-31T23:59:59Z",
+            }
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        import_response = await client.post(
+            f"{BASE_URL}/api/admin/studies/import-config",
+            json=payload,
+            auth=ADMIN_AUTH,
+        )
+        assert import_response.status_code == 200
+        assert import_response.json()["summary"]["created"] == 1
+
+        unauthorized_delete_response = await client.delete(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}"
+        )
+        assert unauthorized_delete_response.status_code == 401
+
+        delete_response = await client.delete(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}",
+            auth=ADMIN_AUTH,
+        )
+        assert delete_response.status_code == 200
+        assert delete_response.json()["study_name_short"] == study_name_short
+
+        missing_study_config_response = await client.get(
+            f"{BASE_URL}/api/studies/{study_name_short}/study-config"
+        )
+        assert missing_study_config_response.status_code == 404
+
+        second_delete_response = await client.delete(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}",
+            auth=ADMIN_AUTH,
+        )
+        assert second_delete_response.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -265,7 +358,9 @@ async def test_admin_import_rejects_payload_with_both_activity_sources():
 
 
 @pytest.mark.asyncio
-async def test_admin_import_accepts_activities_json_files_only():
+async def test_admin_import_accepts_activities_json_files_only(
+    created_studies_for_cleanup,
+):
     study_name_short = f"it_file_source_{uuid.uuid4().hex[:8]}"
 
     payload = {
@@ -306,6 +401,7 @@ async def test_admin_import_accepts_activities_json_files_only():
         import_data = import_response.json()
         assert import_data["summary"]["created"] == 1
         assert import_data["summary"]["failed"] == 0
+        created_studies_for_cleanup.append(study_name_short)
 
         activities_response = await client.get(
             f"{BASE_URL}/api/studies/{study_name_short}/activities-config",
@@ -339,7 +435,7 @@ async def test_admin_export_includes_require_consent_and_consent_texts():
 
 
 @pytest.mark.asyncio
-async def test_admin_export_require_consent_roundtrip():
+async def test_admin_export_require_consent_roundtrip(created_studies_for_cleanup):
     """Import a study with require_consent=True and consent texts, then verify the
     export reflects require_consent correctly from the database."""
     study_name_short = f"it_consent_{uuid.uuid4().hex[:8]}"
@@ -383,6 +479,7 @@ async def test_admin_export_require_consent_roundtrip():
         assert import_response.status_code == 200
         import_data = import_response.json()
         assert import_data["summary"]["created"] == 1
+        created_studies_for_cleanup.append(study_name_short)
 
         export_response = await client.get(
             f"{BASE_URL}/api/admin/export/studies-runtime-config",
@@ -412,7 +509,7 @@ async def test_admin_export_require_consent_roundtrip():
 
 
 @pytest.mark.asyncio
-async def test_admin_export_external_tasks_roundtrip():
+async def test_admin_export_external_tasks_roundtrip(created_studies_for_cleanup):
     study_name_short = f"it_external_{uuid.uuid4().hex[:8]}"
     activities_payload = _load_activities_template()
 
@@ -460,6 +557,7 @@ async def test_admin_export_external_tasks_roundtrip():
             auth=ADMIN_AUTH,
         )
         assert import_response.status_code == 200
+        created_studies_for_cleanup.append(study_name_short)
 
         export_response = await client.get(
             f"{BASE_URL}/api/admin/export/studies-runtime-config",
@@ -509,7 +607,9 @@ async def test_admin_export_external_tasks_roundtrip():
 
 
 @pytest.mark.asyncio
-async def test_study_config_returns_participant_external_tasks_for_none_confirmation():
+async def test_study_config_returns_participant_external_tasks_for_none_confirmation(
+    created_studies_for_cleanup,
+):
     study_name_short = f"it_external_cfg_{uuid.uuid4().hex[:8]}"
     activities_payload = _load_activities_template()
 
@@ -566,6 +666,7 @@ async def test_study_config_returns_participant_external_tasks_for_none_confirma
             auth=ADMIN_AUTH,
         )
         assert import_response.status_code == 200
+        created_studies_for_cleanup.append(study_name_short)
 
         study_config_response = await client.get(
             f"{BASE_URL}/api/studies/{study_name_short}/study-config",
@@ -604,7 +705,9 @@ async def test_study_config_returns_participant_external_tasks_for_none_confirma
 
 
 @pytest.mark.asyncio
-async def test_callback_external_task_confirmation_updates_assignment_state():
+async def test_callback_external_task_confirmation_updates_assignment_state(
+    created_studies_for_cleanup,
+):
     study_name_short = f"it_external_cb_{uuid.uuid4().hex[:8]}"
     activities_payload = _load_activities_template()
 
@@ -652,6 +755,7 @@ async def test_callback_external_task_confirmation_updates_assignment_state():
             auth=ADMIN_AUTH,
         )
         assert import_response.status_code == 200
+        created_studies_for_cleanup.append(study_name_short)
 
         study_config_response = await client.get(
             f"{BASE_URL}/api/studies/{study_name_short}/study-config",
@@ -684,7 +788,9 @@ async def test_callback_external_task_confirmation_updates_assignment_state():
 
 
 @pytest.mark.asyncio
-async def test_study_config_tracks_instruction_completion_and_study_completion_state():
+async def test_study_config_tracks_instruction_completion_and_study_completion_state(
+    created_studies_for_cleanup,
+):
     study_name_short = f"it_completion_{uuid.uuid4().hex[:8]}"
     activities_payload = _load_activities_template()
 
@@ -731,6 +837,7 @@ async def test_study_config_tracks_instruction_completion_and_study_completion_s
             auth=ADMIN_AUTH,
         )
         assert import_response.status_code == 200
+        created_studies_for_cleanup.append(study_name_short)
 
         initial_study_config_response = await client.get(
             f"{BASE_URL}/api/studies/{study_name_short}/study-config",
