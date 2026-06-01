@@ -24,7 +24,8 @@
               "code": 1101,
               "label": "sleeping",
               "color": "#A8D8EA",
-              "childItems": []
+              "childItems": [],
+              "frequency": ["weekly", "bi-weekly","monthly", "yearly"]
             },
             {
               "name": "Activities of Daily Living",
@@ -68,7 +69,6 @@
                 {
                   "name": "Travelling: running",
                   "code": 1113,
-                  "label": "travelling: running",
                   "color": "#9ACD32"
                 },
                 {
@@ -195,7 +195,6 @@
             },
             {
               "name": "Other home activities",
-              "examples": "Please specify.",
               "code": 1147,
               "label": "other",
               "color": "#9932CC",

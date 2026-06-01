@@ -62,3 +62,19 @@ def test_validate_multiple_activity_codes_reports_valid_and_invalid(tmp_path):
         "invalid": [999],
         "all_valid": False,
     }
+
+
+def test_activity_label_defaults_to_exact_name_when_missing():
+    payload = _example_activities_payload()
+    payload["timeline"]["primary"]["categories"][0]["activities"][0]["name"] = (
+        "Sleep EXACT"
+    )
+    payload["timeline"]["primary"]["categories"][0]["activities"][0]["childItems"][0][
+        "name"
+    ] = "Nap MixedCase"
+
+    config = ActivitiesConfig(**payload)
+    all_codes = get_all_activity_codes(config)
+
+    assert all_codes[100]["label"] == "Sleep EXACT"
+    assert all_codes[101]["label"] == "Nap MixedCase"

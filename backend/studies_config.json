@@ -144,9 +144,7 @@
       "allow_unlisted_participants": true,
       "default_language": "en",
       "supported_languages": [
-        "en",
-        "sv",
-        "de"
+        "en"
       ],
       "activities_json_files": {
         "en": "activities_ki_adults_en.json",
