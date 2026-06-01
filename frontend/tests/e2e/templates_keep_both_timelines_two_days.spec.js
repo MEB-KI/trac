@@ -95,17 +95,23 @@ async function goToSecondaryTimeline(page) {
     await nextBtn.click();
     await page.waitForTimeout(700);
 
-    if (await page.locator('.timeline-title').isVisible()) {
-      const titleText = await page.locator('.timeline-title').textContent();
-      if (titleText.includes('Secondary Activity')) {
-        return;
-      }
+    const activeTimelineKey = await page.evaluate(
+      () => window.timelineManager.keys[window.timelineManager.currentIndex]
+    );
+    if (activeTimelineKey === 'secondary') {
+      return;
     }
   }
 
-  await expect(page.locator('.timeline-title')).toContainText(
-    'Secondary Activity'
-  );
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
+      { timeout: 10000, message: 'Waiting to switch to secondary timeline' }
+    )
+    .toBe('secondary');
 }
 
 async function submitCurrentDay(page, expectedNextDayName) {
