@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from o_timeusediary_backend.parsers.activities_config import (
     ActivitiesConfig,
@@ -78,3 +79,13 @@ def test_activity_label_defaults_to_exact_name_when_missing():
 
     assert all_codes[100]["label"] == "Sleep EXACT"
     assert all_codes[101]["label"] == "Nap MixedCase"
+
+
+def test_rejects_third_level_activity_nesting():
+    payload = _example_activities_payload()
+    payload["timeline"]["primary"]["categories"][0]["activities"][0]["childItems"][0][
+        "childItems"
+    ] = [{"name": "Too Deep", "code": 102}]
+
+    with pytest.raises(ValueError, match="Third-level activity nesting is not allowed"):
+        ActivitiesConfig(**payload)

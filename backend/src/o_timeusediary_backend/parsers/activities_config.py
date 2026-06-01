@@ -134,6 +134,23 @@ class ActivitiesConfig(BaseModel):
 
         return self
 
+    @model_validator(mode="after")
+    def validate_activity_nesting_depth(self) -> "ActivitiesConfig":
+        """Allow childItems only on top-level activities (max depth = 2)."""
+
+        for timeline_name, timeline_config in self.timeline.items():
+            for category in timeline_config.categories:
+                for activity in category.activities:
+                    for child in activity.childItems:
+                        if child.childItems:
+                            raise ValueError(
+                                "Third-level activity nesting is not allowed. "
+                                f"Activity '{child.name}' in timeline '{timeline_name}', "
+                                f"category '{category.name}' is a child item and cannot have childItems."
+                            )
+
+        return self
+
 
 # Handle recursive ActivityItem
 ActivityItem.model_rebuild()
