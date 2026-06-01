@@ -20,6 +20,13 @@ class ActivityItem(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
+    @model_validator(mode="after")
+    def default_label_to_name(self) -> "ActivityItem":
+        """Default missing labels to the exact activity name."""
+        if self.label is None:
+            self.label = self.name
+        return self
+
 
 class ActivityCategory(BaseModel):
     name: str
