@@ -78,14 +78,23 @@ test('desktop timeline positions stay stable when active timeline changes', asyn
   await page.locator('#continueBtn').click();
   await expect(page).toHaveURL(/index\.html/);
 
+  await expect(page.locator('.timeline-title')).toContainText('Monday');
+  await expect(page.locator('.timeline-title')).toContainText('Day 1 of 7');
+
   await addSleepingToMainTimeline(page);
 
   const mainTopBefore = await getTimelineTopByTitle(page, 'Main Activity');
 
   await page.locator('#nextBtn').click();
-  await expect(page.locator('.timeline-title')).toContainText(
-    'Secondary Activity'
-  );
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
+      { timeout: 10000, message: 'Waiting to switch to secondary timeline' }
+    )
+    .toBe('secondary');
 
   const mainTopAfterNext = await getTimelineTopByTitle(page, 'Main Activity');
 
@@ -96,7 +105,15 @@ test('desktop timeline positions stay stable when active timeline changes', asyn
   await expect(pastMainTimeline).toBeVisible();
   await pastMainTimeline.click();
 
-  await expect(page.locator('.timeline-title')).toContainText('Main Activity');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => window.timelineManager.keys[window.timelineManager.currentIndex]
+        ),
+      { timeout: 10000, message: 'Waiting to switch back to primary timeline' }
+    )
+    .toBe('primary');
 
   const mainTopAfterClickBack = await getTimelineTopByTitle(
     page,
