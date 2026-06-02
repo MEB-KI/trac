@@ -252,7 +252,17 @@
               "examples": "Bio, teater, konsert, sportevenemang",
               "code": 1163,
               "label": "events or entertainment outside",
-              "color": "#DA70D6"
+              "color": "#DA70D6",
+              "frequency_options": [
+                {
+                  "key": "bi-weekly",
+                  "label": "Varannan vecka"
+                },
+                {
+                  "key": "monthly",
+                  "label": "Månadsvis"
+                }
+              ]
             },
             {
               "name": "Hobby ej sport",
@@ -261,6 +271,16 @@
               "label": "hobby non-sports",
               "color": "#BA55D3",
               "childItems": [],
+              "frequency_options": [
+                {
+                  "key": "bi-weekly",
+                  "label": "Varannan vecka"
+                },
+                {
+                  "key": "monthly",
+                  "label": "Månadsvis"
+                }
+              ],
               "is_custom_input": true
             },
             {
@@ -273,7 +293,17 @@
                   "name": "Promenera ensam",
                   "code": 1167,
                   "label": "Walking",
-                  "color": "#9370DB"
+                  "color": "#9370DB",
+                  "frequency_options": [
+                    {
+                      "key": "bi-weekly",
+                      "label": "Varannan vecka"
+                    },
+                    {
+                      "key": "monthly",
+                      "label": "Månadsvis"
+                    }
+                  ]
                 },
                 {
                   "name": "Promenera med någon annan",
