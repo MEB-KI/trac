@@ -131,9 +131,7 @@ def _build_external_task_continuation_url(
     if send_pid and participant_id:
         query_items.append((pid_query_param, participant_id))
 
-    return urlunparse(
-        parsed_url._replace(query=urlencode(query_items, doseq=True))
-    )
+    return urlunparse(parsed_url._replace(query=urlencode(query_items, doseq=True)))
 
 
 def _get_participant_external_tasks(
@@ -1127,9 +1125,7 @@ async def admin_overview(
         for external_task in external_task_rows:
             assignment_rows = session.exec(
                 select(StudyExternalTaskAssignment)
-                .where(
-                    StudyExternalTaskAssignment.external_task_id == external_task.id
-                )
+                .where(StudyExternalTaskAssignment.external_task_id == external_task.id)
                 .order_by(
                     StudyExternalTaskAssignment.assignment_order,
                     StudyExternalTaskAssignment.participant_id,
@@ -1358,16 +1354,29 @@ def _collect_codes_from_activities(activities: List) -> List[int]:
 
 
 def _build_activity_structure_signature(activities_cfg: ActivitiesConfig) -> Dict:
+    activity_info_by_code = get_all_activity_codes(activities_cfg)
     timeline_signature: Dict[str, Dict] = {}
     for timeline_name, timeline_cfg in sorted(activities_cfg.timeline.items()):
         codes: List[int] = []
         for category in timeline_cfg.categories:
             codes.extend(_collect_codes_from_activities(category.activities))
 
+        unique_codes = sorted(set(codes))
+        frequency_keys_by_code = {
+            str(code): [
+                option["key"]
+                for option in (
+                    activity_info_by_code.get(code, {}).get("frequency_options") or []
+                )
+            ]
+            for code in unique_codes
+        }
+
         timeline_signature[timeline_name] = {
             "mode": timeline_cfg.mode,
             "min_coverage": timeline_cfg.min_coverage,
-            "codes": sorted(set(codes)),
+            "codes": unique_codes,
+            "frequency_keys_by_code": frequency_keys_by_code,
         }
 
     return timeline_signature
@@ -1454,6 +1463,7 @@ def _create_available_catalog_from_validated_activities(
                         vshort=language_info.get("vshort"),
                         examples=language_info.get("examples"),
                         color=language_info.get("color"),
+                        frequency_options=language_info.get("frequency_options"),
                     )
                 )
 
@@ -2695,7 +2705,9 @@ async def delete_study(
     ).all()
 
     available_activity_ids = session.exec(
-        select(StudyAvailableActivity.id).where(StudyAvailableActivity.study_id == study.id)
+        select(StudyAvailableActivity.id).where(
+            StudyAvailableActivity.study_id == study.id
+        )
     ).all()
 
     if external_task_ids:
@@ -2713,22 +2725,30 @@ async def delete_study(
         )
 
     session.exec(delete(Activity).where(Activity.study_id == study.id))
+    session.exec(delete(StudyParticipant).where(StudyParticipant.study_id == study.id))
     session.exec(
-        delete(StudyParticipant).where(StudyParticipant.study_id == study.id)
+        delete(StudyActivityConfigBlob).where(
+            StudyActivityConfigBlob.study_id == study.id
+        )
     )
     session.exec(
-        delete(StudyActivityConfigBlob).where(StudyActivityConfigBlob.study_id == study.id)
+        delete(StudyAvailableActivity).where(
+            StudyAvailableActivity.study_id == study.id
+        )
     )
     session.exec(
-        delete(StudyAvailableActivity).where(StudyAvailableActivity.study_id == study.id)
+        delete(StudyAvailableCategory).where(
+            StudyAvailableCategory.study_id == study.id
+        )
     )
     session.exec(
-        delete(StudyAvailableCategory).where(StudyAvailableCategory.study_id == study.id)
+        delete(StudyAvailableTimeline).where(
+            StudyAvailableTimeline.study_id == study.id
+        )
     )
     session.exec(
-        delete(StudyAvailableTimeline).where(StudyAvailableTimeline.study_id == study.id)
+        delete(StudyExternalTask).where(StudyExternalTask.study_id == study.id)
     )
-    session.exec(delete(StudyExternalTask).where(StudyExternalTask.study_id == study.id))
     session.exec(delete(Timeline).where(Timeline.study_id == study.id))
     session.exec(delete(DayLabel).where(DayLabel.study_id == study.id))
     session.exec(delete(Study).where(Study.id == study.id))
@@ -3935,9 +3955,7 @@ def complete_participant_instructions(
     }
 
 
-@app.post(
-    "/api/studies/{study_name_short}/participants/{participant_id}/consent"
-)
+@app.post("/api/studies/{study_name_short}/participants/{participant_id}/consent")
 async def set_participant_consent(
     study_name_short: str,
     participant_id: str,
@@ -3948,7 +3966,9 @@ async def set_participant_consent(
         select(Study).where(Study.name_short == study_name_short)
     ).first()
     if not study:
-        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
 
     participant = session.get(Participant, participant_id)
     if not participant:

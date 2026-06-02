@@ -79,7 +79,9 @@ def _ensure_is_paused_column() -> None:
     if "is_paused" not in existing_columns:
         with engine.begin() as connection:
             connection.execute(
-                text("ALTER TABLE studies ADD COLUMN is_paused BOOLEAN NOT NULL DEFAULT FALSE")
+                text(
+                    "ALTER TABLE studies ADD COLUMN is_paused BOOLEAN NOT NULL DEFAULT FALSE"
+                )
             )
             logger.info("Added missing studies.is_paused column")
 
@@ -147,7 +149,33 @@ def _ensure_study_participant_instruction_columns() -> None:
             )
 
 
-def _hydrate_study_texts_from_config(session: Session, study: Study, study_config) -> bool:
+def _ensure_study_available_activity_i18n_frequency_options_column() -> None:
+    inspector = inspect(engine)
+    if "study_available_activity_i18n" not in inspector.get_table_names():
+        return
+
+    existing_columns = {
+        column["name"]
+        for column in inspector.get_columns("study_available_activity_i18n")
+    }
+
+    if "frequency_options" in existing_columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE study_available_activity_i18n ADD COLUMN frequency_options JSON"
+            )
+        )
+        logger.info(
+            "Added missing study_available_activity_i18n.frequency_options column"
+        )
+
+
+def _hydrate_study_texts_from_config(
+    session: Session, study: Study, study_config
+) -> bool:
     updated = False
 
     for field_name in _STUDY_TEXT_FIELDS:
@@ -405,6 +433,9 @@ def _ensure_available_catalog_from_activities_configs(
                         vshort=language_activity_info.get("vshort"),
                         examples=language_activity_info.get("examples"),
                         color=language_activity_info.get("color"),
+                        frequency_options=language_activity_info.get(
+                            "frequency_options"
+                        ),
                     )
                 )
 
@@ -443,6 +474,7 @@ def create_db_and_tables(do_report_contents: bool = False):
     _ensure_is_paused_column()
     _ensure_external_task_assignment_confirmation_columns()
     _ensure_study_participant_instruction_columns()
+    _ensure_study_available_activity_i18n_frequency_options_column()
     create_config_file_studies_in_database(settings.studies_config_path)
     if do_report_contents:
         report_on_db_contents()
@@ -580,7 +612,9 @@ def create_config_file_studies_in_database(config_path: str):
                     if study_config.study_participant_ids:
                         for participant_id in study_config.study_participant_ids:
                             existing_participant = session.exec(
-                                select(Participant).where(Participant.id == participant_id)
+                                select(Participant).where(
+                                    Participant.id == participant_id
+                                )
                             ).first()
                             if not existing_participant:
                                 existing_participant = Participant(id=participant_id)
