@@ -292,7 +292,6 @@
                 {
                   "name": "Spazierengehen allein",
                   "code": 1167,
-                  "label": "Spazierengehen",
                   "color": "#9370DB",
                   "frequency_options": [
                     {

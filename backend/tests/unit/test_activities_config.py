@@ -87,7 +87,10 @@ def test_rejects_third_level_activity_nesting():
         "childItems"
     ] = [{"name": "Too Deep", "code": 102}]
 
-    with pytest.raises(ValueError, match="Third-level activity nesting is not allowed"):
+    with pytest.raises(
+        ValueError,
+        match="found 3 levels of activities, but only 2 are allowed",
+    ):
         ActivitiesConfig(**payload)
 
 

@@ -172,16 +172,32 @@ class ActivitiesConfig(BaseModel):
     def validate_activity_nesting_depth(self) -> "ActivitiesConfig":
         """Allow childItems only on top-level activities (max depth = 2)."""
 
+        invalid_paths: List[str] = []
+
         for timeline_name, timeline_config in self.timeline.items():
             for category in timeline_config.categories:
                 for activity in category.activities:
                     for child in activity.childItems:
                         if child.childItems:
-                            raise ValueError(
-                                "Third-level activity nesting is not allowed. "
-                                f"Activity '{child.name}' in timeline '{timeline_name}', "
-                                f"category '{category.name}' is a child item and cannot have childItems."
-                            )
+                            for grandchild in child.childItems:
+                                invalid_paths.append(
+                                    (
+                                        f"timeline '{timeline_name}' -> "
+                                        f"category '{category.name}' -> "
+                                        f"activity '{activity.name}' -> "
+                                        f"child '{child.name}' -> "
+                                        f"grandchild '{grandchild.name}'"
+                                    )
+                                )
+
+        if invalid_paths:
+            details = "\n".join(f"- {path}" for path in invalid_paths)
+            raise ValueError(
+                "Invalid activity nesting depth: found 3 levels of activities, "
+                "but only 2 are allowed (top-level activity + one child level). "
+                "The following paths exceed the allowed depth:\n"
+                f"{details}"
+            )
 
         return self
 
