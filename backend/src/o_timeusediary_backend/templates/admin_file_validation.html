@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TUD Admin - File Validation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #f7f4ed;
+            --surface: #f7f4ed;
+            --text: #1c1c1c;
+            --muted: #5f5f5d;
+            --border: #eceae4;
+            --border-strong: rgba(28, 28, 28, 0.4);
+            --ok: #1f6f43;
+            --error: #b3261e;
+            --focus-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px;
+            --inset-shadow: rgba(255, 255, 255, 0.2) 0px 0.5px 0px 0px inset,
+                            rgba(0, 0, 0, 0.2) 0px 0px 0px 0.5px inset,
+                            rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;
+        }
+        body {
+            font-family: "Camera Plain Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+            line-height: 1.5;
+            color: var(--text);
+            background: var(--bg);
+            padding: 20px;
+        }
+        .container { max-width: 1280px; margin: 0 auto; }
+        .admin-nav {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .admin-nav-link {
+            display: inline-block;
+            padding: 0.55rem 0.9rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 400;
+            font-size: 0.9rem;
+            color: var(--text);
+            background: transparent;
+            border: 1px solid var(--border-strong);
+        }
+        .admin-nav-link.active {
+            color: #fcfbf8;
+            background: var(--text);
+            border-color: var(--text);
+            box-shadow: var(--inset-shadow);
+        }
+        .admin-nav-link:hover { box-shadow: var(--focus-shadow); }
+        .header,
+        .card,
+        .result-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .header {
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .header h1 {
+            font-size: 2rem;
+            line-height: 1.05;
+            letter-spacing: -1px;
+        }
+        .header p,
+        .hint,
+        .meta,
+        .subtle { color: var(--muted); }
+        .meta {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+        .card { padding: 1rem; }
+        h2 {
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        .field { margin-top: 0.65rem; }
+        label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+        input[type="text"],
+        input[type="file"],
+        textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.65rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.86rem;
+            background: var(--surface);
+            color: var(--text);
+        }
+        textarea {
+            min-height: 92px;
+            resize: vertical;
+        }
+        .actions {
+            margin-top: 0.9rem;
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        button {
+            border-radius: 6px;
+            border: 1px solid transparent;
+            padding: 0.58rem 0.9rem;
+            cursor: pointer;
+            font-weight: 500;
+            background: var(--text);
+            color: #fcfbf8;
+            box-shadow: var(--inset-shadow);
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .result-box {
+            margin-top: 1rem;
+            padding: 1rem;
+        }
+        .result-title {
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        .ok { color: var(--ok); }
+        .error { color: var(--error); }
+        ul {
+            margin-left: 1.2rem;
+            margin-top: 0.45rem;
+        }
+        li { margin-bottom: 0.28rem; }
+        code {
+            background: rgba(28, 28, 28, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.05rem 0.28rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="admin-nav">
+            <a class="admin-nav-link" href="{{ request.scope.root_path }}/admin">Overview</a>
+            <a class="admin-nav-link" href="{{ request.scope.root_path }}/admin/participant-management">Participant Management</a>
+            <a class="admin-nav-link" href="{{ request.scope.root_path }}/admin/tools">Tools</a>
+            <a class="admin-nav-link active" href="{{ request.scope.root_path }}/admin/file-validation">File Validation</a>
+        </nav>
+
+        <div class="header">
+            <h1>File Validation</h1>
+            <p>Validate studies and activities files in-memory without creating or deleting studies.</p>
+            <div class="meta">
+                <div><strong>Admin:</strong> {{ current_admin }}</div>
+                <div><strong>Last Updated:</strong> {{ current_time.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <form class="card validation-form" data-mode="single_activities">
+                <h2>1) Single activities file</h2>
+                <p class="subtle">Checks one activities JSON file only (schema + internal validations).</p>
+                <div class="field">
+                    <label for="singleActivitiesFile">Activities file (.json)</label>
+                    <input id="singleActivitiesFile" name="activities_file" type="file" accept=".json" required>
+                </div>
+                <div class="actions">
+                    <button type="submit">Validate single file</button>
+                </div>
+                <p class="hint">Tip: language-cross checks are skipped in this mode.</p>
+            </form>
+
+            <form class="card validation-form" data-mode="activities_multilang">
+                <h2>2) Activities cross-language set</h2>
+                <p class="subtle">Checks consistency across one activities file per language.</p>
+                <div class="field">
+                    <label for="multiSupportedLanguages">Supported languages (comma-separated)</label>
+                    <input id="multiSupportedLanguages" name="supported_languages_csv" type="text" placeholder="en,de,sv" required>
+                </div>
+                <div class="field">
+                    <label for="multiDefaultLanguage">Default language</label>
+                    <input id="multiDefaultLanguage" name="default_language" type="text" placeholder="en" required>
+                </div>
+                <div class="field">
+                    <label for="multiActivitiesFiles">Activities files (.json, one per language)</label>
+                    <input id="multiActivitiesFiles" name="activities_files" type="file" accept=".json" multiple required>
+                </div>
+                <div class="field">
+                    <label for="multiLanguageMap">Optional language map JSON (lang -&gt; filename)</label>
+                    <textarea id="multiLanguageMap" name="activities_language_map" placeholder='{"en":"activities_default.json","de":"activities_default.de.json"}'></textarea>
+                </div>
+                <div class="actions">
+                    <button type="submit">Validate language set</button>
+                </div>
+            </form>
+
+            <form class="card validation-form" data-mode="full_study">
+                <h2>3) Full study package</h2>
+                <p class="subtle">Checks a single-study studies_config plus all related language activities files.</p>
+                <div class="field">
+                    <label for="fullStudyConfigFile">studies_config.json (must contain exactly one study)</label>
+                    <input id="fullStudyConfigFile" name="studies_config_file" type="file" accept=".json" required>
+                </div>
+                <div class="field">
+                    <label for="fullActivitiesFiles">Activities files referenced by that study</label>
+                    <input id="fullActivitiesFiles" name="activities_files" type="file" accept=".json" multiple required>
+                </div>
+                <div class="field">
+                    <label for="fullLanguageMap">Optional language map JSON (lang -&gt; filename)</label>
+                    <textarea id="fullLanguageMap" name="activities_language_map" placeholder='{"en":"activities_default.json","de":"activities_default.de.json"}'></textarea>
+                </div>
+                <div class="actions">
+                    <button type="submit">Validate full study</button>
+                </div>
+                <p class="hint">By default, filenames from studies_config are used to map uploaded files.</p>
+            </form>
+        </div>
+
+        <div id="validationResult" class="result-box" style="display:none;"></div>
+    </div>
+
+    <script>
+        const forms = document.querySelectorAll('.validation-form');
+        const resultBox = document.getElementById('validationResult');
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderResult(payload) {
+            resultBox.style.display = 'block';
+
+            const titleClass = payload.ok ? 'ok' : 'error';
+            const titleText = payload.ok ? 'Validation passed' : 'Validation failed';
+            const mode = payload.mode || 'unknown';
+
+            let summaryHtml = '';
+            if (payload.summary && Object.keys(payload.summary).length > 0) {
+                const parts = Object.entries(payload.summary).map(([key, value]) => {
+                    const formattedValue = Array.isArray(value)
+                        ? value.join(', ')
+                        : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+                    return `<li><strong>${escapeHtml(key)}:</strong> ${escapeHtml(formattedValue)}</li>`;
+                }).join('');
+                summaryHtml = `<div><strong>Summary</strong><ul>${parts}</ul></div>`;
+            }
+
+            let errorsHtml = '';
+            if (payload.errors && payload.errors.length > 0) {
+                const items = payload.errors.map((error) => {
+                    const message = escapeHtml(error.message || 'Validation error');
+                    const path = error.path ? `<br><span class="subtle">Path: ${escapeHtml(error.path)}</span>` : '';
+                    const type = error.type ? `<br><span class="subtle">Type: ${escapeHtml(error.type)}</span>` : '';
+                    return `<li>${message}${path}${type}</li>`;
+                }).join('');
+                errorsHtml = `<div><strong>Errors</strong><ul>${items}</ul></div>`;
+            }
+
+            resultBox.innerHTML = `
+                <div class="result-title ${titleClass}">${titleText}</div>
+                <p class="subtle">Mode: <code>${escapeHtml(mode)}</code></p>
+                ${summaryHtml}
+                ${errorsHtml}
+            `;
+        }
+
+        async function submitValidationForm(form, mode) {
+            const submitButton = form.querySelector('button[type="submit"]');
+            const fd = new FormData();
+            fd.append('mode', mode);
+
+            if (mode === 'single_activities') {
+                const fileInput = form.querySelector('input[name="activities_file"]');
+                if (!fileInput.files.length) {
+                    throw new Error('Please select one activities file.');
+                }
+                fd.append('activities_file', fileInput.files[0]);
+            }
+
+            if (mode === 'activities_multilang') {
+                const supported = form.querySelector('input[name="supported_languages_csv"]').value.trim();
+                const defaultLanguage = form.querySelector('input[name="default_language"]').value.trim();
+                const languageMap = form.querySelector('textarea[name="activities_language_map"]').value.trim();
+                const filesInput = form.querySelector('input[name="activities_files"]');
+
+                if (!supported || !defaultLanguage) {
+                    throw new Error('Please provide supported languages and a default language.');
+                }
+                if (!filesInput.files.length) {
+                    throw new Error('Please upload activities files for all languages.');
+                }
+
+                fd.append('supported_languages_csv', supported);
+                fd.append('default_language', defaultLanguage);
+                if (languageMap) {
+                    fd.append('activities_language_map', languageMap);
+                }
+                for (const file of filesInput.files) {
+                    fd.append('activities_files', file);
+                }
+            }
+
+            if (mode === 'full_study') {
+                const studiesFileInput = form.querySelector('input[name="studies_config_file"]');
+                const activitiesInput = form.querySelector('input[name="activities_files"]');
+                const languageMap = form.querySelector('textarea[name="activities_language_map"]').value.trim();
+
+                if (!studiesFileInput.files.length) {
+                    throw new Error('Please upload one studies_config file.');
+                }
+                if (!activitiesInput.files.length) {
+                    throw new Error('Please upload related activities files.');
+                }
+
+                fd.append('studies_config_file', studiesFileInput.files[0]);
+                if (languageMap) {
+                    fd.append('activities_language_map', languageMap);
+                }
+                for (const file of activitiesInput.files) {
+                    fd.append('activities_files', file);
+                }
+            }
+
+            submitButton.disabled = true;
+            submitButton.textContent = 'Validating...';
+
+            try {
+                const response = await fetch('{{ request.scope.root_path }}/api/admin/validate/files', {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin',
+                });
+                const payload = await response.json();
+                renderResult(payload);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = mode === 'single_activities'
+                    ? 'Validate single file'
+                    : (mode === 'activities_multilang' ? 'Validate language set' : 'Validate full study');
+            }
+        }
+
+        forms.forEach((form) => {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const mode = form.dataset.mode;
+                try {
+                    await submitValidationForm(form, mode);
+                } catch (error) {
+                    renderResult({
+                        ok: false,
+                        mode,
+                        summary: {},
+                        errors: [{ message: error.message || String(error), path: null, type: 'client_error' }],
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

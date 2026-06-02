@@ -1,4 +1,15 @@
-from fastapi import FastAPI, HTTPException, Request, status, Response, Depends, Query
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Request,
+    status,
+    Response,
+    Depends,
+    Query,
+    UploadFile,
+    File,
+    Form,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -9,10 +20,11 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import logging
 import uuid
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Any
 from datetime import datetime
 import csv
 import json
+import re
 from sqlmodel import Session, delete, select
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from fastapi.templating import Jinja2Templates
@@ -1753,6 +1765,218 @@ def _load_json_file_with_studies_config_base(file_path: str) -> dict:
         return json.load(file_handle)
 
 
+def _guess_language_from_filename(filename: str) -> Optional[str]:
+    if not isinstance(filename, str):
+        return None
+    filename_clean = filename.strip().lower()
+    if not filename_clean:
+        return None
+
+    patterns = [
+        r"[_\-.]([a-z]{2})\.json$",
+        r"([a-z]{2})\.json$",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, filename_clean)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _format_exception_for_client(error: Exception) -> List[Dict[str, Any]]:
+    if isinstance(error, ValidationError):
+        formatted_errors: List[Dict[str, Any]] = []
+        for item in error.errors():
+            location = item.get("loc", [])
+            formatted_errors.append(
+                {
+                    "message": item.get("msg", "Validation error"),
+                    "path": " -> ".join(str(part) for part in location),
+                    "type": item.get("type", "validation_error"),
+                }
+            )
+        return formatted_errors
+
+    return [
+        {
+            "message": str(error),
+            "path": None,
+            "type": "error",
+        }
+    ]
+
+
+async def _parse_json_upload(upload: UploadFile, label: str) -> Dict[str, Any]:
+    raw_bytes = await upload.read()
+    try:
+        decoded = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(
+            f"{label} ('{upload.filename}') must be valid UTF-8 text"
+        ) from error
+
+    try:
+        parsed = json.loads(decoded)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"Invalid JSON in {label} ('{upload.filename}') at line {error.lineno}, column {error.colno}: {error.msg}"
+        ) from error
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{label} ('{upload.filename}') must contain a JSON object")
+
+    return parsed
+
+
+async def _parse_activities_uploads_by_language(
+    activities_files: List[UploadFile],
+    explicit_map_json: Optional[str] = None,
+    expected_filenames_by_language: Optional[Dict[str, str]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    if not activities_files:
+        raise ValueError("At least one activities JSON file is required")
+
+    file_by_name: Dict[str, UploadFile] = {}
+    for upload in activities_files:
+        filename = (upload.filename or "").strip()
+        if not filename:
+            raise ValueError("One uploaded activities file is missing a filename")
+        file_by_name[filename] = upload
+
+    explicit_map: Dict[str, str] = {}
+    if explicit_map_json and explicit_map_json.strip():
+        try:
+            parsed_map = json.loads(explicit_map_json)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                f"Invalid JSON in activities language map at line {error.lineno}, column {error.colno}: {error.msg}"
+            ) from error
+        if not isinstance(parsed_map, dict):
+            raise ValueError("Activities language map must be a JSON object")
+        for language, filename in parsed_map.items():
+            normalized_lang = _normalize_language_code(language)
+            if not normalized_lang:
+                raise ValueError(
+                    f"Invalid language key '{language}' in activities language map"
+                )
+            if not isinstance(filename, str) or not filename.strip():
+                raise ValueError(
+                    f"Language map entry for '{language}' must be a non-empty filename"
+                )
+            explicit_map[normalized_lang] = filename.strip()
+
+    result: Dict[str, Dict[str, Any]] = {}
+
+    if expected_filenames_by_language:
+        for language, expected_filename in expected_filenames_by_language.items():
+            normalized_lang = _normalize_language_code(language)
+            if not normalized_lang:
+                continue
+            basename = Path(expected_filename).name
+            upload = file_by_name.get(basename)
+            if not upload:
+                raise ValueError(
+                    f"Missing uploaded activities file for language '{normalized_lang}': expected filename '{basename}'"
+                )
+            result[normalized_lang] = await _parse_json_upload(
+                upload, f"activities file ({normalized_lang})"
+            )
+        return result
+
+    if explicit_map:
+        for language, filename in explicit_map.items():
+            upload = file_by_name.get(filename)
+            if not upload:
+                raise ValueError(
+                    f"Activities language map references missing uploaded file '{filename}' for language '{language}'"
+                )
+            result[language] = await _parse_json_upload(
+                upload, f"activities file ({language})"
+            )
+        return result
+
+    if len(activities_files) == 1:
+        guessed_lang = _guess_language_from_filename(activities_files[0].filename or "")
+        language = guessed_lang or "en"
+        result[language] = await _parse_json_upload(
+            activities_files[0], f"activities file ({language})"
+        )
+        return result
+
+    ambiguous_files: List[str] = []
+    for upload in activities_files:
+        guessed_lang = _guess_language_from_filename(upload.filename or "")
+        if not guessed_lang:
+            ambiguous_files.append(upload.filename or "<unnamed>")
+            continue
+        if guessed_lang in result:
+            raise ValueError(
+                f"Duplicate language '{guessed_lang}' detected from filenames. Provide an explicit language map."
+            )
+        result[guessed_lang] = await _parse_json_upload(
+            upload, f"activities file ({guessed_lang})"
+        )
+
+    if ambiguous_files:
+        raise ValueError(
+            "Could not infer language for these files from filename suffixes (_en.json, _de.json, ...): "
+            + ", ".join(ambiguous_files)
+        )
+
+    return result
+
+
+def _validate_activities_multilang_in_memory(
+    activities_by_lang: Dict[str, Dict[str, Any]],
+    supported_languages: List[str],
+    default_language: str,
+) -> Dict[str, Any]:
+    day_label_display_names = {
+        language: language.upper() for language in supported_languages
+    }
+
+    payload = ImportStudiesConfigStudy(
+        name="Validation-only study",
+        name_short="validation_only_study",
+        description="In-memory validation",
+        day_labels=[
+            {
+                "name": "day1",
+                "display_order": 0,
+                "display_names": day_label_display_names,
+            }
+        ],
+        study_participant_ids=[],
+        allow_unlisted_participants=True,
+        default_language=default_language,
+        supported_languages=supported_languages,
+        activities_json_data=activities_by_lang,
+        data_collection_start=datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
+        data_collection_end=datetime.fromisoformat("2030-01-01T00:00:00+00:00"),
+    )
+    validated = _validate_import_study_payload(payload)
+    return {
+        "supported_languages": validated["supported_languages"],
+        "default_language": validated["default_language"],
+    }
+
+
+def _extract_single_study_from_studies_config(
+    studies_config_json: Dict[str, Any],
+) -> Dict[str, Any]:
+    studies = studies_config_json.get("studies")
+    if not isinstance(studies, list) or not studies:
+        raise ValueError("studies_config must contain a non-empty 'studies' array")
+    if len(studies) != 1:
+        raise ValueError(
+            "Full-study validation mode currently supports exactly one study in studies_config"
+        )
+    study = studies[0]
+    if not isinstance(study, dict):
+        raise ValueError("The single entry in 'studies' must be a JSON object")
+    return study
+
+
 def _create_study_from_import_payload(
     session: Session,
     study_payload: ImportStudiesConfigStudy,
@@ -2637,6 +2861,215 @@ async def admin_tools(
     template = templates.get_template("admin_tools.html")
     html_content = template.render(context_dict)
     return HTMLResponse(content=html_content)
+
+
+@app.get(
+    "/admin/file-validation",
+    name="Admin File Validation Page",
+    response_class=HTMLResponse,
+)
+async def admin_file_validation(
+    request: Request,
+    current_admin: str = Depends(verify_admin),
+):
+    """Render admin file-validation utilities page."""
+    logger.info("Admin '%s' accessed the admin file validation page.", current_admin)
+    audit_admin_action(current_admin, "opened admin file validation page")
+
+    context_dict = {
+        "request": request,
+        "current_admin": current_admin,
+        "current_time": utc_now(),
+    }
+    template = templates.get_template("admin_file_validation.html")
+    html_content = template.render(context_dict)
+    return HTMLResponse(content=html_content)
+
+
+@app.post("/api/admin/validate/files")
+async def validate_files_in_memory(
+    mode: str = Form(...),
+    default_language: Optional[str] = Form(None),
+    supported_languages_csv: Optional[str] = Form(None),
+    activities_language_map: Optional[str] = Form(None),
+    activities_file: Optional[UploadFile] = File(None),
+    activities_files: List[UploadFile] = File(default_factory=list),
+    studies_config_file: Optional[UploadFile] = File(None),
+    current_admin: str = Depends(verify_admin),
+):
+    """Validate uploaded config files in-memory without writing to disk.
+
+    Modes:
+    - single_activities: one activities JSON file
+    - activities_multilang: several activities files + language config
+    - full_study: studies_config (single study) + activities files
+    """
+    allowed_modes = {
+        "single_activities",
+        "activities_multilang",
+        "full_study",
+    }
+    if mode not in allowed_modes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported mode '{mode}'. Allowed: {sorted(allowed_modes)}",
+        )
+
+    try:
+        if mode == "single_activities":
+            if activities_file is None:
+                raise ValueError(
+                    "single_activities mode requires one activities file upload"
+                )
+            activities_json = await _parse_json_upload(
+                activities_file, "activities file"
+            )
+            parsed = ActivitiesConfig(**activities_json)
+
+            timeline_count = len(parsed.timeline)
+            category_count = sum(
+                len(timeline_cfg.categories)
+                for timeline_cfg in parsed.timeline.values()
+            )
+            activity_count = len(get_all_activity_codes(parsed))
+
+            audit_admin_action(
+                current_admin,
+                f"validated single activities file '{activities_file.filename}' successfully",
+            )
+            return {
+                "ok": True,
+                "mode": mode,
+                "summary": {
+                    "timeline_count": timeline_count,
+                    "category_count": category_count,
+                    "activity_count": activity_count,
+                },
+                "errors": [],
+            }
+
+        if mode == "activities_multilang":
+            supported_languages = _normalize_languages(
+                (supported_languages_csv or "").split(",")
+            )
+            if not supported_languages:
+                raise ValueError(
+                    "activities_multilang mode requires supported languages (comma-separated)"
+                )
+
+            normalized_default_language = _normalize_language_code(default_language)
+            if not normalized_default_language:
+                raise ValueError(
+                    "activities_multilang mode requires a valid default language"
+                )
+            if normalized_default_language not in supported_languages:
+                raise ValueError(
+                    "default_language must be included in supported languages"
+                )
+
+            activities_by_lang = await _parse_activities_uploads_by_language(
+                activities_files=activities_files,
+                explicit_map_json=activities_language_map,
+            )
+
+            _validate_activities_multilang_in_memory(
+                activities_by_lang=activities_by_lang,
+                supported_languages=supported_languages,
+                default_language=normalized_default_language,
+            )
+
+            audit_admin_action(
+                current_admin,
+                "validated multilingual activities file set successfully",
+            )
+            return {
+                "ok": True,
+                "mode": mode,
+                "summary": {
+                    "languages": supported_languages,
+                    "default_language": normalized_default_language,
+                    "uploaded_languages": sorted(activities_by_lang.keys()),
+                },
+                "errors": [],
+            }
+
+        if studies_config_file is None:
+            raise ValueError("full_study mode requires a studies_config file upload")
+
+        studies_config_json = await _parse_json_upload(
+            studies_config_file,
+            "studies_config file",
+        )
+        study = _extract_single_study_from_studies_config(studies_config_json)
+
+        expected_files_by_language: Dict[str, str] = {}
+        if isinstance(study.get("activities_json_files"), dict):
+            expected_files_by_language = {
+                str(language): str(path)
+                for language, path in study["activities_json_files"].items()
+            }
+        elif isinstance(study.get("activities_json_file"), dict):
+            expected_files_by_language = {
+                str(language): str(path)
+                for language, path in study["activities_json_file"].items()
+            }
+        elif isinstance(study.get("activities_json_file"), str):
+            default_lang = study.get("default_language") or "en"
+            expected_files_by_language = {
+                str(default_lang): str(study["activities_json_file"])
+            }
+
+        activities_by_lang = await _parse_activities_uploads_by_language(
+            activities_files=activities_files,
+            explicit_map_json=activities_language_map,
+            expected_filenames_by_language=expected_files_by_language
+            if expected_files_by_language
+            else None,
+        )
+
+        study_payload_dict = dict(study)
+        study_payload_dict.pop("activities_json_file", None)
+        study_payload_dict.pop("activities_json_files", None)
+        study_payload_dict["activities_json_data"] = activities_by_lang
+
+        import_study_payload = ImportStudiesConfigStudy(**study_payload_dict)
+        validated = _validate_import_study_payload(import_study_payload)
+
+        audit_admin_action(
+            current_admin,
+            (
+                "validated full study package successfully "
+                f"(study_name_short='{import_study_payload.name_short}')"
+            ),
+        )
+        return {
+            "ok": True,
+            "mode": mode,
+            "summary": {
+                "study_name_short": import_study_payload.name_short,
+                "supported_languages": validated["supported_languages"],
+                "default_language": validated["default_language"],
+            },
+            "errors": [],
+        }
+
+    except Exception as error:
+        logger.warning(
+            "Admin '%s' file validation failed in mode '%s': %s",
+            current_admin,
+            mode,
+            error,
+        )
+        audit_admin_action(
+            current_admin,
+            f"attempted file validation in mode '{mode}' and received validation errors",
+        )
+        return {
+            "ok": False,
+            "mode": mode,
+            "summary": {},
+            "errors": _format_exception_for_client(error),
+        }
 
 
 @app.post("/api/admin/studies/{study_name_short}/assign-participants")
