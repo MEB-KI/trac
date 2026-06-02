@@ -89,3 +89,45 @@ def test_rejects_third_level_activity_nesting():
 
     with pytest.raises(ValueError, match="Third-level activity nesting is not allowed"):
         ActivitiesConfig(**payload)
+
+
+def test_activity_frequency_options_are_optional_and_exposed_in_metadata():
+    payload = _example_activities_payload()
+    payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "bi_weekly", "label": "Bi-weekly"},
+        {"key": "monthly", "label": "Monthly"},
+    ]
+
+    config = ActivitiesConfig(**payload)
+    all_codes = get_all_activity_codes(config)
+
+    assert all_codes[100]["frequency_options"] == [
+        {"key": "bi_weekly", "label": "Bi-weekly"},
+        {"key": "monthly", "label": "Monthly"},
+    ]
+    assert all_codes[200]["frequency_options"] is None
+
+
+def test_rejects_duplicate_frequency_option_keys():
+    payload = _example_activities_payload()
+    payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "monthly", "label": "Monthly"},
+        {"key": "monthly", "label": "Every month"},
+    ]
+
+    with pytest.raises(ValueError, match="duplicate key"):
+        ActivitiesConfig(**payload)
+
+
+def test_rejects_empty_frequency_options_list():
+    payload = _example_activities_payload()
+    payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = []
+
+    with pytest.raises(ValueError, match="cannot be an empty list"):
+        ActivitiesConfig(**payload)

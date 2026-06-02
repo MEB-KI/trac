@@ -7,6 +7,11 @@ from pathlib import Path
 from functools import lru_cache
 
 
+class FrequencyOption(BaseModel):
+    key: str
+    label: str
+
+
 class ActivityItem(BaseModel):
     name: str
     code: int
@@ -15,6 +20,7 @@ class ActivityItem(BaseModel):
     vshort: Optional[str] = None
     color: Optional[str] = None
     examples: Optional[str] = None
+    frequency_options: Optional[List[FrequencyOption]] = None
     is_custom_input: Optional[bool] = False
     childItems: List["ActivityItem"] = []
 
@@ -26,6 +32,34 @@ class ActivityItem(BaseModel):
         if self.label is None:
             self.label = self.name
         return self
+
+    @field_validator("frequency_options")
+    @classmethod
+    def validate_frequency_options(
+        cls, v: Optional[List[FrequencyOption]]
+    ) -> Optional[List[FrequencyOption]]:
+        if v is None:
+            return v
+
+        if len(v) == 0:
+            raise ValueError("frequency_options cannot be an empty list")
+
+        seen_keys: Set[str] = set()
+        for option in v:
+            option.key = option.key.strip()
+            option.label = option.label.strip()
+
+            if not option.key:
+                raise ValueError("frequency_options[].key must be a non-empty string")
+            if not option.label:
+                raise ValueError("frequency_options[].label must be a non-empty string")
+            if option.key in seen_keys:
+                raise ValueError(
+                    f"frequency_options contains duplicate key '{option.key}'"
+                )
+            seen_keys.add(option.key)
+
+        return v
 
 
 class ActivityCategory(BaseModel):
@@ -214,6 +248,11 @@ def get_all_activity_codes(config: ActivitiesConfig) -> Dict[int, Dict[str, Any]
                 "vshort": activity.vshort,
                 "color": activity.color,
                 "examples": activity.examples,
+                "frequency_options": [
+                    {"key": option.key, "label": option.label}
+                    for option in (activity.frequency_options or [])
+                ]
+                or None,
                 "is_custom_input": activity.is_custom_input,
                 "timeline": context.get("timeline"),
                 "category": context.get("category"),

@@ -12,6 +12,7 @@ from .activities_config import (
     ActivitiesConfig,
     load_activities_config,
     get_activity_codes_set,
+    get_all_activity_codes,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ class CfgFileExternalTask(BaseModel):
         - If "send_pid" is true, the participant ID is also appended using
             "pid_query_param" (default: "pid").
     """
+
     # Stable machine key for this task in API payloads and callbacks.
     task_key: str
     # Human-facing task name shown in admin and participant views.
@@ -88,9 +90,7 @@ def get_external_task_effective_config(
     external_task: CfgFileExternalTask,
 ) -> Dict[str, Any]:
     config = (
-        dict(external_task.config)
-        if isinstance(external_task.config, dict)
-        else {}
+        dict(external_task.config) if isinstance(external_task.config, dict) else {}
     )
     if external_task.send_pid:
         pid_query_param = (external_task.pid_query_param or "pid").strip() or "pid"
@@ -525,6 +525,19 @@ def _resolve_activities_path(raw_path: str, base_dir: Path) -> Path:
 def _validate_multilingual_activity_code_sets(
     cfg_studies: CfgFileStudies, config_dir: Path
 ) -> None:
+    def _frequency_keys_by_code(
+        activities_cfg: ActivitiesConfig,
+    ) -> Dict[int, Optional[tuple[str, ...]]]:
+        all_activity_info = get_all_activity_codes(activities_cfg)
+        frequency_map: Dict[int, Optional[tuple[str, ...]]] = {}
+        for code, metadata in all_activity_info.items():
+            options = metadata.get("frequency_options")
+            if not options:
+                frequency_map[code] = None
+                continue
+            frequency_map[code] = tuple(option["key"] for option in options)
+        return frequency_map
+
     for study in cfg_studies.studies:
         files_by_lang = study.get_supported_activities_json_files()
         data_by_lang = study.get_supported_activities_json_data()
@@ -533,6 +546,7 @@ def _validate_multilingual_activity_code_sets(
             continue
 
         codes_by_lang: Dict[str, set[int]] = {}
+        frequency_by_lang: Dict[str, Dict[int, Optional[tuple[str, ...]]]] = {}
 
         for language in sorted(supported_languages):
             if language in data_by_lang:
@@ -546,6 +560,7 @@ def _validate_multilingual_activity_code_sets(
                     f"Study '{study.name_short}' has supported language '{language}' without activities configuration"
                 )
             codes_by_lang[language] = get_activity_codes_set(activities_cfg)
+            frequency_by_lang[language] = _frequency_keys_by_code(activities_cfg)
 
         reference_language = (
             study.default_language
@@ -573,6 +588,35 @@ def _validate_multilingual_activity_code_sets(
                 f"Study '{study.name_short}' has inconsistent activity code sets across languages. "
                 f"All language activity files must define the same set of codes. "
                 + " | ".join(mismatch_details)
+            )
+
+        reference_frequency = frequency_by_lang[reference_language]
+        frequency_mismatch_details: List[str] = []
+
+        for language, frequency_map in sorted(frequency_by_lang.items()):
+            if language == reference_language:
+                continue
+
+            per_code_mismatches: List[str] = []
+            for code in sorted(reference_codes):
+                reference_keys = reference_frequency.get(code)
+                language_keys = frequency_map.get(code)
+                if reference_keys != language_keys:
+                    per_code_mismatches.append(
+                        f"code={code} ref={reference_keys} lang={language_keys}"
+                    )
+
+            if per_code_mismatches:
+                frequency_mismatch_details.append(
+                    f"language '{language}' differs from '{reference_language}' for frequency_options: "
+                    + "; ".join(per_code_mismatches[:20])
+                )
+
+        if frequency_mismatch_details:
+            raise ValueError(
+                f"Study '{study.name_short}' has inconsistent activity frequency_options across languages. "
+                "Activities with frequency_options must define matching frequency key lists in all supported languages. "
+                + " | ".join(frequency_mismatch_details)
             )
 
 

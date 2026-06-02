@@ -286,6 +286,9 @@ class StudyAvailableActivityI18n(SQLModel, table=True):
     vshort: Optional[str] = None
     examples: Optional[str] = None
     color: Optional[str] = None
+    frequency_options: Optional[List[Dict[str, str]]] = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

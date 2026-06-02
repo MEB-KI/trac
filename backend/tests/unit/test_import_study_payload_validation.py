@@ -252,6 +252,35 @@ def test_validate_import_payload_rejects_external_tasks_with_duplicate_tokens():
         _validate_import_study_payload(study_payload)
 
 
+def test_validate_import_payload_rejects_frequency_key_mismatch_across_languages():
+    payload = _base_payload()
+    payload["supported_languages"] = ["en", "sv"]
+    payload["day_labels"][0]["display_names"] = {"en": "Monday", "sv": "Mandag"}
+
+    en_data = _minimal_activities_payload([100])
+    sv_data = _minimal_activities_payload([100])
+
+    en_data["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "bi_weekly", "label": "Bi-weekly"},
+        {"key": "monthly", "label": "Monthly"},
+    ]
+    sv_data["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "annan_vecka", "label": "Varannan vecka"},
+        {"key": "monthly", "label": "Manadsvis"},
+    ]
+
+    payload["activities_json_data"] = {"en": en_data, "sv": sv_data}
+
+    study_payload = ImportStudiesConfigStudy(**payload)
+
+    with pytest.raises(ValueError, match="structure mismatch"):
+        _validate_import_study_payload(study_payload)
+
+
 def test_build_external_task_continuation_url_uses_configured_token_query_param():
     external_task = StudyExternalTask(
         study_id=1,
@@ -292,7 +321,11 @@ def test_build_external_task_continuation_url_appends_pid_when_enabled():
         url="https://example.org/payment?src=trac",
         confirmation_type="none",
         tokens=["tok-1"],
-        config={"token_query_param": "survey_token", "send_pid": True, "pid_query_param": "participant_id"},
+        config={
+            "token_query_param": "survey_token",
+            "send_pid": True,
+            "pid_query_param": "participant_id",
+        },
     )
 
     continuation_url = _build_external_task_continuation_url(

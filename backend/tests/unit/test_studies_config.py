@@ -404,3 +404,97 @@ def test_load_studies_config_rejects_mismatching_codes_for_mixed_file_and_embedd
 
     with pytest.raises(ValueError, match="inconsistent activity code sets"):
         load_studies_config(str(config_file))
+
+
+def test_load_studies_config_rejects_frequency_option_presence_mismatch_across_languages(
+    tmp_path,
+):
+    en_payload = _minimal_activities_payload([100, 200])
+    sv_payload = _minimal_activities_payload([100, 200])
+
+    en_payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [{"key": "monthly", "label": "Monthly"}]
+
+    (tmp_path / "activities_default.json").write_text(
+        json.dumps(en_payload), encoding="utf-8"
+    )
+    (tmp_path / "activities_default.sv.json").write_text(
+        json.dumps(sv_payload), encoding="utf-8"
+    )
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(_valid_studies_payload()), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError, match="inconsistent activity frequency_options across languages"
+    ):
+        load_studies_config(str(config_file))
+
+
+def test_load_studies_config_rejects_frequency_option_key_mismatch_across_languages(
+    tmp_path,
+):
+    en_payload = _minimal_activities_payload([100, 200])
+    sv_payload = _minimal_activities_payload([100, 200])
+
+    en_payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "bi_weekly", "label": "Bi-weekly"},
+        {"key": "monthly", "label": "Monthly"},
+    ]
+    sv_payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "annan_vecka", "label": "Varannan vecka"},
+        {"key": "monthly", "label": "Manadsvis"},
+    ]
+
+    (tmp_path / "activities_default.json").write_text(
+        json.dumps(en_payload), encoding="utf-8"
+    )
+    (tmp_path / "activities_default.sv.json").write_text(
+        json.dumps(sv_payload), encoding="utf-8"
+    )
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(_valid_studies_payload()), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError, match="inconsistent activity frequency_options across languages"
+    ):
+        load_studies_config(str(config_file))
+
+
+def test_load_studies_config_accepts_matching_frequency_option_keys_across_languages(
+    tmp_path,
+):
+    en_payload = _minimal_activities_payload([100, 200])
+    sv_payload = _minimal_activities_payload([100, 200])
+
+    en_payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "bi_weekly", "label": "Bi-weekly"},
+        {"key": "monthly", "label": "Monthly"},
+    ]
+    sv_payload["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "bi_weekly", "label": "Varannan vecka"},
+        {"key": "monthly", "label": "Manadsvis"},
+    ]
+
+    (tmp_path / "activities_default.json").write_text(
+        json.dumps(en_payload), encoding="utf-8"
+    )
+    (tmp_path / "activities_default.sv.json").write_text(
+        json.dumps(sv_payload), encoding="utf-8"
+    )
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(_valid_studies_payload()), encoding="utf-8")
+
+    config = load_studies_config(str(config_file))
+    assert len(config.studies) == 1

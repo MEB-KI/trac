@@ -8,6 +8,7 @@ from o_timeusediary_backend.models import (
     Study,
     StudyActivityConfigBlob,
     StudyAvailableActivity,
+    StudyAvailableActivityI18n,
     StudyExternalTask,
     StudyExternalTaskAssignment,
 )
@@ -194,6 +195,12 @@ def test_create_config_file_studies_in_database_accepts_embedded_activities_json
     activities_data = json.loads(
         (tmp_path / "activities.json").read_text(encoding="utf-8")
     )
+    activities_data["timeline"]["primary"]["categories"][0]["activities"][0][
+        "frequency_options"
+    ] = [
+        {"key": "bi_weekly", "label": "Bi-weekly"},
+        {"key": "monthly", "label": "Monthly"},
+    ]
 
     config_path = _write_studies_config_with_embedded_activities(
         tmp_path,
@@ -246,6 +253,24 @@ def test_create_config_file_studies_in_database_accepts_embedded_activities_json
             ).all()
         )
         assert available_activity_count >= 2
+
+        i18n_row = session.exec(
+            select(StudyAvailableActivityI18n)
+            .join(
+                StudyAvailableActivity,
+                StudyAvailableActivityI18n.activity_id == StudyAvailableActivity.id,
+            )
+            .where(
+                StudyAvailableActivity.study_id == study.id,
+                StudyAvailableActivity.activity_code == 100,
+                StudyAvailableActivityI18n.language == "en",
+            )
+        ).first()
+        assert i18n_row is not None
+        assert i18n_row.frequency_options == [
+            {"key": "bi_weekly", "label": "Bi-weekly"},
+            {"key": "monthly", "label": "Monthly"},
+        ]
 
 
 def test_create_config_file_studies_in_database_persists_study_texts(
@@ -315,13 +340,14 @@ def test_create_config_file_studies_in_database_persists_external_tasks(
 
         assignments = session.exec(
             select(StudyExternalTaskAssignment)
-            .where(
-                StudyExternalTaskAssignment.external_task_id == external_tasks[0].id
-            )
+            .where(StudyExternalTaskAssignment.external_task_id == external_tasks[0].id)
             .order_by(StudyExternalTaskAssignment.assignment_order)
         ).all()
 
         assert [assignment.participant_id for assignment in assignments] == ["p1", "p2"]
-        assert [assignment.assigned_token for assignment in assignments] == ["tok-1", "tok-2"]
+        assert [assignment.assigned_token for assignment in assignments] == [
+            "tok-1",
+            "tok-2",
+        ]
     assert [assignment.is_confirmed for assignment in assignments] == [False, False]
     assert [assignment.confirmed_at for assignment in assignments] == [None, None]
