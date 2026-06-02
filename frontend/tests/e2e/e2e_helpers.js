@@ -12,6 +12,33 @@ function isIndexUrl(url) {
   return /index\.html/.test(url);
 }
 
+function isTransientNavigationError(error) {
+  const message = String(error?.message || '');
+  return (
+    message.includes('WebKit encountered an internal error') ||
+    message.includes('net::ERR_ABORTED') ||
+    message.includes('Navigation failed because page was closed')
+  );
+}
+
+async function gotoWithRetry(page, url, options = {}, maxAttempts = 3) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(url, options);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientNavigationError(error) || attempt === maxAttempts) {
+        throw error;
+      }
+      await page.waitForTimeout(400);
+    }
+  }
+
+  throw lastError;
+}
+
 async function enterConsentAndInstructionsIfNeeded(page) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const currentUrl = page.url();
@@ -85,7 +112,7 @@ async function enterStudyIfNeeded(page) {
         '/index.html'
       );
       instructionsUrl.searchParams.set('instructions', 'completed');
-      await page.goto(instructionsUrl.toString(), {
+      await gotoWithRetry(page, instructionsUrl.toString(), {
         waitUntil: 'domcontentloaded',
       });
       continue;
