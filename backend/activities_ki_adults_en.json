@@ -252,7 +252,17 @@
               "examples": "Cinema, theatre, concert, sports event",
               "code": 1163,
               "label": "events or entertainment outside",
-              "color": "#DA70D6"
+              "color": "#DA70D6",
+              "frequency_options": [
+                {
+                  "key": "bi-weekly",
+                  "label": "Bi-weekly"
+                },
+                {
+                  "key": "monthly",
+                  "label": "Monthly"
+                }
+              ]
             },
             {
               "name": "Hobby non-sports",
@@ -261,6 +271,16 @@
               "label": "hobby non-sports",
               "color": "#BA55D3",
               "childItems": [],
+              "frequency_options": [
+                {
+                  "key": "bi-weekly",
+                  "label": "Bi-weekly"
+                },
+                {
+                  "key": "monthly",
+                  "label": "Monthly"
+                }
+              ],
               "is_custom_input": true
             },
             {
@@ -273,7 +293,17 @@
                   "name": "Walking alone",
                   "code": 1167,
                   "label": "Walking",
-                  "color": "#9370DB"
+                  "color": "#9370DB",
+                  "frequency_options": [
+                    {
+                      "key": "bi-weekly",
+                      "label": "Bi-weekly"
+                    },
+                    {
+                      "key": "monthly",
+                      "label": "Monthly"
+                    }
+                  ]
                 },
                 {
                   "name": "Walking with someone else",

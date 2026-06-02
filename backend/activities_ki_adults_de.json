@@ -252,7 +252,17 @@
               "examples": "Kino, Theater, Konzert, Sportveranstaltung",
               "code": 1163,
               "label": "veranstaltungen oder unterhaltung außerhalb",
-              "color": "#DA70D6"
+              "color": "#DA70D6",
+              "frequency_options": [
+                {
+                  "key": "bi-weekly",
+                  "label": "Alle zwei Wochen"
+                },
+                {
+                  "key": "monthly",
+                  "label": "Monatlich"
+                }
+              ]
             },
             {
               "name": "Hobby nicht-Sport",
@@ -261,6 +271,16 @@
               "label": "hobby nicht-sport",
               "color": "#BA55D3",
               "childItems": [],
+              "frequency_options": [
+                {
+                  "key": "bi-weekly",
+                  "label": "Alle zwei Wochen"
+                },
+                {
+                  "key": "monthly",
+                  "label": "Monatlich"
+                }
+              ],
               "is_custom_input": true
             },
             {
@@ -273,7 +293,17 @@
                   "name": "Spazierengehen allein",
                   "code": 1167,
                   "label": "Spazierengehen",
-                  "color": "#9370DB"
+                  "color": "#9370DB",
+                  "frequency_options": [
+                    {
+                      "key": "bi-weekly",
+                      "label": "Alle zwei Wochen"
+                    },
+                    {
+                      "key": "monthly",
+                      "label": "Monatlich"
+                    }
+                  ]
                 },
                 {
                   "name": "Spazierengehen mit anderen",
