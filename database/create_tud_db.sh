@@ -43,8 +43,6 @@ echo "Loading configuration from env file: '$ENV_PATH'"
 source "$ENV_PATH"
 
 
-source ".env"   # Loads environment variables DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD
-
 TUD_DATABASE_HOST=${TUD_DATABASE_HOST:-localhost}
 TUD_DATABASE_PORT=${TUD_DATABASE_PORT:-5432}
 
