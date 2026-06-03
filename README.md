@@ -119,6 +119,43 @@ https://your.domain.example.com/report/index.html?study_name=default&pid=c303282
 
 The `template_user` parameter is intended for cases where one participant's entries should be copied as a starting point for another participant, for example when a parent enters similar data for siblings. The `return_url` parameter should be URL-encoded before being placed into the link.
 
+#### External Tasks (external integrations)
+
+Studies may include `external_tasks` entries in `backend/studies_config.json` to describe external systems that participants should visit (for example, external surveys or payment forms). An `external_tasks` entry typically contains:
+
+- `task_key`: short identifier used by the app and callbacks
+- `url`: the base external URL to open
+- `tokens`: a list of per-participant tokens (one token per participant listed in `study_participant_ids`)
+- `send_pid`: boolean; when `true` the participant id is appended as a query parameter
+- `pid_query_param`: name of the participant id query parameter appended to the URL
+- `config.token_query_param`: name of the token query parameter appended to the URL
+
+Example (excerpt from `backend/studies_config.json` for the pilot study):
+
+```
+{
+    "task_key": "payment_info",
+    "name": "Bankdaten eingeben",
+    "confirmation_type": "callback",
+    "url": "https://survey.academiccloud.de/f/153222",
+    "tokens": ["pay-bernd", "pay-sophia", "pay-claudia"],
+    "send_pid": true,
+    "pid_query_param": "participant_id",
+    "config": { "token_query_param": "pay_token" }
+}
+```
+
+With the above settings the backend will build continuation links by appending the participant id and the configured token query parameter. For participant `bernd` the constructed continuation URL for the `payment_info` task will look like:
+
+```
+https://survey.academiccloud.de/f/153222?participant_id=bernd&pay_token=pay-bernd
+```
+
+Callback/confirmation contract: the frontend thank-you page looks for `callback_task_key` and `callback_token` URL parameters returned from the external app and then POSTs a confirmation JSON payload to the backend confirmation endpoint. The backend confirmation endpoint expects JSON in the shape `{ "task_key": "<task_key>", "assigned_token": "<token>" }`.
+
+Note: the token query parameter name is controlled by `config.token_query_param` per external task, and the participant id parameter name is controlled by `pid_query_param`.
+
+
 
 ### 4. Frontend Configuration
 
