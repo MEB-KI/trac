@@ -98,6 +98,7 @@
             font-weight: 600;
         }
         input[type="text"],
+        select,
         input[type="file"],
         textarea {
             width: 100%;
@@ -214,10 +215,15 @@
 
             <form class="card validation-form" data-mode="full_study">
                 <h2>3) Full study package</h2>
-                <p class="subtle">Checks a single-study studies_config plus all related language activities files.</p>
+                <p class="subtle">Checks one selected study from studies_config plus all related language activities files.</p>
                 <div class="field">
-                    <label for="fullStudyConfigFile">studies_config.json (must contain exactly one study)</label>
+                    <label for="fullStudyConfigFile">studies_config.json (can contain one or multiple studies)</label>
                     <input id="fullStudyConfigFile" name="studies_config_file" type="file" accept=".json" required>
+                </div>
+                <div class="field" id="fullStudySelectorField" style="display:none;">
+                    <label for="fullStudyNameShort">Study to validate (from uploaded studies_config)</label>
+                    <select id="fullStudyNameShort" name="full_study_name_short"></select>
+                    <p class="hint">If multiple studies are found, select one and validate again.</p>
                 </div>
                 <div class="field">
                     <label for="fullActivitiesFiles">Activities files referenced by that study</label>
@@ -240,6 +246,9 @@
     <script>
         const forms = document.querySelectorAll('.validation-form');
         const resultBox = document.getElementById('validationResult');
+        const fullStudyForm = document.querySelector('.validation-form[data-mode="full_study"]');
+        const fullStudySelectorField = document.getElementById('fullStudySelectorField');
+        const fullStudyNameShortSelect = document.getElementById('fullStudyNameShort');
 
         function escapeHtml(value) {
             return String(value)
@@ -285,6 +294,52 @@
                 ${summaryHtml}
                 ${errorsHtml}
             `;
+
+            updateFullStudySelector(payload);
+        }
+
+        function updateFullStudySelector(payload) {
+            if (!fullStudyForm || !fullStudySelectorField || !fullStudyNameShortSelect) {
+                return;
+            }
+
+            const mode = payload && payload.mode;
+            const summary = (payload && payload.summary) || {};
+            const availableStudies = Array.isArray(summary.available_studies)
+                ? summary.available_studies
+                : [];
+            const needsSelection = mode === 'full_study' && summary.selection_required === true;
+
+            if (!needsSelection) {
+                if (payload && payload.ok) {
+                    fullStudySelectorField.style.display = 'none';
+                }
+                return;
+            }
+
+            const previousValue = fullStudyNameShortSelect.value;
+            const uniqueStudies = [...new Set(availableStudies.filter((value) => String(value).trim().length > 0))];
+
+            fullStudyNameShortSelect.innerHTML = '';
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = '-- Select study_name_short --';
+            fullStudyNameShortSelect.appendChild(placeholderOption);
+
+            uniqueStudies.forEach((studyNameShort) => {
+                const option = document.createElement('option');
+                option.value = String(studyNameShort);
+                option.textContent = String(studyNameShort);
+                fullStudyNameShortSelect.appendChild(option);
+            });
+
+            if (uniqueStudies.includes(previousValue)) {
+                fullStudyNameShortSelect.value = previousValue;
+            } else {
+                fullStudyNameShortSelect.value = '';
+            }
+
+            fullStudySelectorField.style.display = 'block';
         }
 
         async function submitValidationForm(form, mode) {
@@ -327,6 +382,7 @@
                 const studiesFileInput = form.querySelector('input[name="studies_config_file"]');
                 const activitiesInput = form.querySelector('input[name="activities_files"]');
                 const languageMap = form.querySelector('textarea[name="activities_language_map"]').value.trim();
+                const selectedStudyNameShort = form.querySelector('select[name="full_study_name_short"]')?.value?.trim() || '';
 
                 if (!studiesFileInput.files.length) {
                     throw new Error('Please upload one studies_config file.');
@@ -336,6 +392,9 @@
                 }
 
                 fd.append('studies_config_file', studiesFileInput.files[0]);
+                if (selectedStudyNameShort) {
+                    fd.append('full_study_name_short', selectedStudyNameShort);
+                }
                 if (languageMap) {
                     fd.append('activities_language_map', languageMap);
                 }

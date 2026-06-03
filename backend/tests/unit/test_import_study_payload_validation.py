@@ -10,6 +10,7 @@ os.environ.setdefault("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
 from o_timeusediary_backend.api import (
     ImportStudiesConfigStudy,
     _build_external_task_continuation_url,
+    _extract_study_from_studies_config_for_validation,
     _validate_import_study_payload,
 )
 from o_timeusediary_backend.models import StudyExternalTask
@@ -369,3 +370,40 @@ def test_build_external_task_continuation_url_appends_pid_when_enabled():
         continuation_url
         == "https://example.org/payment?src=trac&survey_token=tok-1&participant_id=p1"
     )
+
+
+def test_extract_study_for_validation_requests_selection_when_multiple_studies_present():
+    studies_config = {
+        "studies": [
+            {"name_short": "study_a", "name": "Study A"},
+            {"name_short": "study_b", "name": "Study B"},
+        ]
+    }
+
+    selected_study, available, selection_required = (
+        _extract_study_from_studies_config_for_validation(studies_config)
+    )
+
+    assert selected_study == {}
+    assert sorted(available) == ["study_a", "study_b"]
+    assert selection_required is True
+
+
+def test_extract_study_for_validation_picks_selected_study_from_multiple():
+    studies_config = {
+        "studies": [
+            {"name_short": "study_a", "name": "Study A"},
+            {"name_short": "study_b", "name": "Study B"},
+        ]
+    }
+
+    selected_study, available, selection_required = (
+        _extract_study_from_studies_config_for_validation(
+            studies_config,
+            selected_study_name_short="study_b",
+        )
+    )
+
+    assert selected_study["name_short"] == "study_b"
+    assert sorted(available) == ["study_a", "study_b"]
+    assert selection_required is False

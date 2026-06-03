@@ -2043,6 +2043,57 @@ def _extract_single_study_from_studies_config(
     return study
 
 
+def _extract_study_from_studies_config_for_validation(
+    studies_config_json: Dict[str, Any],
+    selected_study_name_short: Optional[str] = None,
+) -> Tuple[Dict[str, Any], List[str], bool]:
+    studies = studies_config_json.get("studies")
+    if not isinstance(studies, list) or not studies:
+        raise ValueError("studies_config must contain a non-empty 'studies' array")
+
+    normalized_selected_name = (selected_study_name_short or "").strip()
+    available_studies: List[str] = []
+
+    for index, study in enumerate(studies):
+        if not isinstance(study, dict):
+            raise ValueError(f"Entry #{index} in 'studies' must be a JSON object")
+        study_name_short = study.get("name_short")
+        if not isinstance(study_name_short, str) or not study_name_short.strip():
+            raise ValueError(
+                f"Entry #{index} in 'studies' is missing a non-empty 'name_short'"
+            )
+        available_studies.append(study_name_short.strip())
+
+    duplicate_name_shorts = sorted(
+        {
+            name_short
+            for name_short in available_studies
+            if available_studies.count(name_short) > 1
+        }
+    )
+    if duplicate_name_shorts:
+        raise ValueError(
+            "studies_config contains duplicate name_short values: "
+            f"{duplicate_name_shorts}"
+        )
+
+    if len(studies) == 1:
+        return studies[0], available_studies, False
+
+    if not normalized_selected_name:
+        return {}, available_studies, True
+
+    for study in studies:
+        if str(study.get("name_short", "")).strip() == normalized_selected_name:
+            return study, available_studies, False
+
+    raise ValueError(
+        "Selected study_name_short "
+        f"'{normalized_selected_name}' was not found in studies_config. "
+        f"Available: {sorted(available_studies)}"
+    )
+
+
 def _create_study_from_import_payload(
     session: Session,
     study_payload: ImportStudiesConfigStudy,
@@ -2958,6 +3009,7 @@ async def validate_files_in_memory(
     default_language: Optional[str] = Form(None),
     supported_languages_csv: Optional[str] = Form(None),
     activities_language_map: Optional[str] = Form(None),
+    full_study_name_short: Optional[str] = Form(None),
     activities_file: Optional[UploadFile] = File(None),
     activities_files: List[UploadFile] = File(default_factory=list),
     studies_config_file: Optional[UploadFile] = File(None),
@@ -2968,7 +3020,7 @@ async def validate_files_in_memory(
     Modes:
     - single_activities: one activities JSON file
     - activities_multilang: several activities files + language config
-    - full_study: studies_config (single study) + activities files
+    - full_study: studies_config (one or more studies) + activities files
     """
     allowed_modes = {
         "single_activities",
@@ -3066,7 +3118,34 @@ async def validate_files_in_memory(
             studies_config_file,
             "studies_config file",
         )
-        study = _extract_single_study_from_studies_config(studies_config_json)
+        (
+            study,
+            available_studies,
+            selection_required,
+        ) = _extract_study_from_studies_config_for_validation(
+            studies_config_json,
+            selected_study_name_short=full_study_name_short,
+        )
+
+        if selection_required:
+            return {
+                "ok": False,
+                "mode": mode,
+                "summary": {
+                    "selection_required": True,
+                    "available_studies": sorted(available_studies),
+                },
+                "errors": [
+                    {
+                        "message": (
+                            "Uploaded studies_config contains multiple studies. "
+                            "Select one study_name_short and validate again."
+                        ),
+                        "path": "studies",
+                        "type": "selection_required",
+                    }
+                ],
+            }
 
         expected_files_by_language: Dict[str, str] = {}
         if isinstance(study.get("activities_json_files"), dict):
@@ -3113,6 +3192,7 @@ async def validate_files_in_memory(
             "mode": mode,
             "summary": {
                 "study_name_short": import_study_payload.name_short,
+                "available_studies": sorted(available_studies),
                 "supported_languages": validated["supported_languages"],
                 "default_language": validated["default_language"],
             },
