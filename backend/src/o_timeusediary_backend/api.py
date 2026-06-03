@@ -1528,17 +1528,25 @@ def _build_activity_structure_signature(activities_cfg: ActivitiesConfig) -> Dic
 def _describe_activity_structure_difference(
     reference_signature: Dict[str, Dict],
     candidate_signature: Dict[str, Dict],
+    reference_language: str,
+    candidate_language: str,
 ) -> str:
     reference_timelines = set(reference_signature.keys())
     candidate_timelines = set(candidate_signature.keys())
 
     missing_timelines = sorted(reference_timelines - candidate_timelines)
     if missing_timelines:
-        return f"missing timelines: {missing_timelines}"
+        return (
+            f"language '{candidate_language}' is missing timelines {missing_timelines} "
+            f"present in language '{reference_language}'"
+        )
 
     extra_timelines = sorted(candidate_timelines - reference_timelines)
     if extra_timelines:
-        return f"unexpected timelines: {extra_timelines}"
+        return (
+            f"language '{candidate_language}' has extra timelines {extra_timelines} "
+            f"that are not present in language '{reference_language}'"
+        )
 
     for timeline_key in sorted(reference_timelines):
         reference_timeline = reference_signature[timeline_key]
@@ -1546,7 +1554,8 @@ def _describe_activity_structure_difference(
 
         if candidate_timeline.get("mode") != reference_timeline.get("mode"):
             return (
-                f"timeline '{timeline_key}' mode mismatch: "
+                f"timeline '{timeline_key}' mode mismatch between language "
+                f"'{reference_language}' and '{candidate_language}': "
                 f"expected '{reference_timeline.get('mode')}', "
                 f"got '{candidate_timeline.get('mode')}'"
             )
@@ -1555,7 +1564,8 @@ def _describe_activity_structure_difference(
             "min_coverage"
         ):
             return (
-                f"timeline '{timeline_key}' min_coverage mismatch: "
+                f"timeline '{timeline_key}' min_coverage mismatch between language "
+                f"'{reference_language}' and '{candidate_language}': "
                 f"expected {reference_timeline.get('min_coverage')}, "
                 f"got {candidate_timeline.get('min_coverage')}"
             )
@@ -1565,11 +1575,17 @@ def _describe_activity_structure_difference(
 
         missing_codes = sorted(reference_codes - candidate_codes)
         if missing_codes:
-            return f"timeline '{timeline_key}' missing activity codes: {missing_codes}"
+            return (
+                f"timeline '{timeline_key}': language '{candidate_language}' is missing activity codes "
+                f"{missing_codes} that are present in language '{reference_language}'"
+            )
 
         extra_codes = sorted(candidate_codes - reference_codes)
         if extra_codes:
-            return f"timeline '{timeline_key}' unexpected activity codes: {extra_codes}"
+            return (
+                f"timeline '{timeline_key}': language '{candidate_language}' has extra activity codes "
+                f"{extra_codes}; these codes are missing in language '{reference_language}'"
+            )
 
         reference_frequency_keys = reference_timeline.get("frequency_keys_by_code", {})
         candidate_frequency_keys = candidate_timeline.get("frequency_keys_by_code", {})
@@ -1580,7 +1596,8 @@ def _describe_activity_structure_difference(
             candidate_keys = candidate_frequency_keys.get(code_key, [])
             if candidate_keys != expected_keys:
                 return (
-                    f"timeline '{timeline_key}', activity code {code} frequency options mismatch: "
+                    f"timeline '{timeline_key}', activity code {code} frequency options mismatch "
+                    f"between language '{reference_language}' and '{candidate_language}': "
                     f"expected {expected_keys}, got {candidate_keys}"
                 )
 
@@ -1839,6 +1856,8 @@ def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> D
             details = _describe_activity_structure_difference(
                 reference_signature,
                 signature,
+                reference_language=default_language,
+                candidate_language=language,
             )
             raise ValueError(
                 f"activities_json_data structure mismatch between language '{default_language}' and '{language}': {details}"
@@ -3237,7 +3256,19 @@ async def validate_files_in_memory(
         study_payload_dict["activities_json_data"] = activities_by_lang
 
         import_study_payload = ImportStudiesConfigStudy(**study_payload_dict)
-        validated = _validate_import_study_payload(import_study_payload)
+        try:
+            validated = _validate_import_study_payload(import_study_payload)
+        except ValueError as error:
+            message = str(error)
+            if "activities_json_data structure mismatch between language" in message:
+                file_mapping = {
+                    language: Path(path).name
+                    for language, path in expected_files_by_language.items()
+                }
+                raise ValueError(
+                    f"{message}. Uploaded language-to-file mapping: {file_mapping}"
+                ) from error
+            raise
 
         parsed_activities_by_lang: Dict[str, ActivitiesConfig] = validated[
             "parsed_activities_by_lang"
