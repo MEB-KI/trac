@@ -286,35 +286,45 @@ test('resize activities across timelines keeps minute/time-format integrity and 
 
   await submitCurrentDay(page, 'Tuesday');
 
-  const tuesdayState = await page.evaluate(() => {
-    const data = window.timelineManager.activities;
-    const primary = data.primary || [];
-    const secondary = data.secondary || [];
+  await expect
+    .poll(
+      async () => {
+        return page.evaluate(() => {
+          const data = window.timelineManager.activities;
+          const primary = data.primary || [];
+          const secondary = data.secondary || [];
 
-    const all = [...primary, ...secondary];
+          const all = [...primary, ...secondary];
 
-    return {
-      primaryCount: primary.length,
-      secondaryCount: secondary.length,
-      total: all.length,
-      primaryIntegrity: primary.every((a) => a.timelineKey === 'primary'),
-      secondaryIntegrity: secondary.every((a) => a.timelineKey === 'secondary'),
-      cleanFormat: all.every(
-        (a) =>
-          /^\d{2}:\d{2}(\(\+1\))?$/.test(a.startTime) &&
-          /^\d{2}:\d{2}(\(\+1\))?$/.test(a.endTime) &&
-          !a.startTime.includes(' ') &&
-          !a.endTime.includes(' ')
-      ),
-    };
-  });
-
-  expect(tuesdayState.primaryCount).toBe(2);
-  expect(tuesdayState.secondaryCount).toBe(2);
-  expect(tuesdayState.total).toBe(4);
-  expect(tuesdayState.primaryIntegrity).toBeTruthy();
-  expect(tuesdayState.secondaryIntegrity).toBeTruthy();
-  expect(tuesdayState.cleanFormat).toBeTruthy();
+          return {
+            primaryCount: primary.length,
+            secondaryCount: secondary.length,
+            total: all.length,
+            primaryIntegrity: primary.every((a) => a.timelineKey === 'primary'),
+            secondaryIntegrity: secondary.every((a) => a.timelineKey === 'secondary'),
+            cleanFormat: all.every(
+              (a) =>
+                /^\d{2}:\d{2}(\(\+1\))?$/.test(a.startTime) &&
+                /^\d{2}:\d{2}(\(\+1\))?$/.test(a.endTime) &&
+                !a.startTime.includes(' ') &&
+                !a.endTime.includes(' ')
+            ),
+          };
+        });
+      },
+      {
+        timeout: 30000,
+        message: 'Waiting for Tuesday template activities to hydrate',
+      }
+    )
+    .toMatchObject({
+      primaryCount: 2,
+      secondaryCount: 2,
+      total: 4,
+      primaryIntegrity: true,
+      secondaryIntegrity: true,
+      cleanFormat: true,
+    });
 
   await switchToTimelineKey(page, 'primary');
 
