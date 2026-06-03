@@ -137,8 +137,8 @@ Example (excerpt from `backend/studies_config.json` for the pilot study):
     "task_key": "payment_info",
     "name": "Bankdaten eingeben",
     "confirmation_type": "callback",
-    "url": "https://survey.academiccloud.de/f/153222",
-    "tokens": ["pay-bernd", "pay-sophia", "pay-claudia"],
+    "url": "https://survey.academiccloud.de/f/123456",
+    "tokens": ["pay-bernd-34673643643656", "pay-sophia-5672356832", "pay-claudia-687872532"],
     "send_pid": true,
     "pid_query_param": "participant_id",
     "config": { "token_query_param": "pay_token" }
@@ -148,10 +148,14 @@ Example (excerpt from `backend/studies_config.json` for the pilot study):
 With the above settings the backend will build continuation links by appending the participant id and the configured token query parameter. For participant `bernd` the constructed continuation URL for the `payment_info` task will look like:
 
 ```
-https://survey.academiccloud.de/f/153222?participant_id=bernd&pay_token=pay-bernd
+https://survey.academiccloud.de/f/123456?participant_id=bernd&pay_token=pay-bernd-34673643643656
 ```
 
-Callback/confirmation contract: the frontend thank-you page looks for `callback_task_key` and `callback_token` URL parameters returned from the external app and then POSTs a confirmation JSON payload to the backend confirmation endpoint. The backend confirmation endpoint expects JSON in the shape `{ "task_key": "<task_key>", "assigned_token": "<token>" }`.
+Callback/confirmation contract: the frontend thank-you page looks for `callback_task_key` and `callback_token` URL parameters returned from the external app and then POSTs a confirmation JSON payload to the backend confirmation endpoint. The backend confirmation endpoint expects JSON in the shape `{ "task_key": "<task_key>", "assigned_token": "<token>" }`. Example return URL the external app should redirect the participant to (replace host/path and token):
+
+```
+https://your.domain.example.com/report/thank-you.html?callback_task_key=payment_info&callback_token=pay-bernd-34673643643656
+```
 
 Note: the token query parameter name is controlled by `config.token_query_param` per external task, and the participant id parameter name is controlled by `pid_query_param`.
 
