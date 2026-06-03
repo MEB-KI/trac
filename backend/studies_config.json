@@ -331,6 +331,90 @@
       },
       "data_collection_start": "2024-01-01T00:00:00Z",
       "data_collection_end": "2026-12-31T23:59:59Z"
+    },
+    {
+      "name": "Pilotstudie Erwachsene Deutsch MPIAE",
+      "name_short": "adult_pilot_de",
+      "description": "Pilotstudie TimeUse für Erwachsene am MPIAE.",
+      "day_labels": [
+        {
+          "name": "monday",
+          "display_order": 0,
+          "display_names": {
+            "de": "Montag"
+          }
+        },
+        {
+          "name": "tuesday",
+          "display_order": 1,
+          "display_names": {
+            "de": "Dienstag"
+          }
+        },
+        {
+          "name": "wednesday",
+          "display_order": 2,
+          "display_names": {
+            "de": "Mittwoch"
+          }
+        },
+        {
+          "name": "thursday",
+          "display_order": 3,
+          "display_names": {
+            "de": "Donnerstag"
+          }
+        },
+        {
+          "name": "friday",
+          "display_order": 4,
+          "display_names": {
+            "de": "Freitag"
+          }
+        },
+        {
+          "name": "saturday",
+          "display_order": 5,
+          "display_names": {
+            "de": "Samstag"
+          }
+        },
+        {
+          "name": "sunday",
+          "display_order": 6,
+          "display_names": {
+            "de": "Sonntag"
+          }
+        }
+      ],
+      "study_text_intro": {
+        "de": "Bitte füllen Sie diese Studie für Erwachsene aus. Sie werden gebeten, die Zeitnutzung für eine ganze Woche zu berichten."
+      },
+      "study_text_end_completed": {
+        "de": "Vielen Dank für das Ausfüllen dieser Studie. Ihre Beiträge werden zu wertvoller Forschung beitragen."
+      },
+      "study_text_end_skipped": {
+        "de": "Sie haben das Ausfüllen des Zeitnutzungsteils der Studie übersprungen. Wenn Sie einige Angaben gemacht haben, werden wir versuchen, diese zu verwenden. Vielen Dank!"
+      },
+      "require_consent": true,
+      "is_paused": false,
+      "study_text_consent": {
+        "de": "# Einwilligungsseite für die Studie\n\nWenn Sie fortfahren, stimmen Sie zu, dass:\n- Ihre Antworten für wissenschaftliche Forschung zur Zeitnutzung erhoben werden\n- die Daten in zusammengefasster Form ausgewertet werden können\n- Sie jederzeit vor dem Absenden abbrechen können"
+      },
+      "study_text_end_noconsent": {
+        "de": "Sie haben keine Einwilligung gegeben und Ihre Daten werden in dieser Studie nicht verwendet."
+      },
+      "study_participant_ids": [],
+      "allow_unlisted_participants": true,
+      "default_language": "de",
+      "supported_languages": [
+        "de"
+      ],
+      "activities_json_files": {
+        "de": "activities_mpiae_pilotadults_de.json"
+      },
+      "data_collection_start": "2024-07-01T00:00:00Z",
+      "data_collection_end": "2026-08-01T23:59:59Z"
     }
   ]
 }
