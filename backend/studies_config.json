@@ -404,8 +404,8 @@
       "study_text_end_noconsent": {
         "de": "Sie haben keine Einwilligung gegeben und Ihre Daten werden in dieser Studie nicht verwendet."
       },
-      "study_participant_ids": [],
-      "allow_unlisted_participants": true,
+      "study_participant_ids": ["bernd", "sophia", "claudia"],
+      "allow_unlisted_participants": false,
       "default_language": "de",
       "supported_languages": [
         "de"
@@ -413,8 +413,32 @@
       "activities_json_files": {
         "de": "activities_mpiae_pilotadults_de.json"
       },
-      "data_collection_start": "2024-07-01T00:00:00Z",
-      "data_collection_end": "2026-08-01T23:59:59Z"
+      "data_collection_start": "2026-07-01T00:00:00Z",
+      "data_collection_end": "2026-08-01T23:59:59Z",
+      "external_tasks": [
+          {
+            "task_key": "depression_survey",
+            "name": "Umfrage zu Depressionssymptomen ausfüllen",
+            "description": "Füllen Sie die verlinkte Umfrage zu Depressionssymptomen aus.",
+            "confirmation_type": "callback",
+            "url": "https://survey.academiccloud.de/f/153111",
+            "tokens": ["dep-bernd-31526357", "dep-sophia-3754687526", "dep-claudia-3576872"],
+            "send_pid": true,
+            "pid_query_param": "participant_id",
+            "config": {"token_query_param": "survey_token"}
+          },
+          {
+            "task_key": "payment_info",
+            "name": "Bankdaten eingeben",
+            "description": "Geben Sie Ihre Bankdaten ein, um nach Abschluss der Studie eine Aufwandsentschädigung zu erhalten.",
+            "confirmation_type": "callback",
+            "url": "https://survey.academiccloud.de/f/153222",
+            "tokens": ["pay-bernd-123434214", "pay-sophia-987654321", "pay-claudia-567890123"],
+            "send_pid": true,
+            "pid_query_param": "participant_id",
+            "config": {"token_query_param": "pay_token"}
+          }
+      ]
     }
   ]
 }
