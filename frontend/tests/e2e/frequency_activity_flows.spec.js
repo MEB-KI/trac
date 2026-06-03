@@ -106,25 +106,37 @@ async function clickActiveTimelineAtPercent(page, targetPercent) {
     .first();
   await expect(timeline).toBeVisible();
 
-  const box = await timeline.boundingBox();
-  if (!box) {
-    throw new Error('Active timeline bounding box is not available');
-  }
+  await timeline.evaluate((el, percent) => {
+    const rect = el.getBoundingClientRect();
+    const x =
+      rect.left +
+      Math.max(1, Math.min(rect.width - 1, (rect.width * percent) / 100));
+    const y = rect.top + Math.max(1, Math.min(rect.height - 1, rect.height / 2));
 
-  await timeline.click({
-    position: {
-      x: Math.max(1, Math.min(box.width - 1, (box.width * targetPercent) / 100)),
-      y: Math.max(1, Math.min(box.height - 1, box.height / 2)),
-    },
-    force: true,
-  });
+    const types = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+    for (const type of types) {
+      el.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          view: window,
+        })
+      );
+    }
+  }, targetPercent);
 }
 
 async function placeSelectedAtPercentAndGetId(page, percent) {
-  const hasSelection = await page.evaluate(
-    () => Boolean(window.selectedActivity && window.selectedActivity.name)
-  );
-  if (!hasSelection) {
+  const selectedSnapshot = await page.evaluate(() => {
+    if (!window.selectedActivity || !window.selectedActivity.name) {
+      return null;
+    }
+    return JSON.parse(JSON.stringify(window.selectedActivity));
+  });
+
+  if (!selectedSnapshot) {
     throw new Error('Cannot place activity because window.selectedActivity is not set');
   }
 
@@ -133,8 +145,27 @@ async function placeSelectedAtPercentAndGetId(page, percent) {
     return (window.timelineManager.activities[key] || []).map((a) => String(a.id));
   });
 
-  const attempts = [percent, percent + 7, Math.max(2, percent - 7)];
+  const offsets = [0, 7, -7, 14, -14, 21, -21, 28, -28];
+  const nearbyAttempts = offsets
+    .map((offset) => Math.max(2, Math.min(98, percent + offset)))
+    .filter((value, index, arr) => arr.indexOf(value) === index);
+  const fullSweepAttempts = Array.from({ length: 19 }, (_, i) => 2 + i * 5);
+  const attempts = [...nearbyAttempts, ...fullSweepAttempts].filter(
+    (value, index, arr) => arr.indexOf(value) === index
+  );
+
   for (const targetPercent of attempts) {
+    await page.evaluate((snapshot) => {
+      if (!window.selectedActivity) {
+        window.selectedActivity = JSON.parse(JSON.stringify(snapshot));
+        return;
+      }
+
+      if (Number(window.selectedActivity.code) !== Number(snapshot.code)) {
+        window.selectedActivity = JSON.parse(JSON.stringify(snapshot));
+      }
+    }, selectedSnapshot);
+
     await clickActiveTimelineAtPercent(page, targetPercent);
 
     const newIdHandle = await page.waitForFunction(
@@ -155,6 +186,8 @@ async function placeSelectedAtPercentAndGetId(page, percent) {
         return String(newId);
       }
     }
+
+    await page.waitForTimeout(120);
   }
 
   throw new Error(`Could not place activity around ${percent}% after retries`);
