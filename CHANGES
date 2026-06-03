@@ -1,6 +1,19 @@
 TRAC MPIAE Changes
 ===================
 
+Version 0.14.0 -- Task management and cfg validation tools
+------------------------------------------------------------
+This release adds three new major features: task management, admin tool to validate cfg files,
+and frequencies for activities.
+- NEW: Support frequency for an activity, implements #79
+- NEW: Add admin tool to verify cfg files (activiies and studies_config) for app (implements #78)
+- NEW: Support user tasks, e.g., fill out questionnaire on external websites (implements #73)
+- NEW: Update instructions ribbon text to shorten it (#77)
+- NEW: Add confirmation modal before deleting entire row in frontend (#76)
+- NEW: Shorten timeline line in frontend (#75)
+- CHG: Adapt skip timeline reporting button to be less prominent (#74)
+- NEW: Much better validation of all cfg files on parsing
+
 
 Version 0.13.1 -- Fix CITATION.cff file
 ------------------------------------------
