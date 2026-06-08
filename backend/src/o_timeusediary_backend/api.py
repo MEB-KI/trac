@@ -303,6 +303,38 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     )
 
 
+def _ensure_study_is_currently_available(study: Study) -> None:
+    """Raise 403 when a study cannot currently be filled in by participants."""
+    now = utc_now()
+
+    if now < study.data_collection_start:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "study_unavailable",
+                "message": "Diese Studie ist momentan nicht verfügbar.",
+            },
+        )
+
+    if now > study.data_collection_end:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "study_unavailable",
+                "message": "Diese Studie ist momentan nicht verfügbar.",
+            },
+        )
+
+    if study.is_paused:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "study_unavailable",
+                "message": "Diese Studie ist momentan nicht verfügbar.",
+            },
+        )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """
@@ -516,6 +548,8 @@ def get_study_activities_config(
         raise HTTPException(
             status_code=404, detail=f"Study '{study_name_short}' not found"
         )
+
+    _ensure_study_is_currently_available(study)
 
     # Check if participant_id is required
     if not study.allow_unlisted_participants:
@@ -3918,14 +3952,17 @@ def get_participant_day_activities(
                 detail=f"Participant '{participant_id}' not authorized for this study",
             )
     else:
-        # Study allows unlisted participants - ensure participant exists
+        # Study allows unlisted participants.
+        # First-time participants may not exist in the DB yet; that is not an error
+        # when loading activities and should behave like "no data yet".
         participant = session.exec(
             select(Participant).where(Participant.id == participant_id)
         ).first()
         if not participant:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Participant '{participant_id}' does not exist for this study",
+            logger.info(
+                "Participant '%s' has no stored record yet in open study '%s'; returning empty activity payload.",
+                participant_id,
+                study_name_short,
             )
 
     # Find the target day label
@@ -4469,6 +4506,8 @@ def get_study_config(
         raise HTTPException(
             status_code=404, detail=f"Study '{study_name_short}' not found"
         )
+
+    _ensure_study_is_currently_available(study)
 
     # Check if participant_id is required
     if not study.allow_unlisted_participants:
