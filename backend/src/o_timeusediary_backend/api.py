@@ -4494,7 +4494,10 @@ def get_study_config(
             )
             raise HTTPException(
                 status_code=403,
-                detail=f"Participant '{participant_id}' not authorized for this study",
+                detail={
+                    "code": "study_access_denied",
+                    "message": "You are not authorized to participate in this study.",
+                },
             )
     else:
         # Study allows unlisted participants
