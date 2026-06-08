@@ -3542,6 +3542,165 @@ async def remove_participant_from_study(
     }
 
 
+@app.delete("/api/admin/studies/{study_name_short}/participants/{participant_id}/data")
+async def reset_participant_study_data(
+    study_name_short: str,
+    participant_id: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Reset participant data scoped to one study.
+
+    Deletes submitted activity rows for the participant in this study, deletes
+    external task assignments for this study, and resets consent/instructions
+    flags on the study-participant association if present.
+    """
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    deleted_activity_rows = (
+        session.exec(
+            delete(Activity).where(
+                Activity.study_id == study.id,
+                Activity.participant_id == participant_id,
+            )
+        ).rowcount
+        or 0
+    )
+
+    external_task_ids = session.exec(
+        select(StudyExternalTask.id).where(StudyExternalTask.study_id == study.id)
+    ).all()
+
+    reset_external_task_assignment_rows = 0
+    if external_task_ids:
+        participant_assignments = session.exec(
+            select(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.participant_id == participant_id,
+                StudyExternalTaskAssignment.external_task_id.in_(external_task_ids),
+            )
+        ).all()
+
+        for assignment in participant_assignments:
+            assignment.is_confirmed = False
+            assignment.confirmed_at = None
+            session.add(assignment)
+
+        reset_external_task_assignment_rows = len(participant_assignments)
+
+    association = _get_study_participant_association(session, study, participant_id)
+    association_reset = False
+    if association:
+        association.consent_given = None
+        association.consent_decided_at = None
+        association.instructions_completed = False
+        association.instructions_completed_at = None
+        session.add(association)
+        association_reset = True
+
+    session.commit()
+
+    logger.info(
+        "Admin '%s' reset participant '%s' data in study '%s' (activities_deleted=%s, external_assignments_deleted=%s, association_reset=%s).",
+        current_admin,
+        participant_id,
+        study_name_short,
+        deleted_activity_rows,
+        reset_external_task_assignment_rows,
+        association_reset,
+    )
+    audit_admin_action(
+        current_admin,
+        (
+            f"reset participant '{participant_id}' data in study '{study_name_short}' "
+            f"(activities_deleted={deleted_activity_rows}, "
+            f"external_assignments_reset={reset_external_task_assignment_rows}, "
+            f"association_reset={association_reset})"
+        ),
+    )
+
+    return {
+        "message": "Participant study data reset",
+        "study_name_short": study_name_short,
+        "participant_id": participant_id,
+        "deleted_activity_rows": deleted_activity_rows,
+        "reset_external_task_assignment_rows": reset_external_task_assignment_rows,
+        "association_reset": association_reset,
+    }
+
+
+@app.post(
+    "/api/admin/studies/{study_name_short}/participants/{participant_id}/external-tasks/reseed"
+)
+async def reseed_external_tasks_for_participant(
+    study_name_short: str,
+    participant_id: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Ensure external task assignments exist for one participant in one study."""
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    association = _get_study_participant_association(session, study, participant_id)
+    if not association:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Participant '{participant_id}' is not assigned to study '{study_name_short}'",
+        )
+
+    ensure_external_task_assignments(session, study, [participant_id])
+    session.commit()
+
+    external_task_ids = session.exec(
+        select(StudyExternalTask.id).where(StudyExternalTask.study_id == study.id)
+    ).all()
+
+    assignment_count = 0
+    if external_task_ids:
+        assignment_count = (
+            session.exec(
+                select(func.count(StudyExternalTaskAssignment.id)).where(
+                    StudyExternalTaskAssignment.participant_id == participant_id,
+                    StudyExternalTaskAssignment.external_task_id.in_(external_task_ids),
+                )
+            ).first()
+            or 0
+        )
+
+    logger.info(
+        "Admin '%s' reseeded external task assignments for participant '%s' in study '%s' (assignment_count=%s).",
+        current_admin,
+        participant_id,
+        study_name_short,
+        assignment_count,
+    )
+    audit_admin_action(
+        current_admin,
+        (
+            f"reseeded external task assignments for participant '{participant_id}' "
+            f"in study '{study_name_short}' (assignment_count={assignment_count})"
+        ),
+    )
+
+    return {
+        "message": "Participant external task assignments reseeded",
+        "study_name_short": study_name_short,
+        "participant_id": participant_id,
+        "assignment_count": int(assignment_count),
+    }
+
+
 @app.delete("/api/admin/studies/{study_name_short}")
 async def delete_study(
     study_name_short: str,

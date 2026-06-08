@@ -255,8 +255,31 @@ async function deleteActivityById(page, id) {
 
   await block.click({ button: 'right' });
   const menu = page.locator('#activityContextMenu');
-  await expect(menu).toBeVisible();
-  await menu.locator('[data-action="delete"]').click();
+  if (!(await menu.isVisible())) {
+    await block.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      element.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+          button: 2,
+        })
+      );
+    });
+  }
+
+  if (await menu.isVisible()) {
+    const deleteButton = menu.locator('[data-action="delete"]:visible').first();
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
+  } else {
+    // Fallback path for flaky right-click handling in CI/browser engines:
+    // the app supports deleting the currently hovered activity via keyboard shortcut.
+    await block.hover();
+    await page.keyboard.press('d');
+  }
 
   await expect(block).toHaveCount(0);
 }

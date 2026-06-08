@@ -443,20 +443,19 @@ test('3-day resume flow with callback-confirmed and link-only external tasks', a
     `index.html?pid=${PID}&study_name=teststudy&lang=en&return_url=${encodeURIComponent('https://example.org/end-link')}`,
     { waitUntil: 'domcontentloaded' }
   );
-  await expect(page).toHaveURL(/pages\/thank-you\.html/);
+  await expect(page).toHaveURL(/pages\/tasks\.html/);
 
-  const callbackTaskLink = page.locator(
-    '#study-custom-message-end a.continue-link',
-    { hasText: 'Payment Verification Task' }
-  );
+  const callbackTaskLink = page.locator('#tasks-list .task-item a.task-link', {
+    hasText: 'Payment Verification Task',
+  });
   await expect(callbackTaskLink).toBeVisible();
 
   // Simulate provider callback-return URL that confirms callback task.
   await page.goto(
-    `pages/thank-you.html?pid=${PID}&study_name=teststudy&lang=en&completion_status=completed&callback_task_key=callback_payment&callback_token=cb-6655507015767739&return_url=${encodeURIComponent('https://example.org/end-link')}`,
+    `pages/tasks.html?pid=${PID}&study_name=teststudy&lang=en&completion_status=completed&callback_task_key=callback_payment&callback_token=cb-6655507015767739&return_url=${encodeURIComponent('https://example.org/end-link')}`,
     { waitUntil: 'domcontentloaded' }
   );
-  await expect(page).toHaveURL(/pages\/thank-you\.html/);
+  await expect(page).toHaveURL(/pages\/tasks\.html/);
 
   // 3) Return again via invitation link (as requested with study_name=default alias).
   await page.goto(
@@ -464,28 +463,22 @@ test('3-day resume flow with callback-confirmed and link-only external tasks', a
     { waitUntil: 'domcontentloaded' }
   );
 
-  // Must redirect to end page and show finished base task + finished callback task row.
-  await expect(page).toHaveURL(/pages\/thank-you\.html/);
+  // Must redirect to tasks page, with callback task now marked complete.
+  await expect(page).toHaveURL(/pages\/tasks\.html/);
 
-  const baseTaskRow = page.locator('#study-custom-message-end .follow-up-link-row', {
-    hasText: 'Complete TRAC diary reporting',
-  });
-  await expect(baseTaskRow).toBeVisible();
-  await expect(baseTaskRow).toContainText('Completed');
-
-  const callbackTaskRow = page.locator('#study-custom-message-end .follow-up-link-row', {
+  const callbackTaskRow = page.locator('#tasks-list .task-item', {
     hasText: 'Payment Verification Task',
   });
   await expect(callbackTaskRow).toBeVisible();
-  await expect(callbackTaskRow).toContainText('Already completed');
+  await expect(callbackTaskRow.locator('.task-status')).toContainText(
+    'Already completed'
+  );
   await expect(
-    page.locator('#study-custom-message-end a.continue-link', {
-      hasText: 'Payment Verification Task',
-    })
+    callbackTaskRow.locator('a.task-link', { hasText: 'Payment Verification Task' })
   ).toHaveCount(0);
 
   // Link-only task remains clickable because it has no completion callback.
-  const followupLink = page.locator('#study-custom-message-end a.continue-link', {
+  const followupLink = page.locator('#tasks-list .task-item a.task-link', {
     hasText: 'Follow-up Link Task',
   });
   await expect(followupLink).toBeVisible();
@@ -494,10 +487,6 @@ test('3-day resume flow with callback-confirmed and link-only external tasks', a
     'https://example.org/followup?token=lnk-6655507015767739'
   );
 
-  // End/return link should still be shown.
-  const continueLink = page.locator('#study-custom-message-end a.continue-link', {
-    hasText: 'Click here to continue.',
-  });
-  await expect(continueLink).toBeVisible();
-  await expect(continueLink).toHaveAttribute('href', 'https://example.org/end-link');
+  // As long as at least one task is still pending, final continue action remains hidden.
+  await expect(page.locator('#continue-wrapper')).toBeHidden();
 });
