@@ -38,7 +38,7 @@ test('return_url is preserved and shown as continue link on thank-you page', asy
   await expect(continueLink).toHaveAttribute('href', rawReturnUrl);
 });
 
-test('thank-you page shows assigned external task link for confirmation_type none', async ({
+test('tasks page shows assigned external task links for pending tasks', async ({
   page,
 }) => {
   await page.route('**/api/studies/pw_external/study-config**', async (route) => {
@@ -87,38 +87,32 @@ test('thank-you page shows assigned external task link for confirmation_type non
   });
 
   await page.goto(
-    'pages/thank-you.html?study_name=pw_external&pid=p1&lang=en&completion_status=completed',
+    'pages/tasks.html?study_name=pw_external&pid=p1&lang=en&completion_status=completed',
     { waitUntil: 'domcontentloaded' }
   );
 
-  const paymentLink = page.locator(
-    '#study-custom-message-end a.continue-link',
-    { hasText: 'Payment Survey' }
-  );
+  const paymentLink = page.locator('#tasks-list .task-item .task-link', {
+    hasText: 'Payment Survey',
+  });
   await expect(paymentLink).toBeVisible();
   await expect(paymentLink).toHaveAttribute(
     'href',
     'https://example.org/payment?src=playwright&survey_token=tok-1'
   );
 
-  const callbackLink = page.locator(
-    '#study-custom-message-end a.continue-link',
-    { hasText: 'Callback Task' }
-  );
+  const callbackLink = page.locator('#tasks-list .task-item .task-link', {
+    hasText: 'Callback Task',
+  });
   await expect(callbackLink).toBeVisible();
   await expect(callbackLink).toHaveAttribute(
     'href',
     'https://example.org/callback?token=cb-1'
   );
 
-  const baseTaskRow = page.locator('#study-custom-message-end .follow-up-link-row', {
-    hasText: 'Complete TRAC diary reporting',
-  });
-  await expect(baseTaskRow).toBeVisible();
-  await expect(baseTaskRow).toContainText('Completed');
+  await expect(page.locator('#continue-wrapper')).toBeHidden();
 });
 
-test('thank-you page confirms callback external task and shows it as completed', async ({
+test('tasks page confirms callback task and marks it as completed', async ({
   page,
 }) => {
   let callbackConfirmed = false;
@@ -181,70 +175,34 @@ test('thank-you page confirms callback external task and shows it as completed',
   );
 
   await page.goto(
-    'pages/thank-you.html?study_name=pw_callback&pid=p1&lang=en&completion_status=completed&callback_task_key=callback_task&callback_token=cb-1',
+    'pages/tasks.html?study_name=pw_callback&pid=p1&lang=en&completion_status=completed&callback_task_key=callback_task&callback_token=cb-1',
     { waitUntil: 'domcontentloaded' }
   );
 
-  const callbackTaskRow = page.locator('#study-custom-message-end .follow-up-link-row', {
+  const callbackTaskRow = page.locator('#tasks-list .task-item', {
     hasText: 'Callback Task',
   });
   await expect(callbackTaskRow).toBeVisible();
-  await expect(callbackTaskRow).toContainText('Already completed');
+  await expect(callbackTaskRow.locator('.task-status')).toContainText(
+    'Already completed'
+  );
 
   await expect(
-    page.locator('#study-custom-message-end a.continue-link', {
-      hasText: 'Callback Task',
-    })
+    callbackTaskRow.locator('a.task-link', { hasText: 'Callback Task' })
   ).toHaveCount(0);
+
+  await expect(page.locator('#continue-wrapper')).toBeVisible();
 });
 
-test('thank-you page shows base task row as not completed for noconsent status', async ({
+test('tasks page redirects noconsent status to thank-you page', async ({
   page,
 }) => {
-  await page.route('**/api/studies/pw_noconsent/study-config**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        study_name: 'Playwright Noconsent Study',
-        study_name_short: 'pw_noconsent',
-        description: 'Mocked noconsent study config',
-        allow_unlisted_participants: false,
-        require_consent: true,
-        data_collection_start: '2024-01-01T00:00:00Z',
-        data_collection_end: '2028-12-31T23:59:59Z',
-        default_language: 'en',
-        activities_json_url: '/unused.json',
-        supported_languages: ['en'],
-        selected_language: 'en',
-        study_text_end_completed: 'Done.',
-        study_text_end_skipped: 'Skipped.',
-        study_text_end_noconsent: 'No consent.',
-        external_tasks: [],
-        timelines: [],
-        day_labels: [],
-        study_days_count: 1,
-      }),
-    });
-  });
-
   await page.goto(
-    'pages/thank-you.html?study_name=pw_noconsent&pid=p1&lang=en&completion_status=noconsent',
+    'pages/tasks.html?study_name=pw_noconsent&pid=p1&lang=en&completion_status=noconsent',
     { waitUntil: 'domcontentloaded' }
   );
 
-  const baseTaskRow = page.locator('#study-custom-message-end .follow-up-link-row', {
-    hasText: 'Complete TRAC diary reporting',
-  });
-  await expect(baseTaskRow).toBeVisible();
-  await expect(baseTaskRow).toContainText('Not completed');
-
-  await expect(
-    page.locator('#study-custom-message-end a.continue-link', {
-      hasText: 'Complete TRAC diary reporting',
-    })
-  ).toHaveCount(0);
-  await expect(page.locator('#study-custom-message-end a.continue-link')).toHaveCount(
-    0
-  );
+  await expect(page).toHaveURL(/pages\/thank-you\.html/);
+  const completionStatus = new URL(page.url()).searchParams.get('completion_status');
+  await expect(completionStatus).toBe('noconsent');
 });
