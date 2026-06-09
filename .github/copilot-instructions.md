@@ -42,7 +42,7 @@ Note that users do not explicitly login: they get an invitation link that includ
 
 ## Study Setup
 
-Scientists can provide a `studies_config.json` file and the respective `activities_<study_name>.json` files to define a study. When the backend is started in scans the `studies_config.json` file and creates the studies and activities in the database, if no study with that name exists yet. However, if a study with that name exists,no further action is taken (i.e., if the config file lists information for that study that differs from the current database contents, the study in the database is not changed, as this would require complex database migration that cannot be done automatically in general). Scientists can also use the admin interface to change some properties of a study, like add a new user to a closed study. They can of course not make changes that would require adapting the database schema in the admin interface.
+Scientists can provide a `studies_config.json` file and the respective `activities_<study_name>.json` files to define a study. When the backend is started in scans the `studies_config.json` file and creates the studies and activities in the database, if no study with that name exists yet. However, if a study with that name exists,no further action is taken (i.e., if the config file lists information for that study that differs from the current database contents, the study in the database is not changed, as this would require complex database migration that cannot be done automatically in general). Scientists can also use the admin interface to change some properties of a study, like add a new user to a closed study. They can of course **not** make changes that would require adapting the database schema in the admin interface.
 
 ## Admin Interface
 
@@ -60,9 +60,16 @@ In production, the frontend and backend may be run on different servers and at a
 The backend uses `uv`, and one should use it for all commands or manually activate the .venv it creates first. E.g., the recommended way to run the unit tests would be `cd backend && uv run pytest`. An alternative is `cd backend && source .venv/bin/activate && python -m pytest`. But `uv` is the way to go. So to build the backend, do `cd backend && uv run build`.
 
 
+## Running the tests
+
+There are three types of tests for this project: unit tests, integration tests, and end-to-end (E2E) tests. The unit tests are located in the `backend/tests/unit` directory, the integration tests are located in the `backend/tests/integration` directory, and the E2E tests are located in the `frontend/e2e_tests` directory. The unit and integration tests can be run with pytest, and the E2E tests can be run with Playwright. Note that the E2E tests require a running backend and frontend, so you need to start the backend and frontend in development mode before running the E2E tests. There are scripts named test_* in the repo root directory to start the tests, e.g., `test_backend_unit.sh` to run the backend unit tests, `test_backend_integration.sh` to run the backend integration tests, and `test_e2e.sh` to run the frontend E2E tests.
+
+It is important that unit tests do not require a running backend or frontend, and that integration tests do not require a running frontend.
+
+
 ## Development scripts
 
-There are scripts to start the backend and frontend in development mode, which can be found in the repo root directory. The recommended way is to install nginx on your development machine and the use the `run_dev_nginx.sh` script to start nginx with the correct configuration for the frontend and backend. This way, you can access the frontend and backend at the same paths as in production (with nginx root_path), which makes the development environment more similar to production and prevents path errors in links in templates, etc. With this script, the frontend is at localhost:3000/report/, and the backend is at localhost:3000/tud_backend/ unless you change the nginx template config file shipped in this repo. The dev script runs nginx as your user, so you only need root access once to install nginx.
+There are scripts to start the backend and frontend in development mode, which can be found in the repo root directory. The recommended way is to install nginx on your development machine and the use the `run_dev_nginx.sh` script to start nginx with the correct configuration for the frontend and backend. This way, you can access the frontend and backend at the same paths as in production (with nginx root_path), which makes the development environment more similar to production and prevents path errors in links in templates, etc. With this script, the frontend is at localhost:3000/report/, and the backend is at localhost:3000/tud_backend/ unless you change the nginx template config file shipped in this repo. The dev script runs nginx as your user, so one only needs root access once to install nginx.
 
 The `run_backend_dev_minimal.sh` and `run_frontend_dev_minimal.sh` scripts can be used to start the backend and frontend in development mode without nginx (using Python's built-in webserver) directly at localhost:3000, and the backend directly at localhost:8000, but this setup is not recommended, as it does not reflect the production setup well and may lead to path errors in links in templates, etc.
 
