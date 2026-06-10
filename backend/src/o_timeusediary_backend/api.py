@@ -2433,6 +2433,80 @@ def _extract_study_from_studies_config_for_validation(
     )
 
 
+async def _prepare_full_study_import_from_uploads(
+    *,
+    studies_config_file: UploadFile,
+    activities_files: List[UploadFile],
+    activities_language_map: Optional[str],
+    full_study_name_short: Optional[str],
+) -> Tuple[ImportStudiesConfigStudy, Dict[str, Any], List[str]]:
+    studies_config_json = await _parse_json_upload(
+        studies_config_file,
+        "studies_config file",
+    )
+    (
+        study,
+        available_studies,
+        selection_required,
+    ) = _extract_study_from_studies_config_for_validation(
+        studies_config_json,
+        selected_study_name_short=full_study_name_short,
+    )
+
+    if selection_required:
+        raise ValueError(
+            "Uploaded studies_config contains multiple studies. "
+            "Select one study_name_short and validate again."
+        )
+
+    expected_files_by_language: Dict[str, str] = {}
+    if isinstance(study.get("activities_json_files"), dict):
+        expected_files_by_language = {
+            str(language): str(path)
+            for language, path in study["activities_json_files"].items()
+        }
+    elif isinstance(study.get("activities_json_file"), dict):
+        expected_files_by_language = {
+            str(language): str(path)
+            for language, path in study["activities_json_file"].items()
+        }
+    elif isinstance(study.get("activities_json_file"), str):
+        default_lang = study.get("default_language") or "en"
+        expected_files_by_language = {
+            str(default_lang): str(study["activities_json_file"])
+        }
+
+    activities_by_lang = await _parse_activities_uploads_by_language(
+        activities_files=activities_files,
+        explicit_map_json=activities_language_map,
+        expected_filenames_by_language=expected_files_by_language
+        if expected_files_by_language
+        else None,
+    )
+
+    study_payload_dict = dict(study)
+    study_payload_dict.pop("activities_json_file", None)
+    study_payload_dict.pop("activities_json_files", None)
+    study_payload_dict["activities_json_data"] = activities_by_lang
+
+    import_study_payload = ImportStudiesConfigStudy(**study_payload_dict)
+    try:
+        validated = _validate_import_study_payload(import_study_payload)
+    except ValueError as error:
+        message = str(error)
+        if "activities_json_data structure mismatch between language" in message:
+            file_mapping = {
+                language: Path(path).name
+                for language, path in expected_files_by_language.items()
+            }
+            raise ValueError(
+                f"{message}. Uploaded language-to-file mapping: {file_mapping}"
+            ) from error
+        raise
+
+    return import_study_payload, validated, available_studies
+
+
 def _create_study_from_import_payload(
     session: Session,
     study_payload: ImportStudiesConfigStudy,
@@ -3393,6 +3467,7 @@ async def validate_files_in_memory(
     activities_files: List[UploadFile] = File(default_factory=list),
     studies_config_file: Optional[UploadFile] = File(None),
     current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
 ):
     """Validate uploaded config files in-memory without writing to disk.
 
@@ -3530,50 +3605,18 @@ async def validate_files_in_memory(
                 ],
             }
 
-        expected_files_by_language: Dict[str, str] = {}
-        if isinstance(study.get("activities_json_files"), dict):
-            expected_files_by_language = {
-                str(language): str(path)
-                for language, path in study["activities_json_files"].items()
-            }
-        elif isinstance(study.get("activities_json_file"), dict):
-            expected_files_by_language = {
-                str(language): str(path)
-                for language, path in study["activities_json_file"].items()
-            }
-        elif isinstance(study.get("activities_json_file"), str):
-            default_lang = study.get("default_language") or "en"
-            expected_files_by_language = {
-                str(default_lang): str(study["activities_json_file"])
-            }
+        # The studies_config upload has already been read once to decide whether
+        # selection is required. Rewind before passing it to the shared parser.
+        await studies_config_file.seek(0)
 
-        activities_by_lang = await _parse_activities_uploads_by_language(
-            activities_files=activities_files,
-            explicit_map_json=activities_language_map,
-            expected_filenames_by_language=expected_files_by_language
-            if expected_files_by_language
-            else None,
+        import_study_payload, validated, available_studies = (
+            await _prepare_full_study_import_from_uploads(
+                studies_config_file=studies_config_file,
+                activities_files=activities_files,
+                activities_language_map=activities_language_map,
+                full_study_name_short=full_study_name_short,
+            )
         )
-
-        study_payload_dict = dict(study)
-        study_payload_dict.pop("activities_json_file", None)
-        study_payload_dict.pop("activities_json_files", None)
-        study_payload_dict["activities_json_data"] = activities_by_lang
-
-        import_study_payload = ImportStudiesConfigStudy(**study_payload_dict)
-        try:
-            validated = _validate_import_study_payload(import_study_payload)
-        except ValueError as error:
-            message = str(error)
-            if "activities_json_data structure mismatch between language" in message:
-                file_mapping = {
-                    language: Path(path).name
-                    for language, path in expected_files_by_language.items()
-                }
-                raise ValueError(
-                    f"{message}. Uploaded language-to-file mapping: {file_mapping}"
-                ) from error
-            raise
 
         parsed_activities_by_lang: Dict[str, ActivitiesConfig] = validated[
             "parsed_activities_by_lang"
@@ -3597,6 +3640,54 @@ async def validate_files_in_memory(
             {},
         )
 
+        existing_name_short_study = session.exec(
+            select(Study).where(Study.name_short == import_study_payload.name_short)
+        ).first()
+        existing_name_study = session.exec(
+            select(Study).where(Study.name == import_study_payload.name)
+        ).first()
+
+        creation_conflicts: List[Dict[str, Any]] = []
+        validation_notices: List[Dict[str, str]] = []
+
+        if existing_name_short_study:
+            creation_conflicts.append(
+                {
+                    "field": "name_short",
+                    "value": import_study_payload.name_short,
+                    "existing_study_name_short": existing_name_short_study.name_short,
+                }
+            )
+            validation_notices.append(
+                {
+                    "message": (
+                        "Study creation blocked: a study with the same name_short "
+                        f"'{import_study_payload.name_short}' already exists."
+                    ),
+                    "path": "studies[0].name_short",
+                    "type": "conflict_notice",
+                }
+            )
+
+        if existing_name_study:
+            creation_conflicts.append(
+                {
+                    "field": "name",
+                    "value": import_study_payload.name,
+                    "existing_study_name_short": existing_name_study.name_short,
+                }
+            )
+            validation_notices.append(
+                {
+                    "message": (
+                        "Study creation blocked: a study with the same name "
+                        f"'{import_study_payload.name}' already exists."
+                    ),
+                    "path": "studies[0].name",
+                    "type": "conflict_notice",
+                }
+            )
+
         audit_admin_action(
             current_admin,
             (
@@ -3616,8 +3707,12 @@ async def validate_files_in_memory(
                 "category_count": default_language_stats.get("category_count", 0),
                 "activity_count": default_language_stats.get("activity_count", 0),
                 "per_language_stats": per_language_stats,
+                "creation_mode": "create_only",
+                "transaction_mode": "all_or_nothing",
+                "creation_eligible": len(creation_conflicts) == 0,
+                "creation_conflicts": creation_conflicts,
             },
-            "errors": [],
+            "errors": validation_notices,
         }
 
     except Exception as error:
@@ -3635,6 +3730,112 @@ async def validate_files_in_memory(
             "ok": False,
             "mode": mode,
             "summary": {},
+            "errors": _format_exception_for_client(error),
+        }
+
+
+@app.post("/api/admin/studies/create-from-files")
+async def create_study_from_validated_uploads(
+    full_study_name_short: Optional[str] = Form(None),
+    activities_language_map: Optional[str] = Form(None),
+    activities_files: List[UploadFile] = File(default_factory=list),
+    studies_config_file: Optional[UploadFile] = File(None),
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Create exactly one new study from uploaded full-study package.
+
+    Enforced constraints:
+    - create_only
+    - all_or_nothing
+    - fail if study with same name_short or same name already exists
+    """
+    if studies_config_file is None:
+        raise HTTPException(
+            status_code=400,
+            detail="full_study creation requires a studies_config file upload",
+        )
+    if not activities_files:
+        raise HTTPException(
+            status_code=400,
+            detail="full_study creation requires related activities files",
+        )
+
+    try:
+        import_study_payload, validated_data, available_studies = (
+            await _prepare_full_study_import_from_uploads(
+                studies_config_file=studies_config_file,
+                activities_files=activities_files,
+                activities_language_map=activities_language_map,
+                full_study_name_short=full_study_name_short,
+            )
+        )
+
+        existing_by_name_short = session.exec(
+            select(Study).where(Study.name_short == import_study_payload.name_short)
+        ).first()
+        if existing_by_name_short:
+            raise ValueError(
+                "Study creation blocked: a study with the same name_short "
+                f"'{import_study_payload.name_short}' already exists"
+            )
+
+        existing_by_name = session.exec(
+            select(Study).where(Study.name == import_study_payload.name)
+        ).first()
+        if existing_by_name:
+            raise ValueError(
+                "Study creation blocked: a study with the same name "
+                f"'{import_study_payload.name}' already exists"
+            )
+
+        _create_study_from_import_payload(session, import_study_payload, validated_data)
+        session.commit()
+
+        logger.info(
+            "Admin '%s' created study from file validation package: study_name_short='%s'",
+            current_admin,
+            import_study_payload.name_short,
+        )
+        audit_admin_action(
+            current_admin,
+            (
+                "created study from validated full-study package "
+                f"(study_name_short='{import_study_payload.name_short}', mode=create_only, transaction_mode=all_or_nothing)"
+            ),
+        )
+
+        return {
+            "ok": True,
+            "mode": "create_only",
+            "transaction_mode": "all_or_nothing",
+            "summary": {
+                "study_name_short": import_study_payload.name_short,
+                "available_studies": sorted(available_studies),
+                "created": 1,
+                "failed": 0,
+            },
+            "errors": [],
+        }
+    except Exception as error:
+        session.rollback()
+        logger.warning(
+            "Admin '%s' create-from-files failed: %s",
+            current_admin,
+            error,
+        )
+        audit_admin_action(
+            current_admin,
+            "attempted study creation from validated full-study package and received errors",
+        )
+        return {
+            "ok": False,
+            "mode": "create_only",
+            "transaction_mode": "all_or_nothing",
+            "summary": {
+                "created": 0,
+                "failed": 1,
+            },
             "errors": _format_exception_for_client(error),
         }
 
