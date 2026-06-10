@@ -121,43 +121,60 @@ The `template_user` parameter is intended for cases where one participant's entr
 
 #### External Tasks (external integrations)
 
-Studies may include `external_tasks` entries in `backend/studies_config.json` to describe external systems that participants should visit (for example, external surveys or payment forms). An `external_tasks` entry typically contains:
+Studies may include `external_tasks` entries in `backend/studies_config.json` to describe external systems participants should visit (for example, external surveys or payment forms). The current configuration format used in this repository is:
 
-- `task_key`: short identifier used by the app and callbacks
-- `url`: the base external URL to open
-- `tokens`: a list of per-participant tokens (one token per participant listed in `study_participant_ids`)
-- `send_pid`: boolean; when `true` the participant id is appended as a query parameter
-- `pid_query_param`: name of the participant id query parameter appended to the URL
-- `config.token_query_param`: name of the token query parameter appended to the URL
+- `task_key`: short identifier used by the app
+- `task_level`: positive integer used to define task hierarchy: If a task has task_level N it means it can only be started once all taks with level less than N have been completed by the user. Set all to 1 if you need to hierarchy.
+- `name`, `description`: localized objects (e.g. `{ "en": "..." }`)
+- `confirmation_type`:  must be "callback" (callback means the study expects a confirmation on return)
+- `outbound_tokens`: array of token definitions; each has a `name` and a `by_participant` map of participant id → token string
+- `outbound_url`: URL template containing placeholders which will be substituted per-participant. Common placeholders: `{participant_id}`, `{study_name}`, `{task_key}`, and token placeholders matching the `outbound_tokens` `name` (for example `{pay_token}`)
 
-Example (excerpt from `backend/studies_config.json` for the pilot study):
+Example (excerpt from `backend/studies_config.json` used in the pilot studies):
 
-```
+```json
 {
     "task_key": "payment_info",
-    "name": "Bankdaten eingeben",
+    "task_level": 2,
+    "name": { "de": "Bankdaten eingeben" },
+    "description": { "de": "Geben Sie Ihre Bankdaten ein..." },
     "confirmation_type": "callback",
-    "url": "https://survey.academiccloud.de/f/123456",
-    "tokens": ["pay-bernd-34673643643656", "pay-sophia-5672356832", "pay-claudia-687872532"],
-    "send_pid": true,
-    "pid_query_param": "participant_id",
-    "config": { "token_query_param": "pay_token" }
+    "outbound_tokens": [
+        {
+            "name": "pay_token",
+            "by_participant": {
+                "bernd": "pay-bernd-123434214",
+                "sophia": "pay-sophia-987654321"
+            }
+        }
+    ],
+    "outbound_url": "https://survey.example.org/f/153222?pid={participant_id}&study_name={study_name}&task={task_key}&token={pay_token}"
 }
 ```
 
-With the above settings the backend will build continuation links by appending the participant id and the configured token query parameter. For participant `bernd` the constructed continuation URL for the `payment_info` task will look like:
+How it works at runtime
+- When rendering task links the backend substitutes the placeholders and returns `external_tasks` entries (with `continuation_url` / `outbound_url` already expanded per participant) in the study-config API response.
+- The frontend `pages/tasks.html` is now responsible for handling return/confirmation flows from external providers. When an external provider redirects participants back, it should send the following query parameters to the tasks page:
+    - `callback_task_key`: the `task_key` of the task being confirmed
+    - `callback_token`: the token that was assigned to this participant for that task
 
-```
-https://survey.academiccloud.de/f/123456?participant_id=bernd&pay_token=pay-bernd-34673643643656
-```
+    Example return URL a provider should redirect to after completion:
 
-Callback/confirmation contract: the frontend thank-you page looks for `callback_task_key` and `callback_token` URL parameters returned from the external app and then POSTs a confirmation JSON payload to the backend confirmation endpoint. The backend confirmation endpoint expects JSON in the shape `{ "task_key": "<task_key>", "assigned_token": "<token>" }`. Example return URL the external app should redirect the participant to (replace host/path and token):
+    ```text
+    https://your.domain.example.com/report/pages/tasks.html?study_name=default&pid=bernd&callback_task_key=payment_info&callback_token=pay-bernd-123434214
+    ```
 
-```
-https://your.domain.example.com/report/thank-you.html?callback_task_key=payment_info&callback_token=pay-bernd-34673643643656
-```
+- On page load `pages/tasks.html` reads `callback_task_key` and `callback_token` and POSTs a confirmation JSON payload to the backend endpoint:
 
-Note: the token query parameter name is controlled by `config.token_query_param` per external task, and the participant id parameter name is controlled by `pid_query_param`.
+    `POST /api/studies/{study_name}/participants/{participant_id}/external-tasks/confirm`
+
+    with body `{ "task_key": "<task_key>", "assigned_token": "<token>" }`.
+
+- `pages/tasks.html` also supports an optional `return_url` parameter. If present it is persisted in `localStorage` and appended to outbound continuation links so the external provider (or the user when they come back) can be forwarded to an external finish URL after the internal task flow completes.
+
+Notes
+- The confirmation responsibility moved from `thank-you.html` to `pages/tasks.html` — receivers and integrators should redirect back to `pages/tasks.html` (see example above).
+- Token names in `outbound_tokens` must match the placeholders used in `outbound_url` so the backend can substitute the correct per-participant token.
 
 
 
