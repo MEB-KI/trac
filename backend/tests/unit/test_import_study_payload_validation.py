@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 os.environ.setdefault("TUD_DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
@@ -131,6 +132,15 @@ def test_validate_import_payload_accepts_activities_json_files_only(tmp_path):
         assert "en" in validated["raw_activities_by_lang"]
     finally:
         settings.studies_config_path = previous_studies_config_path
+
+
+def test_import_study_payload_rejects_unknown_fields():
+    payload = _base_payload()
+    payload["activities_json_data"] = {"en": _minimal_activities_payload([100])}
+    payload["allow_skip_timeus"] = False
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ImportStudiesConfigStudy(**payload)
 
 
 def test_import_study_payload_require_consent_defaults_to_false():

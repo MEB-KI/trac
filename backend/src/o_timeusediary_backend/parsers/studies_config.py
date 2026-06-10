@@ -1,7 +1,7 @@
 # config/study_config.py
 from typing import List, Optional, Any, Dict, Union
 from datetime import datetime, timezone
-from pydantic import BaseModel, model_validator, Field
+from pydantic import BaseModel, model_validator, Field, ConfigDict, ValidationError
 import yaml
 import json
 from pathlib import Path
@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class CfgFileDayLabel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     display_order: int
     display_name: Optional[Union[str, Dict[str, str]]] = None
@@ -35,6 +37,8 @@ class CfgFileDayLabel(BaseModel):
 
 
 class CfgFileLoggedActivity(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     timeline: str
     activity_code: int
     start_minutes: int
@@ -42,11 +46,15 @@ class CfgFileLoggedActivity(BaseModel):
 
 
 class CfgFileExternalTaskOutboundToken(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     by_participant: Dict[str, str] = Field(default_factory=dict)
 
 
 class CfgFileExternalTask(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     """Study-config entry for one external task.
 
     Example:
@@ -289,6 +297,8 @@ def validate_external_tasks_for_study(
 
 
 class CfgFileStudy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     name_short: str
     description: Optional[str] = None
@@ -692,7 +702,30 @@ class CfgFileStudy(BaseModel):
 
 
 class CfgFileStudies(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     studies: List[CfgFileStudy]
+
+
+def _format_validation_error(error: ValidationError) -> str:
+    formatted_items: List[str] = []
+
+    for item in error.errors():
+        location = item.get("loc", [])
+        path = ".".join(str(part) for part in location) if location else "<root>"
+        message = item.get("msg", "Validation error")
+        error_type = item.get("type", "validation_error")
+
+        if error_type == "extra_forbidden":
+            unknown_field = str(location[-1]) if location else "<unknown>"
+            message = f"Unknown field '{unknown_field}' is not allowed"
+
+        formatted_items.append(f"- {path}: {message}")
+
+    if not formatted_items:
+        return str(error)
+
+    return "Invalid studies_config schema:\n" + "\n".join(formatted_items)
 
 
 def _resolve_activities_path(raw_path: str, base_dir: Path) -> Path:
@@ -823,7 +856,11 @@ def load_studies_config(config_path: str) -> CfgFileStudies:
     else:
         raise ValueError(f"Unsupported config file format: {config_path.suffix}")
 
-    cfg_studies = CfgFileStudies(**data)
+    try:
+        cfg_studies = CfgFileStudies(**data)
+    except ValidationError as error:
+        raise ValueError(_format_validation_error(error)) from error
+
     _validate_multilingual_activity_code_sets(cfg_studies, config_path.parent)
     return cfg_studies
 

@@ -566,3 +566,39 @@ def test_load_studies_config_accepts_matching_frequency_option_keys_across_langu
 
     config = load_studies_config(str(config_file))
     assert len(config.studies) == 1
+
+
+def test_load_studies_config_rejects_unknown_top_level_field(tmp_path):
+    _write_default_multilingual_activities(tmp_path)
+    payload = _valid_studies_payload()
+    payload["unexpected_root_key_typo"] = True
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Unknown field 'unexpected_root_key_typo'"):
+        load_studies_config(str(config_file))
+
+
+def test_load_studies_config_rejects_unknown_study_field(tmp_path):
+    _write_default_multilingual_activities(tmp_path)
+    payload = _valid_studies_payload()
+    payload["studies"][0]["allow_skip_timeus"] = False
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Unknown field 'allow_skip_timeus'"):
+        load_studies_config(str(config_file))
+
+
+def test_load_studies_config_rejects_unknown_nested_day_label_field(tmp_path):
+    _write_default_multilingual_activities(tmp_path)
+    payload = _valid_studies_payload()
+    payload["studies"][0]["day_labels"][0]["display_namess"] = {"en": "Typo"}
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Unknown field 'display_namess'"):
+        load_studies_config(str(config_file))
