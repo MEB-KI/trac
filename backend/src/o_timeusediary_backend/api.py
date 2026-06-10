@@ -908,6 +908,38 @@ def _validate_frequency_key_for_codes(
     return errors
 
 
+def _validate_timeline_min_coverage(
+    *,
+    submitted_activities: List[ActivitySubmitItem],
+    required_min_coverage_by_timeline: Dict[str, int],
+) -> List[Dict[str, object]]:
+    """Return validation errors when submitted timeline coverage is below minimum."""
+    covered_minutes_by_timeline: Dict[str, int] = {}
+    for activity_item in submitted_activities:
+        duration = activity_item.end_minutes - activity_item.start_minutes
+        covered_minutes_by_timeline[activity_item.timeline_key] = (
+            covered_minutes_by_timeline.get(activity_item.timeline_key, 0) + duration
+        )
+
+    insufficient_timeline_coverage: List[Dict[str, object]] = []
+    for timeline_key, required_min_coverage in required_min_coverage_by_timeline.items():
+        if required_min_coverage <= 0:
+            continue
+
+        covered_minutes = covered_minutes_by_timeline.get(timeline_key, 0)
+        if covered_minutes < required_min_coverage:
+            insufficient_timeline_coverage.append(
+                {
+                    "timeline": timeline_key,
+                    "covered_minutes": covered_minutes,
+                    "required_min_coverage": required_min_coverage,
+                    "missing_minutes": required_min_coverage - covered_minutes,
+                }
+            )
+
+    return insufficient_timeline_coverage
+
+
 @app.post(
     "/api/studies/{study_name_short}/participants/{participant_id}/day_labels/{day_label_name}/activities"
 )
@@ -1180,6 +1212,32 @@ def submit_activities(
                 "invalid_frequency_keys": invalid_frequency_keys,
                 "total_invalid": len(invalid_frequency_keys),
                 "suggestion": "Use one of the configured frequency option keys for the selected activity code.",
+            },
+        )
+
+    required_min_coverage_by_timeline = {
+        timeline_name: int(timeline.min_coverage or 0)
+        for timeline_name, timeline in timeline_map.items()
+    }
+    insufficient_timeline_coverage = _validate_timeline_min_coverage(
+        submitted_activities=activities_data.activities,
+        required_min_coverage_by_timeline=required_min_coverage_by_timeline,
+    )
+
+    if insufficient_timeline_coverage:
+        logger.error(
+            "Timeline min_coverage validation failed for study '%s': %s",
+            study_name_short,
+            insufficient_timeline_coverage,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Submitted activities do not meet timeline minimum coverage requirements.",
+                "error_type": "insufficient_timeline_coverage",
+                "insufficient_timelines": insufficient_timeline_coverage,
+                "total_invalid": len(insufficient_timeline_coverage),
+                "suggestion": "Complete each required timeline until its min_coverage is reached before submitting the day.",
             },
         )
 
