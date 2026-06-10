@@ -562,7 +562,7 @@
             "confirmation_type": "callback",
             "outbound_tokens": [
               {
-                "name": "survey_token",
+                "name": "depression_survey_token",
                 "by_participant": {
                   "bernd": "dep-bernd-31526357",
                   "sophia": "dep-sophia-3754687526",
@@ -570,7 +570,7 @@
                 }
               }
             ],
-            "outbound_url": "https://survey.academiccloud.de/f/153111?participant_id={participant_id}&study_name={study_name}&task={task_key}&token={survey_token}"
+            "outbound_url": "https://survey.academiccloud.de/f/153111?pid={participant_id}&study_name={study_name}&task={task_key}&token={depression_survey_token}"
           },
           {
             "task_key": "payment_info",
@@ -592,7 +592,7 @@
                 }
               }
             ],
-            "outbound_url": "https://survey.academiccloud.de/f/153222?participant_id={participant_id}&study_name={study_name}&task={task_key}&token={pay_token}"
+            "outbound_url": "https://survey.academiccloud.de/f/153222?pid={participant_id}&study_name={study_name}&task={task_key}&token={pay_token}"
           }
       ]
     }
