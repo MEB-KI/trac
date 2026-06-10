@@ -79,7 +79,7 @@ from .api_deps.available_activities import (
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from io import StringIO
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 import o_timeusediary_backend
 
 from .utils import utc_now, get_time_for_minutes_from_midnight
@@ -1705,6 +1705,8 @@ class UpdateStudyCollectionWindowRequest(BaseModel):
 
 
 class ImportStudiesConfigStudy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     name_short: str
     description: Optional[str] = None
@@ -1734,6 +1736,8 @@ class UpdateConsentRequest(BaseModel):
 
 
 class ImportStudiesConfigRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     mode: str = "create_only"
     transaction_mode: str = "all_or_nothing"
     studies: List[ImportStudiesConfigStudy]
@@ -2170,11 +2174,18 @@ def _format_exception_for_client(error: Exception) -> List[Dict[str, Any]]:
         formatted_errors: List[Dict[str, Any]] = []
         for item in error.errors():
             location = item.get("loc", [])
+            error_type = item.get("type", "validation_error")
+            message = item.get("msg", "Validation error")
+
+            if error_type == "extra_forbidden":
+                unknown_field = str(location[-1]) if location else "<unknown>"
+                message = f"Unknown field '{unknown_field}' is not allowed"
+
             formatted_errors.append(
                 {
-                    "message": item.get("msg", "Validation error"),
+                    "message": message,
                     "path": " -> ".join(str(part) for part in location),
-                    "type": item.get("type", "validation_error"),
+                    "type": error_type,
                 }
             )
         return formatted_errors
