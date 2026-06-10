@@ -482,9 +482,15 @@ test('3-day resume flow with callback-confirmed and link-only external tasks', a
     hasText: 'Follow-up Link Task',
   });
   await expect(followupLink).toBeVisible();
-  await expect(followupLink).toHaveAttribute(
-    'href',
-    'https://example.org/followup?token=lnk-6655507015767739'
+  const followupHref = await followupLink.getAttribute('href');
+  expect(followupHref).toBeTruthy();
+  const followupUrl = new URL(followupHref);
+  expect(followupUrl.origin + followupUrl.pathname).toBe(
+    'https://example.org/followup'
+  );
+  expect(followupUrl.searchParams.get('token')).toBe('lnk-6655507015767739');
+  expect(followupUrl.searchParams.get('return_url')).toBe(
+    'https://example.org/end-link'
   );
 
   // As long as at least one task is still pending, final continue action remains hidden.
