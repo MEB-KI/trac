@@ -235,8 +235,10 @@
                 </div>
                 <div class="actions">
                     <button type="submit">Validate full study</button>
+                    <button type="button" id="createStudyBtn" disabled>Create study (create_only, all_or_nothing)</button>
                 </div>
                 <p class="hint">By default, filenames from studies_config are used to map uploaded files.</p>
+                <p class="hint" id="createStudyHint">Validate full study first. Creation is only allowed when no existing study has the same name or name_short.</p>
             </form>
         </div>
 
@@ -249,6 +251,9 @@
         const fullStudyForm = document.querySelector('.validation-form[data-mode="full_study"]');
         const fullStudySelectorField = document.getElementById('fullStudySelectorField');
         const fullStudyNameShortSelect = document.getElementById('fullStudyNameShort');
+        const createStudyBtn = document.getElementById('createStudyBtn');
+        const createStudyHint = document.getElementById('createStudyHint');
+        let lastFullStudyValidationEligible = false;
 
         function escapeHtml(value) {
             return String(value)
@@ -296,6 +301,41 @@
             `;
 
             updateFullStudySelector(payload);
+            updateCreateStudyActionState(payload);
+        }
+
+        function updateCreateStudyActionState(payload) {
+            if (!createStudyBtn || !createStudyHint) {
+                return;
+            }
+
+            const isFullStudyPayload = payload && payload.mode === 'full_study';
+            const isValidationSuccess = isFullStudyPayload && payload.ok === true;
+            const creationEligible = Boolean(payload?.summary?.creation_eligible);
+
+            lastFullStudyValidationEligible = isValidationSuccess && creationEligible;
+            createStudyBtn.disabled = !lastFullStudyValidationEligible;
+
+            if (!isFullStudyPayload) {
+                createStudyHint.textContent =
+                    'Validate full study first. Creation is only allowed when no existing study has the same name or name_short.';
+                return;
+            }
+
+            if (!isValidationSuccess) {
+                createStudyHint.textContent =
+                    'Validation failed. Fix errors before creating a study.';
+                return;
+            }
+
+            if (creationEligible) {
+                createStudyHint.textContent =
+                    'Validation passed and no conflicts found. You can create this study now.';
+                return;
+            }
+
+            createStudyHint.textContent =
+                'Validation passed, but creation is blocked because a study with the same name or name_short already exists.';
         }
 
         function setFullStudySelectorOptions(studyNameShorts, preserveCurrentValue = true) {
@@ -467,6 +507,54 @@
             }
         }
 
+        async function createStudyFromFullStudyForm() {
+            if (!fullStudyForm) {
+                return;
+            }
+            if (!lastFullStudyValidationEligible) {
+                throw new Error('Please run a successful full study validation without conflicts before creating.');
+            }
+
+            const studiesFileInput = fullStudyForm.querySelector('input[name="studies_config_file"]');
+            const activitiesInput = fullStudyForm.querySelector('input[name="activities_files"]');
+            const languageMap = fullStudyForm.querySelector('textarea[name="activities_language_map"]').value.trim();
+            const selectedStudyNameShort = fullStudyForm.querySelector('select[name="full_study_name_short"]')?.value?.trim() || '';
+
+            if (!studiesFileInput.files.length) {
+                throw new Error('Please upload one studies_config file.');
+            }
+            if (!activitiesInput.files.length) {
+                throw new Error('Please upload related activities files.');
+            }
+
+            const fd = new FormData();
+            fd.append('studies_config_file', studiesFileInput.files[0]);
+            if (selectedStudyNameShort) {
+                fd.append('full_study_name_short', selectedStudyNameShort);
+            }
+            if (languageMap) {
+                fd.append('activities_language_map', languageMap);
+            }
+            for (const file of activitiesInput.files) {
+                fd.append('activities_files', file);
+            }
+
+            createStudyBtn.disabled = true;
+            createStudyBtn.textContent = 'Creating...';
+            try {
+                const response = await fetch('{{ request.scope.root_path }}/api/admin/studies/create-from-files', {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin',
+                });
+                const payload = await response.json();
+                renderResult(payload);
+            } finally {
+                createStudyBtn.textContent = 'Create study (create_only, all_or_nothing)';
+                createStudyBtn.disabled = !lastFullStudyValidationEligible;
+            }
+        }
+
         forms.forEach((form) => {
             form.addEventListener('submit', async (event) => {
                 event.preventDefault();
@@ -489,6 +577,43 @@
             if (studiesFileInput) {
                 studiesFileInput.addEventListener('change', () => {
                     updateFullStudySelectorFromUploadedFile();
+                    lastFullStudyValidationEligible = false;
+                    updateCreateStudyActionState(null);
+                });
+            }
+
+            const activitiesInput = fullStudyForm.querySelector('input[name="activities_files"]');
+            if (activitiesInput) {
+                activitiesInput.addEventListener('change', () => {
+                    lastFullStudyValidationEligible = false;
+                    updateCreateStudyActionState(null);
+                });
+            }
+
+            const languageMapInput = fullStudyForm.querySelector('textarea[name="activities_language_map"]');
+            if (languageMapInput) {
+                languageMapInput.addEventListener('input', () => {
+                    lastFullStudyValidationEligible = false;
+                    updateCreateStudyActionState(null);
+                });
+            }
+
+            if (createStudyBtn) {
+                createStudyBtn.addEventListener('click', async () => {
+                    try {
+                        await createStudyFromFullStudyForm();
+                    } catch (error) {
+                        renderResult({
+                            ok: false,
+                            mode: 'create_only',
+                            summary: {},
+                            errors: [{
+                                message: error.message || String(error),
+                                path: null,
+                                type: 'client_error',
+                            }],
+                        });
+                    }
                 });
             }
         }
