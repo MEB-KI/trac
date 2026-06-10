@@ -114,6 +114,19 @@ def test_load_studies_config_accepts_external_tasks(tmp_path):
     assert config.studies[0].external_tasks[0].task_key == "payment"
 
 
+def test_load_studies_config_accepts_require_diary_before_external_tasks_setting(tmp_path):
+    _write_default_multilingual_activities(tmp_path)
+    payload = _valid_studies_payload()
+    payload["studies"][0]["require_diary_before_external_tasks"] = True
+
+    config_file = tmp_path / "studies_config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    config = load_studies_config(str(config_file))
+
+    assert config.studies[0].require_diary_before_external_tasks is True
+
+
 def test_load_studies_config_rejects_external_tasks_for_open_study(tmp_path):
     _write_default_multilingual_activities(tmp_path)
     payload = _valid_studies_payload()

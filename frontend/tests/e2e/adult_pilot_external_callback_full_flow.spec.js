@@ -60,6 +60,62 @@ function pickSubmissionTemplate(activitiesConfig) {
   );
 }
 
+function pickRequiredTimelineTemplate(activitiesConfig) {
+  const timelineConfig = activitiesConfig?.timeline || {};
+  const fallbackTemplate = pickSubmissionTemplate(activitiesConfig);
+  let requiredTimelineKey = null;
+  let requiredMinCoverage = 0;
+
+  for (const [timelineKey, timelineValue] of Object.entries(timelineConfig)) {
+    const minCoverage = Number(timelineValue?.min_coverage || 0);
+    if (minCoverage > requiredMinCoverage) {
+      requiredMinCoverage = minCoverage;
+      requiredTimelineKey = timelineKey;
+    }
+  }
+
+  if (!requiredTimelineKey) {
+    return fallbackTemplate;
+  }
+
+  const timelineValue = timelineConfig[requiredTimelineKey] || {};
+  const mode = timelineValue?.mode || 'single-choice';
+  const categories = Array.isArray(timelineValue?.categories)
+    ? timelineValue.categories
+    : [];
+
+  for (const category of categories) {
+    const categoryName = category?.name;
+    const activities = Array.isArray(category?.activities)
+      ? category.activities
+      : [];
+
+    for (const activity of activities) {
+      const activityName = activity?.name;
+      const activityCode = activity?.code;
+      if (!activityName) {
+        continue;
+      }
+      if (
+        (mode === 'single-choice' || mode === 'multiple-choice') &&
+        typeof activityCode !== 'number'
+      ) {
+        continue;
+      }
+
+      return {
+        timelineKey: requiredTimelineKey,
+        mode,
+        categoryName,
+        activityName,
+        activityCode,
+      };
+    }
+  }
+
+  return fallbackTemplate;
+}
+
 function getParticipantIdForProject(projectName) {
   if (projectName === 'firefox') {
     return 'sophia';
@@ -122,24 +178,24 @@ test('adult_pilot_de closed-study full task flow with simulated external callbac
   );
   expect(activitiesConfigResponse.ok()).toBeTruthy();
   const activitiesConfig = await activitiesConfigResponse.json();
-  const template = pickSubmissionTemplate(activitiesConfig);
+  const template = pickRequiredTimelineTemplate(activitiesConfig);
+
+  const payload = {
+    timeline_key: template.timelineKey,
+    activity: template.activityName,
+    category: template.categoryName,
+    start_minutes: 240,
+    end_minutes: 1680,
+    mode: template.mode,
+  };
+
+  if (template.mode === 'single-choice') {
+    payload.code = template.activityCode;
+  } else if (template.mode === 'multiple-choice') {
+    payload.codes = [template.activityCode];
+  }
 
   for (const dayLabel of studyConfig.day_labels) {
-    const payload = {
-      timeline_key: template.timelineKey,
-      activity: template.activityName,
-      category: template.categoryName,
-      start_minutes: 600,
-      end_minutes: 660,
-      mode: template.mode,
-    };
-
-    if (template.mode === 'single-choice') {
-      payload.code = template.activityCode;
-    } else if (template.mode === 'multiple-choice') {
-      payload.codes = [template.activityCode];
-    }
-
     const submitResponse = await request.post(
       `${API_BASE_URL}/studies/${STUDY_NAME}/participants/${participantId}/day_labels/${dayLabel.name}/activities`,
       { data: { activities: [payload] } }

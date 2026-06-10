@@ -302,6 +302,7 @@ class CfgFileStudy(BaseModel):
     activities_json_data: Optional[Dict[str, Dict[str, Any]]] = None
     require_consent: bool = False
     is_paused: bool = False
+    require_diary_before_external_tasks: bool = False
     external_tasks: List[CfgFileExternalTask] = Field(default_factory=list)
     study_text_intro: Optional[Dict[str, str]] = None
     study_text_end_completed: Optional[Dict[str, str]] = None
