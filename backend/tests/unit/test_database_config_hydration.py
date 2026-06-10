@@ -46,6 +46,7 @@ def _write_studies_config(
     study_participant_ids: list[str],
     activities_logged_by_userid: dict,
     external_tasks: list[dict] | None = None,
+    require_diary_before_external_tasks: bool = False,
 ) -> str:
     studies_payload = {
         "studies": [
@@ -67,6 +68,7 @@ def _write_studies_config(
                 "study_text_consent": {"en": "Consent text"},
                 "study_text_end_noconsent": {"en": "No consent text"},
                 "external_tasks": external_tasks or [],
+                "require_diary_before_external_tasks": require_diary_before_external_tasks,
                 "activities_json_files": {"en": activities_file},
                 "activities_logged_by_userid": activities_logged_by_userid,
                 "data_collection_start": "2024-01-01T00:00:00Z",
@@ -325,6 +327,7 @@ def test_create_config_file_studies_in_database_persists_external_tasks(
                 ],
             }
         ],
+        require_diary_before_external_tasks=True,
     )
 
     database_module.create_config_file_studies_in_database(config_path)
@@ -334,6 +337,7 @@ def test_create_config_file_studies_in_database_persists_external_tasks(
             select(Study).where(Study.name_short == "hydration_demo")
         ).first()
         assert study is not None
+        assert study.require_diary_before_external_tasks is True
 
         external_tasks = session.exec(
             select(StudyExternalTask)

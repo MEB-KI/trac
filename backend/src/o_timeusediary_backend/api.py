@@ -275,6 +275,7 @@ def _get_participant_external_tasks(
     study: Study,
     participant_id: Optional[str],
     selected_language: Optional[str],
+    study_days_count: int,
 ) -> List["ParticipantExternalTaskResponse"]:
     if not participant_id:
         return []
@@ -297,6 +298,12 @@ def _get_participant_external_tasks(
     ).all()
 
     unlock_by_task_id = _build_participant_external_task_unlock_map(assigned_rows)
+    locked_by_diary_requirement = _is_external_tasks_locked_by_diary_requirement(
+        session=session,
+        study=study,
+        participant_id=participant_id,
+        study_days_count=study_days_count,
+    )
 
     tasks: List[ParticipantExternalTaskResponse] = []
     for assignment, external_task in assigned_rows:
@@ -324,6 +331,7 @@ def _get_participant_external_tasks(
                         assignment.assigned_token,
                     )
                     if unlock_by_task_id.get(external_task.id, True)
+                    and not locked_by_diary_requirement
                     else ""
                 ),
                 is_confirmed=assignment.is_confirmed,
@@ -358,6 +366,23 @@ def _is_participant_study_complete(
     ).first()
 
     return int(completed_day_count or 0) >= study_days_count
+
+
+def _is_external_tasks_locked_by_diary_requirement(
+    session: Session,
+    study: Study,
+    participant_id: Optional[str],
+    study_days_count: int,
+) -> bool:
+    if not study.require_diary_before_external_tasks:
+        return False
+
+    return not _is_participant_study_complete(
+        session=session,
+        study=study,
+        participant_id=participant_id,
+        study_days_count=study_days_count,
+    )
 
 
 # Initialize templates with absolute path
@@ -1692,6 +1717,7 @@ class ImportStudiesConfigStudy(BaseModel):
     activities_json_files: Optional[Dict[str, str]] = None
     require_consent: bool = False
     is_paused: bool = False
+    require_diary_before_external_tasks: bool = False
     external_tasks: List[CfgFileExternalTask] = Field(default_factory=list)
     study_text_intro: Optional[Dict[str, str]] = None
     study_text_end_completed: Optional[Dict[str, str]] = None
@@ -2423,6 +2449,7 @@ def _create_study_from_import_payload(
         allow_unlisted_participants=study_payload.allow_unlisted_participants,
         require_consent=study_payload.require_consent,
         is_paused=study_payload.is_paused,
+        require_diary_before_external_tasks=study_payload.require_diary_before_external_tasks,
         default_language=default_language,
         study_text_intro=study_payload.study_text_intro,
         study_text_end_completed=study_payload.study_text_end_completed,
@@ -4848,6 +4875,7 @@ class StudyConfigResponse(BaseModel):
     description: str
     allow_unlisted_participants: bool
     require_consent: bool = False
+    require_diary_before_external_tasks: bool = False
     data_collection_start: datetime
     data_collection_end: datetime
     default_language: str
@@ -5065,7 +5093,7 @@ def get_study_config(
             instructions_completed_at = study_participant.instructions_completed_at
 
     participant_external_tasks = _get_participant_external_tasks(
-        session, study, participant_id, selected_language
+        session, study, participant_id, selected_language, len(day_labels)
     )
     all_external_tasks_confirmed = bool(participant_external_tasks) and all(
         external_task.is_confirmed for external_task in participant_external_tasks
@@ -5083,6 +5111,7 @@ def get_study_config(
         description=study.description,
         allow_unlisted_participants=study.allow_unlisted_participants,
         require_consent=require_consent,
+        require_diary_before_external_tasks=study.require_diary_before_external_tasks,
         data_collection_start=study.data_collection_start,
         data_collection_end=study.data_collection_end,
         default_language=study.default_language,
@@ -5142,6 +5171,20 @@ def confirm_external_task_callback(
                 status_code=403,
                 detail=f"Participant '{participant_id}' not authorized for this study",
             )
+
+    day_labels = session.exec(
+        select(DayLabel).where(DayLabel.study_id == study.id)
+    ).all()
+    if _is_external_tasks_locked_by_diary_requirement(
+        session=session,
+        study=study,
+        participant_id=participant_id,
+        study_days_count=len(day_labels),
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="External tasks are locked until the diary is completed",
+        )
 
     assignment_row = session.exec(
         select(StudyExternalTaskAssignment, StudyExternalTask)
@@ -5259,6 +5302,21 @@ def launch_external_task(
                 status_code=403,
                 detail=f"Participant '{participant_id}' not authorized for this study",
             )
+
+    day_labels = session.exec(
+        select(DayLabel).where(DayLabel.study_id == study.id)
+    ).all()
+    if _is_external_tasks_locked_by_diary_requirement(
+        session=session,
+        study=study,
+        participant_id=participant_id,
+        study_days_count=len(day_labels),
+    ):
+        log_launch(False, "diary_not_completed")
+        raise HTTPException(
+            status_code=409,
+            detail="External tasks are locked until the diary is completed",
+        )
 
     assignment_row = session.exec(
         select(StudyExternalTaskAssignment, StudyExternalTask)

@@ -88,6 +88,22 @@ def _ensure_is_paused_column() -> None:
             logger.info("Added missing studies.is_paused column")
 
 
+def _ensure_require_diary_before_external_tasks_column() -> None:
+    inspector = inspect(engine)
+    if "studies" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("studies")}
+    if "require_diary_before_external_tasks" not in existing_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE studies ADD COLUMN require_diary_before_external_tasks BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            logger.info("Added missing studies.require_diary_before_external_tasks column")
+
+
 def _ensure_external_task_assignment_confirmation_columns() -> None:
     inspector = inspect(engine)
     if "study_external_task_assignments" not in inspector.get_table_names():
@@ -689,6 +705,7 @@ def create_db_and_tables(do_report_contents: bool = False):
                 raise
         _ensure_study_text_columns()
         _ensure_is_paused_column()
+        _ensure_require_diary_before_external_tasks_column()
         _ensure_external_task_assignment_confirmation_columns()
         _ensure_external_task_task_level_column()
         _ensure_study_participant_instruction_columns()
@@ -830,6 +847,14 @@ def create_config_file_studies_in_database(config_path: str):
                         study_updated = _hydrate_study_texts_from_config(
                             session, existing_study, study_config
                         )
+                        if (
+                            existing_study.require_diary_before_external_tasks
+                            != study_config.require_diary_before_external_tasks
+                        ):
+                            existing_study.require_diary_before_external_tasks = (
+                                study_config.require_diary_before_external_tasks
+                            )
+                            study_updated = True
                         if study_config.study_participant_ids:
                             for participant_id in study_config.study_participant_ids:
                                 existing_participant = session.exec(
@@ -993,6 +1018,7 @@ def create_config_file_studies_in_database(config_path: str):
                         allow_unlisted_participants=study_config.allow_unlisted_participants,
                         require_consent=study_config.require_consent,
                         is_paused=study_config.is_paused,
+                        require_diary_before_external_tasks=study_config.require_diary_before_external_tasks,
                         default_language=study_config.default_language,
                         study_text_intro=study_config.study_text_intro,
                         study_text_end_completed=study_config.study_text_end_completed,
