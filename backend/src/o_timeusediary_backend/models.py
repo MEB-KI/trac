@@ -1,7 +1,7 @@
-from sqlmodel import SQLModel, Field, Relationship, JSON, Column
+from sqlmodel import SQLModel, Field, Relationship, JSON
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from sqlalchemy import DateTime, UniqueConstraint
+from sqlalchemy import DateTime, UniqueConstraint, Column
 
 from .utils import utc_now
 
@@ -31,7 +31,13 @@ class Study(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     name_short: str = Field(index=True, unique=True)
-    description: str
+    # Human-readable fallback description (single-language) kept for
+    # backward compatibility. Prefer `description_i18n` for localized texts.
+    description: Optional[str] = None
+    # Localized description map, keys are language codes -> text
+    description_i18n: Optional[Dict[str, str]] = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
     allow_unlisted_participants: bool = Field(default=True)
     require_consent: bool = Field(default=False)
     is_paused: bool = Field(default=False)

@@ -80,6 +80,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from io import StringIO
 from pydantic import BaseModel, Field, model_validator, ConfigDict
+from typing import Union
 import o_timeusediary_backend
 
 from .utils import utc_now, get_time_for_minutes_from_midnight
@@ -1709,7 +1710,8 @@ class ImportStudiesConfigStudy(BaseModel):
 
     name: str
     name_short: str
-    description: Optional[str] = None
+    # Accept old string or new localized map
+    description: Optional[Union[str, Dict[str, str]]] = None
     day_labels: List[Dict]
     study_participant_ids: List[str] = []
     allow_unlisted_participants: bool = True
@@ -2528,10 +2530,22 @@ def _create_study_from_import_payload(
         "parsed_activities_by_lang"
     ][default_language]
 
+    # Normalize description payload into i18n map + fallback
+    description_map: Dict[str, str] = {}
+    if isinstance(study_payload.description, dict):
+        description_map = dict(study_payload.description)
+    elif isinstance(study_payload.description, str) and study_payload.description.strip():
+        description_map = {validated_data["default_language"]: study_payload.description}
+
+    fallback_description = (
+        description_map.get(validated_data["default_language"]) or next(iter(description_map.values()), "")
+    )
+
     study = Study(
         name=study_payload.name,
         name_short=study_payload.name_short,
-        description=study_payload.description or "",
+        description=fallback_description,
+        description_i18n=description_map or None,
         allow_unlisted_participants=study_payload.allow_unlisted_participants,
         require_consent=study_payload.require_consent,
         allow_skip_timeuse=study_payload.allow_skip_timeuse,
@@ -3192,6 +3206,9 @@ async def export_runtime_studies_config(
                 "name": study.name,
                 "name_short": study.name_short,
                 "description": study.description,
+                "description_i18n": (
+                    study.description_i18n if isinstance(study.description_i18n, dict) else None
+                ),
                 "day_labels": day_labels_export,
                 "study_participant_ids": participant_ids,
                 "allow_unlisted_participants": study.allow_unlisted_participants,
@@ -5006,6 +5023,7 @@ class ActiveOpenStudyResponse(BaseModel):
     name_short: str
     name: Optional[str] = None
     description: Optional[str] = None
+    description_i18n: Optional[Dict[str, str]] = None
 
 
 @app.get("/api/active_open_study_names", response_model=List[ActiveOpenStudyResponse])
@@ -5043,6 +5061,7 @@ async def get_active_open_study_names(session: Session = Depends(get_session)):
                 name_short=study.name_short,
                 name=study.name,
                 description=study.description,
+                description_i18n=(study.description_i18n if isinstance(study.description_i18n, dict) else None),
             )
             for study in studies
         ]
@@ -5088,6 +5107,7 @@ class StudyConfigResponse(BaseModel):
     study_name: str
     study_name_short: str
     description: str
+    description_i18n: Optional[Dict[str, str]] = None
     allow_unlisted_participants: bool
     require_consent: bool = False
     allow_skip_timeuse: bool = True
@@ -5321,10 +5341,16 @@ def get_study_config(
         study_days_count=len(day_labels),
     )
 
+    # Resolve localized study description for the selected language when possible
+    localized_description = _get_localized_study_text(
+        study, "description_i18n", selected_language
+    ) or study.description
+
     return StudyConfigResponse(
         study_name=study.name,
         study_name_short=study.name_short,
-        description=study.description,
+        description=localized_description,
+        description_i18n=(study.description_i18n if isinstance(study.description_i18n, dict) else None),
         allow_unlisted_participants=study.allow_unlisted_participants,
         require_consent=require_consent,
         allow_skip_timeuse=study.allow_skip_timeuse,
