@@ -3,7 +3,11 @@
     {
       "name": "Default Weekly Study for Adults",
       "name_short": "default",
-      "description": "Default Study for Adults at KI, filled out by themselves",
+      "description": {
+        "en": "Default Study for Adults at KI, filled out by themselves",
+        "sv": "Standardstudie för vuxna vid KI, ifylld av deltagarna själva",
+        "de": "Standardstudie für Erwachsene am KI, ausgefüllt von den Teilnehmern selbst"
+      },
       "day_labels": [
         {
           "name": "monday",
@@ -113,7 +117,11 @@
     {
       "name": "Weekly Study for 15 year olds",
       "name_short": "15yearolds",
-      "description": "Weekly Study for 15 year olds at KI, filled out by themselves.",
+      "description": {
+        "en": "Weekly Study for 15 year olds at KI, filled out by themselves.",
+        "sv": "Veckostudie för 15-åringar vid KI, ifylld av deltagarna själva.",
+        "de": "Wöchentliche Studie für 15-Jährige am KI, ausgefüllt von den Teilnehmern selbst."
+      },
       "day_labels": [
         {
           "name": "monday",
@@ -224,7 +232,11 @@
     {
       "name": "Weekly Study for 9 year olds",
       "name_short": "9yearolds",
-      "description": "Weekly Study for 9 year olds at KI, filled out by their parents.",
+      "description": {
+        "en": "Weekly Study for 9 year olds at KI, filled out by their parents.",
+        "sv": "Veckostudie för 9-åringar vid KI, ifylld av deras föräldrar.",
+        "de": "Wöchentliche Studie für 9-Jährige am KI, ausgefüllt von deren Eltern."
+      },
       "day_labels": [
         {
           "name": "monday",
@@ -335,7 +347,9 @@
     {
       "name": "Pilotstudie Erwachsene Deutsch MPIAE",
       "name_short": "adult_pilot_de",
-      "description": "Pilotstudie TimeUse für Erwachsene am MPIAE.",
+      "description": {
+        "de": "Pilotstudie TimeUse für Erwachsene am MPIAE."
+      },
       "allow_skip_timeuse": false,
       "day_labels": [
         {
@@ -467,7 +481,9 @@
     {
       "name": "Pilotstudie Erwachsene Deutsch MPIAE2",
       "name_short": "adult_pilot_de2",
-      "description": "Pilotstudie TimeUse für Erwachsene am MPIAE2.",
+      "description": {
+        "de": "Pilotstudie TimeUse für Erwachsene am MPIAE2."
+      },
       "allow_skip_timeuse": false,
       "day_labels": [
         {

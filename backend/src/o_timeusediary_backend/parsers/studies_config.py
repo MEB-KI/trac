@@ -301,7 +301,8 @@ class CfgFileStudy(BaseModel):
 
     name: str
     name_short: str
-    description: Optional[str] = None
+    # Accept either a single-string description (legacy) or a localized map.
+    description: Optional[Union[str, Dict[str, str]]] = None
     day_labels: List[CfgFileDayLabel] = Field(min_length=1)
     study_participant_ids: List[str] = []
     allow_unlisted_participants: bool = True
@@ -417,6 +418,18 @@ class CfgFileStudy(BaseModel):
             or text_map.get(self.default_language)
             or text_map.get("en")
         )
+
+    def get_description_map(self) -> Dict[str, str]:
+        """Return description as a language->text map.
+
+        If `description` is a string (legacy), return a single-entry map
+        keyed by the study default language.
+        """
+        if isinstance(self.description, dict):
+            return dict(self.description)
+        if isinstance(self.description, str) and self.description.strip():
+            return {self.default_language: self.description}
+        return {}
 
     def get_logged_activities_by_participant(
         self,
