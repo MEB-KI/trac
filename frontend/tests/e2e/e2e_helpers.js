@@ -49,6 +49,14 @@ async function enterConsentAndInstructionsIfNeeded(page) {
 
     if (isConsentUrl(currentUrl)) {
       const consentAcceptBtn = page.locator('#consentAcceptBtn');
+      const consentCheckbox = page.locator('#consentCheckbox');
+      try {
+        if ((await consentCheckbox.count()) > 0 && !(await consentCheckbox.isChecked())) {
+          await consentCheckbox.check({ timeout: 2000 }).catch(() => undefined);
+        }
+      } catch (e) {
+        // ignore
+      }
       await consentAcceptBtn
         .click({ timeout: 5000 })
         .then(() => page.waitForLoadState('domcontentloaded'))
@@ -98,6 +106,14 @@ async function enterStudyIfNeeded(page) {
 
     if (isConsentUrl(currentUrl)) {
       const consentAcceptBtn = page.locator('#consentAcceptBtn');
+      const consentCheckbox = page.locator('#consentCheckbox');
+      try {
+        if ((await consentCheckbox.count()) > 0 && !(await consentCheckbox.isChecked())) {
+          await consentCheckbox.check({ timeout: 2000 }).catch(() => undefined);
+        }
+      } catch (e) {
+        // ignore
+      }
       await consentAcceptBtn
         .click({ timeout: 5000 })
         .then(() => page.waitForLoadState('domcontentloaded'))

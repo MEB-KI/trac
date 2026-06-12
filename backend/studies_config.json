@@ -87,9 +87,9 @@
       "require_consent": true,
       "is_paused": false,
       "study_text_consent": {
-        "en": "# Study Consent Page\n\nBy continuing, you agree that:\n- your answers are collected for scientific time use research\n- the data may be analyzed in aggregated form\n- you can stop at any time before submitting",
-        "sv": "# Sida för samtycke till studien\n\nGenom att fortsätta godkänner du att:\n- dina svar samlas in för vetenskaplig tidsanvändningsforskning\n- uppgifterna kan analyseras i samlad form\n- du kan avbryta när som helst innan du skickar in",
-        "de": "# Einwilligungsseite für die Studie\n\nWenn Sie fortfahren, stimmen Sie zu, dass:\n- Ihre Antworten für wissenschaftliche Forschung zur Zeitnutzung erhoben werden\n- die Daten in zusammengefasster Form ausgewertet werden können\n- Sie jederzeit vor dem Absenden abbrechen können"
+        "en": "By continuing, you agree that:\n- your answers are collected for scientific time use research\n- the data may be analyzed in aggregated form\n- you can stop at any time before submitting",
+        "sv": "Genom att fortsätta godkänner du att:\n- dina svar samlas in för vetenskaplig tidsanvändningsforskning\n- uppgifterna kan analyseras i samlad form\n- du kan avbryta när som helst innan du skickar in",
+        "de": "Wenn Sie fortfahren, stimmen Sie zu, dass:\n- Ihre Antworten für wissenschaftliche Forschung zur Zeitnutzung erhoben werden\n- die Daten in zusammengefasster Form ausgewertet werden können\n- Sie jederzeit vor dem Absenden abbrechen können"
       },
       "study_text_end_noconsent": {
         "en": "You did not give consent and your data will not be used in this study.",
