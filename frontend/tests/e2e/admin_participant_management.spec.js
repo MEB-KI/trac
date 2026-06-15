@@ -34,7 +34,8 @@ test('admin login -> participant management -> study participant list', async ({
   await expect(
     page.getByRole('heading', {
       level: 2,
-      name: /Participants in study default\s*\(\d+\)/,
+      // Accept both old format "(\d+)" and new format "(showing X of Y)"
+      name: /Participants in study default\s*\((?:showing\s+\d+\s+of\s+\d+|\d+)\)/i,
     })
   ).toBeVisible();
 });
