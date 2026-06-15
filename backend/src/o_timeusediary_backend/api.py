@@ -1700,6 +1700,31 @@ class AssignParticipantsRequest(BaseModel):
     must_be_new: bool = False
 
 
+class DeleteTokensByPidRequest(BaseModel):
+    task_key: str
+    participant_ids: List[str]
+
+
+class DeleteTokensByTokenRequest(BaseModel):
+    task_key: str
+    tokens: List[str]
+
+
+class DeletePreviewItem(BaseModel):
+    input_value: str
+    found: bool
+    participant_id: Optional[str] = None
+    assigned_token: Optional[str] = None
+
+
+class DeletePreviewResponse(BaseModel):
+    total_input: int
+    matched: int
+    not_found: int
+    items: List[DeletePreviewItem]
+
+
+
 class UpdateStudyCollectionWindowRequest(BaseModel):
     data_collection_start: Optional[datetime] = None
     data_collection_end: Optional[datetime] = None
@@ -3394,6 +3419,35 @@ async def admin_participant_management(
             .order_by(StudyParticipant.created_at.desc())
         ).all()
 
+        # Load external tasks and assignments for this study to include tokens in the UI
+        external_tasks = session.exec(
+            select(StudyExternalTask)
+            .where(StudyExternalTask.study_id == selected_study.id)
+            .order_by(StudyExternalTask.task_key)
+        ).all()
+        external_task_ids = [t.id for t in external_tasks]
+        external_task_keys = [t.task_key for t in external_tasks]
+
+        assignments = []
+        if external_task_ids:
+            assignments = session.exec(
+                select(StudyExternalTaskAssignment).where(
+                    StudyExternalTaskAssignment.external_task_id.in_(external_task_ids)
+                )
+            ).all()
+
+        # build lookup: assignments_by_participant[participant_id][task_key] = token
+        assignments_by_participant = {}
+        if assignments:
+            # need mapping from task_id to task_key
+            task_id_to_key = {t.id: t.task_key for t in external_tasks}
+            for a in assignments:
+                pid = a.participant_id
+                tk = task_id_to_key.get(a.external_task_id)
+                if pid not in assignments_by_participant:
+                    assignments_by_participant[pid] = {}
+                assignments_by_participant[pid][tk] = a.assigned_token
+
         for association in study_participants:
             participant = session.get(Participant, association.participant_id)
             if not participant:
@@ -3417,6 +3471,7 @@ async def admin_participant_management(
                     "consent_given": association.consent_given,
                     "consent_decided_at": association.consent_decided_at,
                     "activity_count": participant_activity_count,
+                    "tokens": assignments_by_participant.get(participant.id, {}) if assignments_by_participant else {},
                 }
             )
 
@@ -4188,21 +4243,39 @@ async def remove_participant_from_study(
             detail=f"Participant '{participant_id}' is not assigned to study '{study_name_short}'",
         )
 
+    # Delete any external task assignments for this participant scoped to the study
+    external_task_ids = session.exec(
+        select(StudyExternalTask.id).where(StudyExternalTask.study_id == study.id)
+    ).all()
+
+    deleted_assignments = 0
+    if external_task_ids:
+        deleted_assignments = (
+            session.exec(
+                delete(StudyExternalTaskAssignment).where(
+                    StudyExternalTaskAssignment.participant_id == participant_id,
+                    StudyExternalTaskAssignment.external_task_id.in_(external_task_ids),
+                )
+            ).rowcount
+            or 0
+        )
+
     session.delete(association)
     session.commit()
 
     logger.info(
-        f"Admin '{current_admin}' removed participant '{participant_id}' from study '{study_name_short}'."
+        f"Admin '{current_admin}' removed participant '{participant_id}' from study '{study_name_short}' (deleted_assignments={deleted_assignments})."
     )
     audit_admin_action(
         current_admin,
-        f"removed participant '{participant_id}' from study '{study_name_short}'",
+        f"removed participant '{participant_id}' from study '{study_name_short}' (deleted_assignments={deleted_assignments})",
     )
 
     return {
         "message": "Participant removed from study",
         "study_name_short": study_name_short,
         "participant_id": participant_id,
+        "deleted_assignments": int(deleted_assignments),
     }
 
 
@@ -4371,6 +4444,167 @@ async def reseed_external_tasks_for_participant(
         "participant_id": participant_id,
         "assignment_count": int(assignment_count),
     }
+
+
+
+@app.post("/api/admin/studies/{study_name_short}/delete-tokens/by-pid/preview")
+async def preview_delete_tokens_by_pid(
+    study_name_short: str,
+    payload: DeleteTokensByPidRequest,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Preview which StudyExternalTaskAssignment rows would be deleted for the given study+task when supplying participant ids."""
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    task = session.exec(
+        select(StudyExternalTask).where(
+            StudyExternalTask.study_id == study.id,
+            StudyExternalTask.task_key == payload.task_key,
+        )
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{payload.task_key}' not found in study '{study_name_short}'")
+
+    normalized = [p.strip() for p in payload.participant_ids if (p or "").strip()]
+    items: List[DeletePreviewItem] = []
+    matched = 0
+    for inp in normalized:
+        assignment = session.exec(
+            select(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id == task.id,
+                StudyExternalTaskAssignment.participant_id == inp,
+            )
+        ).first()
+        if assignment:
+            items.append(DeletePreviewItem(input_value=inp, found=True, participant_id=assignment.participant_id, assigned_token=assignment.assigned_token))
+            matched += 1
+        else:
+            items.append(DeletePreviewItem(input_value=inp, found=False))
+
+    resp = DeletePreviewResponse(total_input=len(normalized), matched=matched, not_found=len(normalized)-matched, items=items)
+    return jsonable_encoder(resp)
+
+
+@app.post("/api/admin/studies/{study_name_short}/delete-tokens/by-token/preview")
+async def preview_delete_tokens_by_token(
+    study_name_short: str,
+    payload: DeleteTokensByTokenRequest,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Preview which StudyExternalTaskAssignment rows would be deleted for the given study+task when supplying tokens."""
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    task = session.exec(
+        select(StudyExternalTask).where(
+            StudyExternalTask.study_id == study.id,
+            StudyExternalTask.task_key == payload.task_key,
+        )
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{payload.task_key}' not found in study '{study_name_short}'")
+
+    normalized = [t.strip() for t in payload.tokens if (t or "").strip()]
+    items: List[DeletePreviewItem] = []
+    matched = 0
+    for tok in normalized:
+        assignment = session.exec(
+            select(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id == task.id,
+                StudyExternalTaskAssignment.assigned_token == tok,
+            )
+        ).first()
+        if assignment:
+            items.append(DeletePreviewItem(input_value=tok, found=True, participant_id=assignment.participant_id, assigned_token=assignment.assigned_token))
+            matched += 1
+        else:
+            items.append(DeletePreviewItem(input_value=tok, found=False))
+
+    resp = DeletePreviewResponse(total_input=len(normalized), matched=matched, not_found=len(normalized)-matched, items=items)
+    return jsonable_encoder(resp)
+
+
+@app.post("/api/admin/studies/{study_name_short}/delete-tokens/by-pid/commit")
+async def commit_delete_tokens_by_pid(
+    study_name_short: str,
+    payload: DeleteTokensByPidRequest,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Delete StudyExternalTaskAssignment rows scoped to the study+task for the provided participant ids."""
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    task = session.exec(
+        select(StudyExternalTask).where(
+            StudyExternalTask.study_id == study.id,
+            StudyExternalTask.task_key == payload.task_key,
+        )
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{payload.task_key}' not found in study '{study_name_short}'")
+
+    normalized = [p.strip() for p in payload.participant_ids if (p or "").strip()]
+    deleted = 0
+    for pid in normalized:
+        count = session.exec(
+            delete(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id == task.id,
+                StudyExternalTaskAssignment.participant_id == pid,
+            )
+        ).rowcount or 0
+        deleted += int(count)
+
+    session.commit()
+    logger.info("Admin '%s' deleted %s token assignments by participant for study '%s' task '%s'", current_admin, deleted, study_name_short, payload.task_key)
+    audit_admin_action(current_admin, f"deleted {deleted} token assignments by participant for study '{study_name_short}' task '{payload.task_key}'")
+
+    return {"deleted": deleted, "study_name_short": study_name_short, "task_key": payload.task_key}
+
+
+@app.post("/api/admin/studies/{study_name_short}/delete-tokens/by-token/commit")
+async def commit_delete_tokens_by_token(
+    study_name_short: str,
+    payload: DeleteTokensByTokenRequest,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Delete StudyExternalTaskAssignment rows scoped to the study+task for the provided tokens."""
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    task = session.exec(
+        select(StudyExternalTask).where(
+            StudyExternalTask.study_id == study.id,
+            StudyExternalTask.task_key == payload.task_key,
+        )
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{payload.task_key}' not found in study '{study_name_short}'")
+
+    normalized = [t.strip() for t in payload.tokens if (t or "").strip()]
+    deleted = 0
+    for tok in normalized:
+        count = session.exec(
+            delete(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id == task.id,
+                StudyExternalTaskAssignment.assigned_token == tok,
+            )
+        ).rowcount or 0
+        deleted += int(count)
+
+    session.commit()
+    logger.info("Admin '%s' deleted %s token assignments by token for study '%s' task '%s'", current_admin, deleted, study_name_short, payload.task_key)
+    audit_admin_action(current_admin, f"deleted {deleted} token assignments by token for study '{study_name_short}' task '{payload.task_key}'")
+
+    return {"deleted": deleted, "study_name_short": study_name_short, "task_key": payload.task_key}
 
 
 @app.delete("/api/admin/studies/{study_name_short}")

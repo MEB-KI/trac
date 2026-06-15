@@ -94,3 +94,52 @@ async def test_admin_participant_management_page_and_actions_work():
             # The configured external task keys should be visible
             assert "depression_survey" in page_response.text
             assert "payment_info" in page_response.text
+
+
+    @pytest.mark.asyncio
+    async def test_admin_delete_tokens_preview_and_commit_scoped():
+        study_name_short = "adult_pilot_de2"
+        # Use values unlikely to exist to exercise 'not found' branch
+        sample_pids = [f"it_del_preview_{uuid.uuid4().hex[:6]}"]
+        sample_tokens = [f"tok_del_preview_{uuid.uuid4().hex[:6]}"]
+
+        async with httpx.AsyncClient() as client:
+            # Preview by pid
+            resp = await client.post(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}/delete-tokens/by-pid/preview",
+                json={"task_key": "depression_survey", "participant_ids": sample_pids},
+                auth=ADMIN_AUTH,
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "total_input" in data
+
+            # Commit by pid (should be harmless, 0 deleted)
+            resp2 = await client.post(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}/delete-tokens/by-pid/commit",
+                json={"task_key": "depression_survey", "participant_ids": sample_pids},
+                auth=ADMIN_AUTH,
+            )
+            assert resp2.status_code == 200
+            data2 = resp2.json()
+            assert "deleted" in data2
+
+            # Preview by token
+            resp3 = await client.post(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}/delete-tokens/by-token/preview",
+                json={"task_key": "depression_survey", "tokens": sample_tokens},
+                auth=ADMIN_AUTH,
+            )
+            assert resp3.status_code == 200
+            data3 = resp3.json()
+            assert "total_input" in data3
+
+            # Commit by token
+            resp4 = await client.post(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}/delete-tokens/by-token/commit",
+                json={"task_key": "depression_survey", "tokens": sample_tokens},
+                auth=ADMIN_AUTH,
+            )
+            assert resp4.status_code == 200
+            data4 = resp4.json()
+            assert "deleted" in data4

@@ -325,7 +325,9 @@
 
         {% if selected_study %}
         <div class="card">
-            <h2 style="margin-bottom: 0.75rem;">Participants in "{{ selected_study.name_short }}" ({{ current_participants|length }})</h2>
+            {% set total_participants = current_participants|length %}
+            {% set shown = current_participants[:10]|length %}
+            <h2 style="margin-bottom: 0.75rem;">Participants in study {{ selected_study.name_short }} (showing {{ shown }} of {{ total_participants }})</h2>
             {% if selected_study_requires_consent %}
             <div class="hint" style="margin-bottom: 0.75rem;">This study requires consent. Consent status is shown below.</div>
             {% endif %}
@@ -340,11 +342,14 @@
                         <th>Consent Decided At</th>
                         {% endif %}
                         <th>Activity Count</th>
+                        {% for key in selected_study_external_task_keys %}
+                        <th>{{ key }}</th>
+                        {% endfor %}
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for participant in current_participants %}
+                    {% for participant in current_participants[:10] %}
                     <tr>
                         <td><code>{{ participant.id }}</code></td>
                         <td>{{ participant.created_at.strftime('%Y-%m-%d %H:%M') if participant.created_at else '-' }}</td>
@@ -361,8 +366,11 @@
                         <td>{{ participant.consent_decided_at.strftime('%Y-%m-%d %H:%M') if participant.consent_decided_at else '-' }}</td>
                         {% endif %}
                         <td>{{ participant.activity_count }}</td>
+                        {% for key in selected_study_external_task_keys %}
+                        <td>{{ participant.tokens.get(key, '-') }}</td>
+                        {% endfor %}
                         <td>
-                            <button type="button" class="btn-danger" onclick="removeParticipant('{{ participant.id }}')">Remove</button>
+                            <button type="button" class="btn-danger" onclick="removeParticipant('{{ participant.id }}')">Remove user</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -374,7 +382,7 @@
         </div>
 
         <div class="card">
-            <h2 style="margin-bottom: 0.75rem;">Add participants</h2>
+            <h2 style="margin-bottom: 0.75rem;">Add participants to study {{ selected_study.name_short }}</h2>
             <textarea id="participantIds" rows="6" placeholder="participant_001,participant_002,participant_003"></textarea>
             <div class="hint">Use new lines, comma, semicolon, or spaces as separators.</div>
             <div style="margin-top: 0.75rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
@@ -385,7 +393,7 @@
         </div>
 
         <div class="card">
-            <h2 style="margin-bottom: 0.75rem;">Add participants and task tokens</h2>
+            <h2 style="margin-bottom: 0.75rem;">Add participants and task tokens to study {{ selected_study.name_short }}</h2>
             <div class="hint" style="margin-bottom: 0.5rem;">
                 Upload a CSV with header row: first column must be <code>pid</code>, then one column per external task labeled with the task_key.
             </div>
@@ -405,6 +413,48 @@
             </div>
             {% else %}
             <div class="empty">This study has no external tasks configured. The CSV upload is disabled.</div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 0.75rem;">Delete task tokens (keep users) for study {{ selected_study.name_short }}</h2>
+            <div class="hint" style="margin-bottom: 0.5rem;">Delete external-task tokens for the selected study and task only. This cannot be used to view tokens from other studies.</div>
+            {% if selected_study_external_task_keys|length > 0 %}
+            <div style="margin-bottom:0.5rem; display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+                <label style="min-width:80px;">Task</label>
+                <select id="deleteTaskSelect">
+                    {% for key in selected_study_external_task_keys %}
+                    <option value="{{ key }}">{{ key }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-top:0.6rem; display:flex; gap:1rem; align-items:center;">
+                <label><input type="radio" name="deleteMode" value="by_pid" checked /> By user (pid)</label>
+                <label><input type="radio" name="deleteMode" value="by_token" /> By token</label>
+            </div>
+
+            <div style="margin-top:0.6rem;">
+                <textarea id="deleteInput" rows="6" placeholder="Enter comma- or newline-separated pids or tokens"></textarea>
+                <div class="hint">Accepts comma or newline separated values. Preview before commit.</div>
+            </div>
+
+            <div style="margin-top:0.75rem; display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+                <button id="previewDeleteBtn" class="btn-secondary" type="button">Preview deletions</button>
+                <button id="commitDeleteBtn" class="btn-danger" type="button" disabled>Delete tokens (commit)</button>
+                <div id="deleteStatus" class="status"></div>
+            </div>
+
+            <div id="deletePreview" style="margin-top:0.75rem; display:none;">
+                <h3>Preview</h3>
+                <div id="deletePreviewSummary" class="hint"></div>
+                <table id="deletePreviewTable" style="margin-top:0.5rem; display:none;">
+                    <thead><tr><th>Input</th><th>Found</th><th>Participant</th><th>Token</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty">This study has no external tasks configured. Token deletion disabled for study {{ selected_study.name_short }}.</div>
             {% endif %}
         </div>
         {% endif %}
@@ -622,6 +672,89 @@
                     }
                 });
             }
+        })();
+
+        // --- Delete tokens UI (strictly scoped to selected study + selected task) ---
+        (function(){
+            const previewBtn = document.getElementById('previewDeleteBtn');
+            const commitBtn = document.getElementById('commitDeleteBtn');
+            const inputEl = document.getElementById('deleteInput');
+            const statusEl = document.getElementById('deleteStatus');
+            const previewSection = document.getElementById('deletePreview');
+            const previewSummary = document.getElementById('deletePreviewSummary');
+            const previewTable = document.getElementById('deletePreviewTable');
+            const previewTbody = previewTable && previewTable.querySelector('tbody');
+
+            function parseLines(text){
+                if(!text) return [];
+                return text.replace(/[,;]+/g,'\n').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+            }
+
+            previewBtn?.addEventListener('click', async ()=>{
+                const select = document.getElementById('studySelect');
+                const studyName = select?.value;
+                if(!studyName){ alert('Select a study first'); return; }
+                const task = document.getElementById('deleteTaskSelect')?.value;
+                if(!task){ alert('Select a task'); return; }
+                const mode = document.querySelector('input[name=deleteMode]:checked')?.value || 'by_pid';
+                const inputs = parseLines(inputEl.value);
+                if(!inputs.length){ alert('Enter at least one pid or token'); return; }
+
+                statusEl.textContent = 'Previewing...'; statusEl.style.color = '#4f46e5';
+                commitBtn.disabled = true;
+                previewSection.style.display = 'none';
+
+                try{
+                    const url = `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/delete-tokens/${mode==='by_pid'?'by-pid':'by-token'}/preview`;
+                    const body = mode==='by_pid'? { task_key: task, participant_ids: inputs } : { task_key: task, tokens: inputs };
+                    const resp = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                    const json = await resp.json().catch(()=>({}));
+                    if(!resp.ok){ throw new Error(json.detail || 'Preview failed'); }
+
+                    // render preview
+                    previewSection.style.display = ''; previewTable.style.display = ''; previewTbody.innerHTML = '';
+                    const items = json.items || [];
+                    for(const it of items){
+                        const tr = document.createElement('tr');
+                        const tdInput = document.createElement('td'); tdInput.textContent = it.input_value || '';
+                        const tdFound = document.createElement('td'); tdFound.textContent = it.found? 'yes':'no';
+                        const tdPid = document.createElement('td'); tdPid.textContent = it.participant_id || '-';
+                        const tdTok = document.createElement('td'); tdTok.textContent = it.assigned_token || '-';
+                        tr.appendChild(tdInput); tr.appendChild(tdFound); tr.appendChild(tdPid); tr.appendChild(tdTok);
+                        previewTbody.appendChild(tr);
+                    }
+
+                    previewSummary.textContent = `Input: ${json.total_input || 0}; matched: ${json.matched || 0}; not found: ${json.not_found || 0}`;
+                    statusEl.textContent = 'Preview ready. Review results and commit to delete.'; statusEl.style.color = '#059669';
+                    if((json.matched||0) > 0){ commitBtn.disabled = false; }
+                }catch(err){
+                    statusEl.textContent = err.message; statusEl.style.color = '#dc2626';
+                }
+            });
+
+            commitBtn?.addEventListener('click', async ()=>{
+                if(!confirm('Delete the matched token assignments for the selected study+task? This action cannot be undone.')) return;
+                const select = document.getElementById('studySelect');
+                const studyName = select?.value;
+                const task = document.getElementById('deleteTaskSelect')?.value;
+                const mode = document.querySelector('input[name=deleteMode]:checked')?.value || 'by_pid';
+                const inputs = parseLines(inputEl.value);
+                statusEl.textContent = 'Deleting...'; statusEl.style.color = '#4f46e5';
+                commitBtn.disabled = true;
+
+                try{
+                    const url = `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/delete-tokens/${mode==='by_pid'?'by-pid':'by-token'}/commit`;
+                    const body = mode==='by_pid'? { task_key: task, participant_ids: inputs } : { task_key: task, tokens: inputs };
+                    const resp = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                    const json = await resp.json().catch(()=>({}));
+                    if(!resp.ok){ throw new Error(json.detail || 'Delete failed'); }
+
+                    statusEl.textContent = `Deleted: ${json.deleted || 0}`; statusEl.style.color = '#059669';
+                    setTimeout(()=>{
+                        window.location.href = `${rootPath}/admin/participant-management?study_name_short=${encodeURIComponent(studyName)}`;
+                    }, 800);
+                }catch(err){ statusEl.textContent = err.message; statusEl.style.color = '#dc2626'; commitBtn.disabled = false; }
+            });
         })();
     </script>
 </body>
