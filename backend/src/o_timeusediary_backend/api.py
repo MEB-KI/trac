@@ -3428,12 +3428,179 @@ async def admin_participant_management(
         "studies": studies_for_dropdown,
         "selected_study": selected_study,
         "selected_study_requires_consent": selected_study_requires_consent,
+        "selected_study_external_task_keys": [],
+        "selected_study_external_task_count": 0,
         "current_participants": current_participants,
         "current_time": utc_now(),
     }
+    if selected_study:
+        external_tasks = session.exec(
+            select(StudyExternalTask)
+            .where(StudyExternalTask.study_id == selected_study.id)
+            .order_by(StudyExternalTask.task_key)
+        ).all()
+        context_dict["selected_study_external_task_keys"] = [t.task_key for t in external_tasks]
+        context_dict["selected_study_external_task_count"] = len(external_tasks)
     template = templates.get_template("admin_participant_management.html")
     html_content = template.render(context_dict)
     return HTMLResponse(content=html_content)
+
+
+@app.post(
+    "/api/admin/studies/{study_name_short}/import-external-tokens",
+    name="Import external task tokens for participants",
+)
+async def import_external_task_tokens(
+    study_name_short: str,
+    file: UploadFile = File(...),
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Import a CSV with header `pid` plus one column per external task `task_key`.
+
+    CSV must include header row. For each row, a participant will be created if
+    missing and associated with the study; for each task column the token will be
+    upserted into `study_external_task_assignments` (existing assignments will be
+    replaced).
+    """
+    study = session.exec(select(Study).where(Study.name_short == study_name_short)).first()
+    if not study:
+        raise HTTPException(status_code=404, detail=f"Study '{study_name_short}' not found")
+
+    external_tasks = session.exec(
+        select(StudyExternalTask)
+        .where(StudyExternalTask.study_id == study.id)
+        .order_by(StudyExternalTask.task_key)
+    ).all()
+    task_keys = [t.task_key for t in external_tasks]
+
+    if not task_keys:
+        raise HTTPException(status_code=400, detail="Study has no external tasks configured")
+
+    # Read CSV
+    try:
+        raw = await file.read()
+        text = raw.decode("utf-8-sig")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {e}")
+
+    reader = csv.DictReader(StringIO(text))
+    headers = [h for h in reader.fieldnames or []]
+    required_headers = ["pid"] + task_keys
+    missing = [h for h in required_headers if h not in headers]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required CSV columns: {missing}. Required: {required_headers}",
+        )
+
+    # Track summary
+    participants_created = 0
+    participants_existing = 0
+    assignments_created = 0
+    assignments_updated = 0
+    assignment_skipped_same = 0
+    errors: List[str] = []
+
+    # Preload mappings
+    tasks_by_key = {t.task_key: t for t in external_tasks}
+
+    for lineno, row in enumerate(reader, start=2):
+        pid = (row.get("pid") or "").strip()
+        if not pid:
+            errors.append(f"Line {lineno}: empty pid")
+            continue
+
+        participant = session.get(Participant, pid)
+        if not participant:
+            participant = Participant(id=pid)
+            session.add(participant)
+            participants_created += 1
+        else:
+            participants_existing += 1
+
+        # ensure study association exists
+        assoc = session.exec(
+            select(StudyParticipant).where(
+                StudyParticipant.study_id == study.id,
+                StudyParticipant.participant_id == pid,
+            )
+        ).first()
+        if not assoc:
+            session.add(StudyParticipant(study_id=study.id, participant_id=pid))
+
+        # handle each task column
+        for key in task_keys:
+            token = (row.get(key) or "").strip()
+            if token == "":
+                # record but skip empty tokens
+                errors.append(f"Line {lineno}: empty token for task '{key}' and pid '{pid}'")
+                continue
+
+            task = tasks_by_key.get(key)
+            if not task:
+                errors.append(f"Line {lineno}: unknown task key '{key}'")
+                continue
+
+            # check for token collision (same token already assigned to other participant)
+            collision = session.exec(
+                select(StudyExternalTaskAssignment).where(
+                    StudyExternalTaskAssignment.external_task_id == task.id,
+                    StudyExternalTaskAssignment.assigned_token == token,
+                )
+            ).first()
+            if collision and collision.participant_id != pid:
+                errors.append(
+                    f"Line {lineno}: token '{token}' for task '{key}' already assigned to participant '{collision.participant_id}'"
+                )
+                continue
+
+            # upsert assignment
+            assignment = session.exec(
+                select(StudyExternalTaskAssignment).where(
+                    StudyExternalTaskAssignment.external_task_id == task.id,
+                    StudyExternalTaskAssignment.participant_id == pid,
+                )
+            ).first()
+
+            if assignment:
+                if assignment.assigned_token != token:
+                    assignment.assigned_token = token
+                    assignments_updated += 1
+                else:
+                    assignment_skipped_same += 1
+            else:
+                session.add(
+                    StudyExternalTaskAssignment(
+                        external_task_id=task.id,
+                        participant_id=pid,
+                        assigned_token=token,
+                    )
+                )
+                assignments_created += 1
+
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {e}")
+
+    audit_admin_action(
+        current_admin,
+        f"imported external task tokens for study '{study_name_short}' from file {file.filename}: participants_created={participants_created}, assignments_created={assignments_created}, assignments_updated={assignments_updated}",
+    )
+
+    return {
+        "ok": True,
+        "summary": {
+            "participants_created": participants_created,
+            "participants_existing": participants_existing,
+            "assignments_created": assignments_created,
+            "assignments_updated": assignments_updated,
+            "assignment_skipped_same": assignment_skipped_same,
+        },
+        "errors": errors,
+    }
 
 
 @app.get("/admin/tools", name="Admin Tools Page", response_class=HTMLResponse)

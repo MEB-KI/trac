@@ -383,6 +383,30 @@
                 <div id="addStatus" class="status"></div>
             </div>
         </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 0.75rem;">Add participants and task tokens</h2>
+            <div class="hint" style="margin-bottom: 0.5rem;">
+                Upload a CSV with header row: first column must be <code>pid</code>, then one column per external task labeled with the task_key.
+            </div>
+            {% if selected_study_external_task_keys|length > 0 %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Required task columns:</strong>
+                <div style="margin-top: 0.4rem; color: var(--muted);">
+                    {% for key in selected_study_external_task_keys %}<code>{{ key }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+                </div>
+            </div>
+            <input type="file" id="tokensCsv" accept="text/csv,text/plain" />
+            <div class="hint" id="tokensCsvHint">No file selected.</div>
+            <div style="margin-top: 0.75rem; display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+                <button id="validateTokensBtn" class="btn-secondary" type="button" disabled>Validate CSV</button>
+                <button id="uploadTokensBtn" class="btn-primary" type="button" disabled>Add users and task tokens</button>
+                <div id="tokensStatus" class="status"></div>
+            </div>
+            {% else %}
+            <div class="empty">This study has no external tasks configured. The CSV upload is disabled.</div>
+            {% endif %}
+        </div>
         {% endif %}
     </div>
 
@@ -488,6 +512,117 @@
                 status.style.color = '#374151';
             }
         }
+
+        // --- CSV import for external task tokens ---
+        (function() {
+            const fileInput = document.getElementById('tokensCsv');
+            const hint = document.getElementById('tokensCsvHint');
+            const validateBtn = document.getElementById('validateTokensBtn');
+            const uploadBtn = document.getElementById('uploadTokensBtn');
+            const statusEl = document.getElementById('tokensStatus');
+
+            const REQUIRED_TASK_KEYS = [
+                {% for key in selected_study_external_task_keys %}
+                "{{ key }}"{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            if (fileInput) {
+                fileInput.addEventListener('change', () => {
+                    const f = fileInput.files && fileInput.files[0];
+                    if (!f) {
+                        hint.textContent = 'No file selected.';
+                        validateBtn.disabled = true;
+                        uploadBtn.disabled = true;
+                        return;
+                    }
+                    hint.textContent = `Selected file: ${f.name}`;
+                    validateBtn.disabled = false;
+                    uploadBtn.disabled = true;
+                    statusEl.textContent = '';
+                });
+            }
+
+            if (validateBtn) {
+                validateBtn.addEventListener('click', () => {
+                    const f = fileInput.files && fileInput.files[0];
+                    if (!f) {
+                        alert('Select a CSV file first.');
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const text = (ev.target.result || '').toString();
+                        const firstLine = text.split(/\r?\n/)[0] || '';
+                        const headers = firstLine.split(',').map(h => h.trim());
+                        const missing = [];
+                        if (!headers.includes('pid')) missing.push('pid');
+                        for (const key of REQUIRED_TASK_KEYS) {
+                            if (!headers.includes(key)) missing.push(key);
+                        }
+                        if (missing.length) {
+                            statusEl.textContent = `Missing columns: ${missing.join(', ')}`;
+                            statusEl.style.color = '#dc2626';
+                            uploadBtn.disabled = true;
+                        } else {
+                            statusEl.textContent = 'CSV validated. Ready to upload.';
+                            statusEl.style.color = '#059669';
+                            uploadBtn.disabled = false;
+                        }
+                    };
+                    reader.readAsText(f);
+                });
+            }
+
+            if (uploadBtn) {
+                uploadBtn.addEventListener('click', async () => {
+                    const select = document.getElementById('studySelect');
+                    const studyName = select?.value;
+                    if (!studyName) { alert('Please select a study first.'); return; }
+                    const f = fileInput.files && fileInput.files[0];
+                    if (!f) { alert('Select a CSV file first.'); return; }
+
+                    uploadBtn.disabled = true;
+                    statusEl.textContent = 'Uploading...';
+                    statusEl.style.color = '#4f46e5';
+
+                    try {
+                        const form = new FormData();
+                        form.append('file', f);
+                        const resp = await fetch(`${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/import-external-tokens`, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            body: form,
+                        });
+                        const body = await resp.json().catch(() => ({}));
+                        if (!resp.ok) {
+                            const detail = body.detail || 'Import failed';
+                            statusEl.textContent = detail;
+                            statusEl.style.color = '#dc2626';
+                            uploadBtn.disabled = false;
+                            return;
+                        }
+
+                        const s = body.summary || {};
+                        statusEl.textContent = `Participants created: ${s.participants_created || 0}; Assignments created: ${s.assignments_created || 0}; updated: ${s.assignments_updated || 0}`;
+                        statusEl.style.color = '#059669';
+                        if (body.errors && body.errors.length) {
+                            const errList = body.errors.slice(0,10).join('; ');
+                            statusEl.textContent += `; Errors: ${errList}`;
+                            statusEl.style.color = '#b45309';
+                        }
+
+                        setTimeout(() => {
+                            window.location.href = `${rootPath}/admin/participant-management?study_name_short=${encodeURIComponent(studyName)}`;
+                        }, 900);
+                    } catch (err) {
+                        statusEl.textContent = `Upload failed: ${err.message}`;
+                        statusEl.style.color = '#dc2626';
+                        uploadBtn.disabled = false;
+                    }
+                });
+            }
+        })();
     </script>
 </body>
 </html>

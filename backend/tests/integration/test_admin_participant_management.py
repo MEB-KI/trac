@@ -76,3 +76,21 @@ async def test_admin_participant_management_page_and_actions_work():
         assert after_remove_page.status_code == 200
         assert participant_keep in after_remove_page.text
         assert participant_remove not in after_remove_page.text
+
+
+    @pytest.mark.asyncio
+    async def test_admin_participant_management_external_tasks_ui():
+        study_name_short = "adult_pilot_de2"
+
+        async with httpx.AsyncClient() as client:
+            page_response = await client.get(
+                f"{BASE_URL}/admin/participant-management",
+                params={"study_name_short": study_name_short},
+                auth=ADMIN_AUTH,
+            )
+            assert page_response.status_code == 200
+            # The CSV upload card title should be present
+            assert "Add participants and task tokens" in page_response.text
+            # The configured external task keys should be visible
+            assert "depression_survey" in page_response.text
+            assert "payment_info" in page_response.text
