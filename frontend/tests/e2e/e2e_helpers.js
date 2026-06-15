@@ -16,23 +16,28 @@ function isTransientNavigationError(error) {
   const message = String(error?.message || '');
   return (
     message.includes('WebKit encountered an internal error') ||
+    message.includes('Target page, context or browser has been closed') ||
     message.includes('net::ERR_ABORTED') ||
     message.includes('Navigation failed because page was closed')
   );
 }
 
-async function gotoWithRetry(page, url, options = {}, maxAttempts = 3) {
+async function gotoWithRetry(page, url, options = {}, maxAttempts = 5) {
+  // ensure a reasonable navigation timeout when not provided
+  const gotoOptions = Object.assign({ timeout: 30000 }, options);
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await page.goto(url, options);
+      await page.goto(url, gotoOptions);
       return;
     } catch (error) {
       lastError = error;
       if (!isTransientNavigationError(error) || attempt === maxAttempts) {
         throw error;
       }
-      await page.waitForTimeout(400);
+      // exponential backoff between retries
+      const waitMs = 500 * attempt;
+      await page.waitForTimeout(waitMs);
     }
   }
 
