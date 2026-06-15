@@ -34,7 +34,7 @@ test('admin login -> participant management -> study participant list', async ({
   await expect(
     page.getByRole('heading', {
       level: 2,
-      name: /Participants in "default"\s*\(\d+\)/,
+      name: /Participants in study default\s*\(\d+\)/,
     })
   ).toBeVisible();
 });
