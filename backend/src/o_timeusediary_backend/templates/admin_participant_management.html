@@ -329,7 +329,7 @@
             {% set shown = current_participants[:10]|length %}
             <h2 style="margin-bottom: 0.75rem;">Participants in study {{ selected_study.name_short }} (showing {{ shown }} of {{ total_participants }})</h2>
             {% if selected_study_requires_consent %}
-            <div class="hint" style="margin-bottom: 0.75rem;">This study requires consent. Consent status is shown below.</div>
+            <div class="hint" style="margin-bottom: 0.75rem;">This study requires consent. Consent status is shown below. If the study contains external tasks, task tokens are displayed as well.</div>
             {% endif %}
             {% if current_participants %}
             <table>
@@ -343,7 +343,7 @@
                         {% endif %}
                         <th>Activity Count</th>
                         {% for key in selected_study_external_task_keys %}
-                        <th>{{ key }}</th>
+                        <th>Token {{ key }}</th>
                         {% endfor %}
                         <th>Action</th>
                     </tr>
@@ -418,7 +418,7 @@
 
         <div class="card">
             <h2 style="margin-bottom: 0.75rem;">Delete task tokens (keep users) for study {{ selected_study.name_short }}</h2>
-            <div class="hint" style="margin-bottom: 0.5rem;">Delete external-task tokens for the selected study and task only. This cannot be used to view tokens from other studies.</div>
+            <div class="hint" style="margin-bottom: 0.5rem;">Delete external-task tokens for the selected study and task.<br /><b>WARNING: Deletions are irreversible, and without a token, you may not be able to link a user to their external task data on the remote system.</b></div>
             {% if selected_study_external_task_keys|length > 0 %}
             <div style="margin-bottom:0.5rem; display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
                 <label style="min-width:80px;">Task</label>

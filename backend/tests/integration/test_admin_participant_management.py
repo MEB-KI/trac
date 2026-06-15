@@ -35,7 +35,7 @@ async def test_admin_participant_management_page_and_actions_work():
             auth=ADMIN_AUTH,
         )
         assert selected_page.status_code == 200
-        assert f'Participants in "{study_name_short}"' in selected_page.text
+        assert f'Participants in study {study_name_short}' in selected_page.text
 
         assign_response = await client.post(
             f"{BASE_URL}/api/admin/studies/{study_name_short}/assign-participants",
