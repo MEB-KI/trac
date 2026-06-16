@@ -4,6 +4,7 @@
 # 1) From repo root, start services in another terminal:
 #      ./run_dev_nginx_both.bash
 #    This starts nginx + backend and serves frontend at http://localhost:3000/report/.
+#    The script also applies migrations and imports studies config before launching backend.
 # 2) Keep that terminal open while tests run.
 # 3) In a second terminal, from repo root, run:
 #      ./test_e2e.sh

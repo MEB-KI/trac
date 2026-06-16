@@ -63,44 +63,26 @@ TUD_ROOTPATH=/
 
 Install the backend into a virtual environment and start it with a WSGI server such as `uvicorn` (development) or `gunicorn` (production).
 
-Backend startup modes (3 practical ways):
+Backend startup workflow (recommended for development, CI, and production):
 
-1. **Explicit ops mode (recommended for production and CI)**
-
-    Run schema migrations and optional study import explicitly, then start backend in `serve` mode:
-
-    ```bash
-    cd backend/
-    uv run tud db upgrade
-    uv run tud studies import --config studies_config.json   # optional, only when you want to (re)import config
-    TUD_STARTUP_MODE=serve uv run gunicorn -c ../deployment/gunicorn_conf.py o_timeusediary_backend.api:app
-    ```
-
-2. **Serve mode (`TUD_STARTUP_MODE=serve`, default)**
-
-    Starts the API only. No startup schema bootstrap and no startup study import are executed.
-    Use this together with explicit `tud db upgrade` and optional `tud studies import` commands.
-
-3. **Bootstrap mode (`TUD_STARTUP_MODE=bootstrap`, compatibility mode)**
-
-    Starts the API and also runs startup bootstrap tasks (schema init + study import from configured `studies_config`).
-    This is mainly for compatibility/development workflows.
+1. Run schema migrations explicitly.
+2. Import studies explicitly when needed.
+3. Start backend (startup does not perform schema/data bootstrap).
 
 Minimal examples:
 
 ```bash
 cd backend/
 
-# 1) Recommended explicit ops mode
+# 1) Prepare runtime state explicitly
 uv run tud db upgrade
 uv run tud studies import --config studies_config.json
-TUD_STARTUP_MODE=serve uv run gunicorn --reload -c ../deployment/gunicorn_conf.dev.py o_timeusediary_backend.api:app
 
-# 2) Serve mode only (expects schema/data already prepared)
-TUD_STARTUP_MODE=serve uv run gunicorn --reload -c ../deployment/gunicorn_conf.dev.py o_timeusediary_backend.api:app
+# 2) Start backend (development)
+uv run gunicorn --reload -c ../deployment/gunicorn_conf.dev.py o_timeusediary_backend.api:app
 
-# 3) Bootstrap mode (legacy-style startup bootstrap)
-TUD_STARTUP_MODE=bootstrap uv run gunicorn --reload -c ../deployment/gunicorn_conf.dev.py o_timeusediary_backend.api:app
+# 3) Start backend (production-style)
+uv run gunicorn -c ../deployment/gunicorn_conf.py o_timeusediary_backend.api:app
 ```
 
 Schema management is migration-first: run `uv run tud db upgrade` explicitly during deployment/startup scripts.

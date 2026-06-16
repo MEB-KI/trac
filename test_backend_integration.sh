@@ -4,11 +4,13 @@
 # 1) From repo root, start services in another terminal:
 #      ./run_dev_nginx_both.bash
 #    This starts nginx + backend (dev config) and keeps backend running in foreground.
+#    The script also applies migrations and imports studies config before launching backend.
 # 2) Keep that terminal open while tests run.
 # 3) In a second terminal, from repo root, run:
 #      ./test_backend_integration.sh
 #
 # Alternative (without nginx helper): start the backend manually from backend/ with a valid .env,
+# run `uv run tud db upgrade` and `uv run tud studies import --config studies_config.json`,
 # then run this script from repo root.
 
 echo "Running backend integration tests"

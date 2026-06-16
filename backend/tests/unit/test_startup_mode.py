@@ -13,43 +13,21 @@ from o_timeusediary_backend.settings import TUDBackendSettings
 
 @pytest.mark.asyncio
 async def test_lifespan_serve_mode_skips_create_db(monkeypatch):
-    monkeypatch.setattr(api.settings, "startup_mode", "serve")
-
-    called = {"value": False}
-
-    def _fake_create_db_and_tables(do_report_contents: bool = False):
-        called["value"] = True
-
-    monkeypatch.setattr(api, "create_db_and_tables", _fake_create_db_and_tables)
-
     async with api.lifespan(api.app):
         pass
-
-    assert called["value"] is False
 
 
 @pytest.mark.asyncio
-async def test_lifespan_bootstrap_mode_runs_create_db(monkeypatch):
-    monkeypatch.setattr(api.settings, "startup_mode", "bootstrap")
-
-    called = {"value": False, "arg": None}
-
-    def _fake_create_db_and_tables(do_report_contents: bool = False):
-        called["value"] = True
-        called["arg"] = do_report_contents
-
-    monkeypatch.setattr(api, "create_db_and_tables", _fake_create_db_and_tables)
-    monkeypatch.setattr(api.settings, "print_db_contents_on_startup", True)
+async def test_lifespan_ignores_startup_mode_env_and_skips_create_db(monkeypatch):
+    monkeypatch.setenv("TUD_STARTUP_MODE", "bootstrap")
 
     async with api.lifespan(api.app):
         pass
 
-    assert called["value"] is True
-    assert called["arg"] is True
 
+def test_settings_initializes_even_with_legacy_startup_mode_env(monkeypatch):
+    monkeypatch.setenv("TUD_STARTUP_MODE", "bootstrap")
 
-def test_settings_reject_invalid_startup_mode(monkeypatch):
-    monkeypatch.setenv("TUD_STARTUP_MODE", "invalid_mode")
+    settings = TUDBackendSettings()
 
-    with pytest.raises(ValueError, match="TUD_STARTUP_MODE"):
-        TUDBackendSettings()
+    assert settings.studies_config_path

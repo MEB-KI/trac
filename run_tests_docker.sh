@@ -41,6 +41,13 @@ check_containers() {
     fi
 }
 
+# Prepare backend runtime state explicitly (schema + studies import).
+prepare_backend_runtime() {
+    check_containers
+    docker compose -f "$COMPOSE_FILE" exec "$BACKEND_SERVICE" uv run tud db upgrade
+    docker compose -f "$COMPOSE_FILE" exec "$BACKEND_SERVICE" uv run tud studies import --config studies_config.json
+}
+
 # Run backend unit tests
 run_unit_tests() {
     echo "Running backend UNIT tests..."
@@ -54,7 +61,7 @@ run_unit_tests() {
 run_integration_tests() {
     echo "Running backend INTEGRATION tests..."
     echo "---"
-    check_containers
+    prepare_backend_runtime
     docker compose -f "$COMPOSE_FILE" exec "$BACKEND_SERVICE" uv run pytest tests/integration -v
     echo ""
 }
@@ -63,7 +70,7 @@ run_integration_tests() {
 run_e2e_tests() {
     echo "Running E2E tests..."
     echo "---"
-    check_containers
+    prepare_backend_runtime
     docker compose --profile e2e -f "$COMPOSE_FILE" run --rm e2e
     echo ""
 }

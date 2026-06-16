@@ -62,7 +62,6 @@ from .models import (
 )
 from .database import (
     get_session,
-    create_db_and_tables,
     get_timelines_for_study,
     ensure_external_task_assignments,
 )
@@ -419,14 +418,10 @@ async def lifespan(app: FastAPI):
     if settings.debug:
         print("Debug mode enabled.")
 
-    logger.info("Running startup tasks in mode '%s'...", settings.startup_mode)
-    if settings.startup_mode == "bootstrap":
-        create_db_and_tables(settings.print_db_contents_on_startup)
-    else:
-        logger.info(
-            "Startup mode is 'serve'; skipping schema/bootstrap tasks. "
-            "Use TUD_STARTUP_MODE=bootstrap for explicit startup bootstrap."
-        )
+    logger.info(
+        "Startup does not perform schema/data bootstrap. "
+        "Run 'tud db upgrade' and optional 'tud studies import' explicitly."
+    )
     logger.info(
         f"Running with rootpath '{settings.rootpath}' and allowed origins: '{settings.allowed_origins}'."
     )
@@ -3119,13 +3114,28 @@ async def export_runtime_studies_config(
             .order_by(DayLabel.display_order)
         ).all()
 
+        blob_rows = session.exec(
+            select(StudyActivityConfigBlob)
+            .where(StudyActivityConfigBlob.study_id == study.id)
+            .order_by(StudyActivityConfigBlob.language)
+        ).all()
+        blob_by_lang = {blob.language: blob.activities_json_data for blob in blob_rows}
+
+        if blob_by_lang:
+            supported_languages = sorted(blob_by_lang.keys())
+        else:
+            supported_languages = [study.default_language]
+
         day_labels_export = []
         for day_label in day_labels:
             day_labels_export.append(
                 {
                     "name": day_label.name,
                     "display_order": day_label.display_order,
-                    "display_names": {study.default_language: day_label.display_name},
+                    "display_names": {
+                        language: day_label.display_name
+                        for language in supported_languages
+                    },
                 }
             )
 
@@ -3172,23 +3182,14 @@ async def export_runtime_studies_config(
                 }
             )
 
-        blob_rows = session.exec(
-            select(StudyActivityConfigBlob)
-            .where(StudyActivityConfigBlob.study_id == study.id)
-            .order_by(StudyActivityConfigBlob.language)
-        ).all()
-        blob_by_lang = {blob.language: blob.activities_json_data for blob in blob_rows}
-
         activity_configs_for_study: Dict = {}
         if blob_by_lang:
             activity_configs_for_study.update(blob_by_lang)
-            supported_languages = sorted(blob_by_lang.keys())
             activities_json_files = {
                 language: f"db_blob://{study.name_short}/{language}"
                 for language in supported_languages
             }
         else:
-            supported_languages = [study.default_language]
             activities_json_files = {
                 study.default_language: f"db_blob://{study.name_short}/{study.default_language}"
             }

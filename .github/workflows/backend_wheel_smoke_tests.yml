@@ -61,6 +61,8 @@ jobs:
           TUD_STUDIES_CONFIG_PATH: /tmp/tud-wheel-runtime/studies_config.json
         run: |
           cd /tmp/tud-wheel-runtime
+          /tmp/tud-wheel-venv/bin/tud db upgrade
+          /tmp/tud-wheel-venv/bin/tud studies import --config /tmp/tud-wheel-runtime/studies_config.json
           /tmp/tud-wheel-venv/bin/uvicorn o_timeusediary_backend.api:app --host 127.0.0.1 --port 8010 > /tmp/tud-wheel-backend.log 2>&1 &
 
           timeout 90s bash -c 'until curl -fsS http://127.0.0.1:8010/docs > /dev/null; do sleep 2; done'
