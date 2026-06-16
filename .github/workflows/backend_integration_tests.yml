@@ -55,6 +55,8 @@ jobs:
         run: |
           cp dev_tools/ci/backend_settings/.env.ci backend/.env
           cd backend
+          uv run tud db upgrade
+          uv run tud studies import --config studies_config.json
           # Start in background
           uv run uvicorn o_timeusediary_backend.api:app --host 127.0.0.1 --port 8000 &
           # Wait for it to be alive

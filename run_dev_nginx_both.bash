@@ -46,6 +46,11 @@ cp "$CURRENT_DIR/dev_tools/local_nginx/frontend_settings/tud_settings.dev-nginx.
 # Copy backend config .env file
 cp "$CURRENT_DIR/dev_tools/local_nginx/backend_settings/.env.dev-nginx" "$CURRENT_DIR/backend/.env" || { echo -e "ERROR: Failed to copy backend config file"; exit 1; }
 
+# Prepare backend DB state explicitly before starting the API server.
+cd "$CURRENT_DIR/backend/" || { echo -e "ERROR: Failed to change to backend directory"; exit 1; }
+uv run tud db upgrade || { echo -e "ERROR: Failed to apply DB migrations"; exit 1; }
+uv run tud studies import --config studies_config.json || { echo -e "ERROR: Failed to import studies config"; exit 1; }
+
 cleanup() {
     echo -e "\n Shutting down nginx service..."
 

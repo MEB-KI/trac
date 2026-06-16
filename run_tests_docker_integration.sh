@@ -14,4 +14,8 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 echo "Running backend INTEGRATION tests in Docker..."
+echo "Preparing backend schema and study data..."
+docker compose -f "$COMPOSE_FILE" exec backend uv run tud db upgrade
+docker compose -f "$COMPOSE_FILE" exec backend uv run tud studies import --config studies_config.json
+
 docker compose -f "$COMPOSE_FILE" exec backend uv run pytest tests/integration -v
