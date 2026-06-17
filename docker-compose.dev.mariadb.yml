@@ -15,6 +15,11 @@ services:
       retries: 5
 
   backend:
+    command: >-
+      sh -lc "uv sync --dev &&
+      uv pip install 'pymysql>=1.1.0' &&
+      uv run gunicorn --reload -c /workspace/dev_tools/docker/gunicorn_conf.docker.py
+      o_timeusediary_backend.api:app"
     volumes:
       - ./backend:/workspace/backend
       - ./dev_tools/docker:/workspace/dev_tools/docker:ro
