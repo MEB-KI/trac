@@ -3172,13 +3172,19 @@ async def update_study_collection_window(
     previous_end = study.data_collection_end
     mysql_like_backend = settings.database_url.startswith("mysql")
 
-    new_start = payload.data_collection_start or previous_start
-    new_end = payload.data_collection_end or previous_end
+    requested_start = payload.data_collection_start or previous_start
+    requested_end = payload.data_collection_end or previous_end
 
-    # MariaDB may return mixed tz styles for DATETIME(timezone=True). Persist as
-    # naive UTC wall time to avoid ORM comparison errors on assignment.
-    new_start = _to_utc_naive(new_start)
-    new_end = _to_utc_naive(new_end)
+    if mysql_like_backend:
+        # Keep tz-style aligned with persisted values to avoid mysql/mariadb
+        # timezone comparison issues during ORM attribute assignment.
+        new_start = _align_datetime_to_reference_tz_style(
+            requested_start, previous_start
+        )
+        new_end = _align_datetime_to_reference_tz_style(requested_end, previous_end)
+    else:
+        new_start = _coerce_utc_aware(requested_start)
+        new_end = _coerce_utc_aware(requested_end)
 
     if _to_utc_naive(new_start) >= _to_utc_naive(new_end):
         raise HTTPException(

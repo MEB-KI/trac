@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: timeusediary_user
       POSTGRES_PASSWORD: timeusediary_password
     volumes:
-      - trac-dev-postgres-data:/var/lib/postgresql/data
+      - trac-dev-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U timeusediary_user -d timeusediary_db"]
       interval: 5s
