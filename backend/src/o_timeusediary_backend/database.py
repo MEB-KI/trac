@@ -44,8 +44,28 @@ def _backend_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _resolve_alembic_ini_path() -> Path:
+    package_root = Path(__file__).resolve().parent
+    package_candidate = package_root / "alembic.ini"
+    if package_candidate.exists():
+        return package_candidate
+
+    source_candidate = _backend_root() / "alembic.ini"
+    if source_candidate.exists():
+        return source_candidate
+
+    raise FileNotFoundError(
+        "Unable to locate Alembic configuration file 'alembic.ini'. "
+        "Expected it either next to the installed package or in the backend root."
+    )
+
+
 def _alembic_config() -> AlembicConfig:
-    config = AlembicConfig(str(_backend_root() / "alembic.ini"))
+    config_path = _resolve_alembic_ini_path()
+    config = AlembicConfig(str(config_path))
+    script_location = config_path.parent / "alembic"
+    if script_location.exists():
+        config.set_main_option("script_location", str(script_location))
     config.set_main_option("sqlalchemy.url", settings.database_url)
     return config
 

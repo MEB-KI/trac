@@ -11,7 +11,7 @@ from sqlmodel import SQLModel
 # Ensure backend/src is importable when Alembic runs from backend/
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = BACKEND_ROOT / "src"
-if str(SRC_PATH) not in sys.path:
+if SRC_PATH.exists() and str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from o_timeusediary_backend import models  # noqa: F401
