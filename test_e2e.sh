@@ -13,12 +13,16 @@
 #
 # You can run individual tests via:
 #
-#  cd frontend/
-#  npx playwright test tests/e2e/your_test_file.spec.ts
+#    cd frontend/
+#    npx playwright test tests/e2e/your_test_file.spec.ts
 #
 # and do things like run one test several times via:
 #
-#  npx playwright test --repeat-each=5 tests/e2e/your_test_file.spec.ts
+#    npx playwright test --repeat-each=5 tests/e2e/your_test_file.spec.ts
+#
+# or you can run all tests, but only in one specific browser (as opposed to all browsers configured in playwright.config.ts):
+#
+#    npx playwright test --project=chromium
 
 echo "Running E2E tests"
 echo "IMPORTANT: Make sure all services are running via './run_dev_nginx_both.bash' in another terminal before starting this..."
