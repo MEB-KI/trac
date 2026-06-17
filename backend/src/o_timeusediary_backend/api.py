@@ -21,7 +21,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import logging
 import uuid
 from typing import Dict, List, Optional, Set, Tuple, Any, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import csv
 import json
 import re
@@ -488,11 +488,34 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     )
 
 
+def _coerce_utc_aware(value: datetime) -> datetime:
+    """Coerce DB datetimes to UTC-aware values for safe cross-dialect comparisons."""
+    # Some DB/driver combinations can attach tzinfo objects that still behave as
+    # offset-naive (`utcoffset()` is None). Treat them as UTC-naive values.
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    try:
+        offset = value.tzinfo.utcoffset(value)
+    except Exception:
+        return value.replace(tzinfo=timezone.utc)
+
+    if offset is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    try:
+        return value.astimezone(timezone.utc)
+    except Exception:
+        return value.replace(tzinfo=timezone.utc)
+
+
 def _ensure_study_is_currently_available(study: Study) -> None:
     """Raise 403 when a study cannot currently be filled in by participants."""
-    now = utc_now()
+    now = _coerce_utc_aware(utc_now())
+    collection_start = _coerce_utc_aware(study.data_collection_start)
+    collection_end = _coerce_utc_aware(study.data_collection_end)
 
-    if now < study.data_collection_start:
+    if now < collection_start:
         raise HTTPException(
             status_code=403,
             detail={
@@ -501,7 +524,7 @@ def _ensure_study_is_currently_available(study: Study) -> None:
             },
         )
 
-    if now > study.data_collection_end:
+    if now > collection_end:
         raise HTTPException(
             status_code=403,
             detail={
@@ -1012,16 +1035,18 @@ def submit_activities(
             status_code=404, detail=f"Study '{study_name_short}' not found"
         )
 
-    now = utc_now()
+    now = _coerce_utc_aware(utc_now())
+    collection_start = _coerce_utc_aware(study.data_collection_start)
+    collection_end = _coerce_utc_aware(study.data_collection_end)
 
-    if now < study.data_collection_start:
+    if now < collection_start:
         raise HTTPException(
             status_code=403,
             detail=f"Study '{study.name_short}' has not started yet. "
             f"Data collection starts on {study.data_collection_start.isoformat()}.",
         )
 
-    if now > study.data_collection_end:
+    if now > collection_end:
         raise HTTPException(
             status_code=403,
             detail=f"Study '{study.name_short}' has ended. "
@@ -1420,8 +1445,11 @@ async def admin_overview(
             .order_by(DayLabel.display_order)
         ).all()
 
+        now_utc = _coerce_utc_aware(utc_now())
         study_is_currently_collecting = (
-            study.data_collection_start <= utc_now() <= study.data_collection_end
+            _coerce_utc_aware(study.data_collection_start)
+            <= now_utc
+            <= _coerce_utc_aware(study.data_collection_end)
             and not study.is_paused
         )
 
@@ -3020,9 +3048,9 @@ async def update_study_collection_window(
             "data_collection_start": study.data_collection_start,
             "data_collection_end": study.data_collection_end,
         },
-        "is_currently_collecting": study.data_collection_start
-        <= utc_now()
-        <= study.data_collection_end
+        "is_currently_collecting": _coerce_utc_aware(study.data_collection_start)
+        <= _coerce_utc_aware(utc_now())
+        <= _coerce_utc_aware(study.data_collection_end)
         and not study.is_paused,
     }
 

@@ -34,11 +34,24 @@ echo "Running backend INTEGRATION tests in Docker..."
 echo "Selected DBMS: $DBMS"
 echo "Preparing backend schema and study data..."
 
-if [ "$DBMS" = "mariadb" ]; then
-    echo "Installing MariaDB driver inside backend container (.venv)..."
-    docker compose "${COMPOSE_ARGS[@]}" exec backend uv pip install "pymysql>=1.1.0"
+echo "Ensuring required services are running..."
+docker compose "${COMPOSE_ARGS[@]}" up -d db backend
+
+BACKEND_CONTAINER_ID=$(docker compose "${COMPOSE_ARGS[@]}" ps -q backend)
+if [ -z "$BACKEND_CONTAINER_ID" ]; then
+    echo "Error: backend container could not be resolved for selected compose stack."
+    exit 1
+fi
+
+BACKEND_RUNNING=$(docker inspect -f '{{.State.Running}}' "$BACKEND_CONTAINER_ID" 2>/dev/null || true)
+if [ "$BACKEND_RUNNING" != "true" ]; then
+    echo "Error: service 'backend' is not running for DBMS '$DBMS'."
+    echo "Recent backend logs:"
+    docker compose "${COMPOSE_ARGS[@]}" logs --tail=80 backend || true
+    exit 1
 fi
 
 docker compose "${COMPOSE_ARGS[@]}" exec backend uv run tud db upgrade
 docker compose "${COMPOSE_ARGS[@]}" exec backend uv run tud studies import --config studies_config.json
-docker compose "${COMPOSE_ARGS[@]}" exec backend uv run pytest tests/integration -v
+echo "Running integration tests against backend direct endpoint: http://localhost:8000"
+docker compose "${COMPOSE_ARGS[@]}" exec -e TUD_BASE_SCHEME="http://localhost:8000" backend uv run pytest tests/integration -v
