@@ -788,6 +788,12 @@
                            style="display: inline-block; padding: 0.5rem 1rem; background: #4f46e5; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; font-weight: 500; transition: background 0.2s;">
                             📥 Download Server Runtime Config JSON
                         </a>
+                        <a href="{{ request.scope.root_path }}/api/admin/export/studies-runtime-config?study_name={{ study_data.study.name_short }}&mode=split_zip"
+                           download="studies_config_{{ study_data.study.name_short }}_{{ current_time.strftime('%Y-%m-%d') }}.zip"
+                           class="export-btn"
+                           style="display: inline-block; padding: 0.5rem 1rem; background: #0f766e; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; font-weight: 500; transition: background 0.2s;">
+                            📥 Download Server Runtime Config ZIP (Split Files)
+                        </a>
                     </div>
                 </div>
                 <div class="study-meta">
@@ -1115,6 +1121,12 @@
                        class="export-btn"
                        style="display: inline-block; padding: 0.5rem 1rem; background: #4f46e5; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; font-weight: 500; transition: background 0.2s;">
                         📥 Download Server Runtime Config (All Studies)
+                    </a>
+                    <a href="{{ request.scope.root_path }}/api/admin/export/studies-runtime-config?mode=split_zip"
+                              download="studies_config_{{ current_time.strftime('%Y-%m-%d') }}.zip"
+                       class="export-btn"
+                       style="display: inline-block; padding: 0.5rem 1rem; background: #0f766e; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; font-weight: 500; transition: background 0.2s; margin-left: 0.5rem;">
+                        📥 Download Runtime Config ZIP (All Studies, Split Files)
                     </a>
                 </div>
             </div>

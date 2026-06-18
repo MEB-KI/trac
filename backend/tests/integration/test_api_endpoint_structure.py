@@ -1,7 +1,9 @@
 import csv
+import json
 import os
 import uuid
-from io import StringIO
+from io import StringIO, BytesIO
+import zipfile
 
 import httpx
 import pytest
@@ -265,6 +267,9 @@ async def test_admin_endpoints_are_available_with_auth_and_expected_structure(
             auth=(settings.admin_username, settings.admin_password),
         )
         assert runtime_config_export_response.status_code == 200
+        runtime_config_export_text = runtime_config_export_response.text
+        assert "\n" in runtime_config_export_text
+        assert "\n  \"studies_config\"" in runtime_config_export_text
         runtime_config_export_data = runtime_config_export_response.json()
         assert "studies_config" in runtime_config_export_data
         assert "activities" in runtime_config_export_data
@@ -299,3 +304,44 @@ async def test_admin_endpoints_are_available_with_auth_and_expected_structure(
         )
 
         assert study_name_short in runtime_config_export_data["activities"]
+
+        runtime_config_zip_response = await client.get(
+            f"{BASE_URL}/api/admin/export/studies-runtime-config",
+            params={"study_name": study_name_short, "mode": "split_zip"},
+            auth=(settings.admin_username, settings.admin_password),
+        )
+        assert runtime_config_zip_response.status_code == 200
+        assert "application/zip" in runtime_config_zip_response.headers.get(
+            "Content-Type", ""
+        )
+        assert ".zip" in runtime_config_zip_response.headers.get(
+            "Content-Disposition", ""
+        )
+
+        archive = zipfile.ZipFile(BytesIO(runtime_config_zip_response.content))
+        archive_names = archive.namelist()
+        assert "studies_config.json" in archive_names
+        assert "export_manifest.json" in archive_names
+
+        studies_config_zip_text = archive.read("studies_config.json").decode("utf-8")
+        assert "\n" in studies_config_zip_text
+        assert "\n  \"studies\"" in studies_config_zip_text
+        studies_config_in_zip = json.loads(studies_config_zip_text)
+        assert "studies" in studies_config_in_zip
+        assert len(studies_config_in_zip["studies"]) == 1
+
+        exported_zip_study = studies_config_in_zip["studies"][0]
+        assert "activities_json_files" in exported_zip_study
+        assert "activities_json_data" not in exported_zip_study
+
+        activity_file_path = exported_zip_study["activities_json_files"]["en"]
+        assert activity_file_path in archive_names
+        activity_file_text = archive.read(activity_file_path).decode("utf-8")
+        assert "\n" in activity_file_text
+        assert "\n  \"timeline\"" in activity_file_text
+        activity_file_payload = json.loads(activity_file_text)
+        assert "timeline" in activity_file_payload
+
+        export_manifest_text = archive.read("export_manifest.json").decode("utf-8")
+        assert "\n" in export_manifest_text
+        assert "\n  \"mode\"" in export_manifest_text
