@@ -240,3 +240,79 @@ def test_cli_db_current_dispatch(monkeypatch):
 
     assert exit_code == 0
     assert called["value"] is True
+
+
+def test_cli_studies_export_runtime_config_writes_zip(monkeypatch, tmp_path, capsys):
+    class _DummySession:
+        def __init__(self, _engine):
+            self._engine = _engine
+
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(cli, "Session", _DummySession)
+
+    fake_response = SimpleNamespace(
+        status_code=200,
+        body=b"zip-bytes",
+        headers={"Content-Disposition": "attachment; filename=studies_config_2026-06-18.zip"},
+    )
+    monkeypatch.setattr(cli, "_build_runtime_export_response", lambda _session: fake_response)
+
+    out_file = tmp_path / "backup.zip"
+    exit_code = cli.main(
+        [
+            "studies",
+            "export-runtime-config",
+            "--output",
+            str(out_file),
+        ]
+    )
+
+    assert exit_code == 0
+    assert out_file.read_bytes() == b"zip-bytes"
+    output = capsys.readouterr().out
+    assert "Runtime config backup written to:" in output
+
+
+def test_extract_filename_from_content_disposition_parses_value():
+    filename = cli._extract_filename_from_content_disposition(
+        'attachment; filename="studies_config_2026-06-18.zip"',
+        fallback="fallback.zip",
+    )
+    assert filename == "studies_config_2026-06-18.zip"
+
+
+def test_cli_studies_export_runtime_config_uses_directory_output(monkeypatch, tmp_path):
+    class _DummySession:
+        def __init__(self, _engine):
+            self._engine = _engine
+
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(cli, "Session", _DummySession)
+    fake_response = SimpleNamespace(
+        status_code=200,
+        body=b"zip-bytes",
+        headers={"Content-Disposition": "attachment; filename=my_export.zip"},
+    )
+    monkeypatch.setattr(cli, "_build_runtime_export_response", lambda _session: fake_response)
+
+    exit_code = cli.main(
+        [
+            "studies",
+            "export-runtime-config",
+            "--output",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert (tmp_path / "my_export.zip").read_bytes() == b"zip-bytes"
