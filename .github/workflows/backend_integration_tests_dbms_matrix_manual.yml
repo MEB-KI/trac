@@ -1,0 +1,51 @@
+name: TUD Backend Integration Tests (DBMS Matrix, Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  integration-docker-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dbms: [postgres, mariadb, mssql]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Run backend integration tests in Docker (${{ matrix.dbms }})
+        run: |
+          chmod +x ./run_tests_docker_integration.sh
+          ./run_tests_docker_integration.sh ${{ matrix.dbms }}
+
+      - name: Collect Docker Compose logs
+        if: always()
+        run: |
+          mkdir -p /tmp/docker-logs
+          docker compose -f docker-compose.dev.yml logs --no-color > /tmp/docker-logs/base.log || true
+          docker compose -f docker-compose.dev.yml -f docker-compose.dev.mariadb.yml logs --no-color > /tmp/docker-logs/mariadb.log || true
+          docker compose -f docker-compose.dev.yml -f docker-compose.dev.mssql.yml logs --no-color > /tmp/docker-logs/mssql.log || true
+
+      - name: Upload Docker logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-logs-${{ matrix.dbms }}
+          path: /tmp/docker-logs/
+          if-no-files-found: ignore
+
+      - name: Tear down Docker Compose stacks
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v || true
+          docker compose -f docker-compose.dev.yml -f docker-compose.dev.mariadb.yml down -v || true
+          docker compose -f docker-compose.dev.yml -f docker-compose.dev.mssql.yml down -v || true
