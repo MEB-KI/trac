@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+import re
 import sys
 from pathlib import Path
 
@@ -62,6 +64,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-ensure-schema",
         action="store_true",
         help="Skip schema initialization before import",
+    )
+
+    export_runtime_parser = studies_subparsers.add_parser(
+        "export-runtime-config",
+        help="Export full runtime studies config as split ZIP backup",
+    )
+    export_runtime_parser.add_argument(
+        "--output",
+        help=(
+            "Output file path for the backup ZIP. "
+            "If omitted, the filename from the export response is used in the current directory."
+        ),
     )
 
     return parser
@@ -209,6 +223,68 @@ def _run_db_current() -> int:
     return 0
 
 
+def _build_runtime_export_response(session: Session):
+    # Lazy import to avoid API module side effects unless this command is used.
+    from .api import export_runtime_studies_config
+
+    return asyncio.run(
+        export_runtime_studies_config(
+            study_name=None,
+            mode="split_zip",
+            current_admin="cli",
+            session=session,
+        )
+    )
+
+
+def _extract_filename_from_content_disposition(
+    content_disposition: str | None, fallback: str
+) -> str:
+    if not content_disposition:
+        return fallback
+    match = re.search(r'filename="?([^";]+)"?', content_disposition)
+    if not match:
+        return fallback
+    filename = (match.group(1) or "").strip()
+    return filename or fallback
+
+
+def _run_studies_export_runtime_config(output: str | None) -> int:
+    fallback_filename = "studies_runtime_config_backup.zip"
+
+    with Session(engine) as session:
+        response = _build_runtime_export_response(session)
+
+    if getattr(response, "status_code", 500) >= 400:
+        print("Runtime config export failed.")
+        return 1
+
+    export_bytes = getattr(response, "body", b"")
+    if not export_bytes:
+        print("Runtime config export returned empty content.")
+        return 1
+
+    suggested_filename = _extract_filename_from_content_disposition(
+        response.headers.get("Content-Disposition"),
+        fallback=fallback_filename,
+    )
+
+    if output:
+        output_path = Path(output).expanduser()
+        if output_path.exists() and output_path.is_dir():
+            target_path = output_path / suggested_filename
+        else:
+            target_path = output_path
+    else:
+        target_path = Path.cwd() / suggested_filename
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_bytes(export_bytes)
+
+    print(f"Runtime config backup written to: {target_path.resolve()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -223,6 +299,9 @@ def main(argv: list[str] | None = None) -> int:
         ensure_schema = not args.no_ensure_schema
         flat_configs = [item for group in args.config for item in group]
         return _run_studies_import(flat_configs, ensure_schema=ensure_schema)
+
+    if args.command == "studies" and args.studies_command == "export-runtime-config":
+        return _run_studies_export_runtime_config(args.output)
 
     parser.print_help()
     return 1
