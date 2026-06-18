@@ -580,9 +580,10 @@ def get_timelines_for_study(study_id: int) -> list[Timeline]:
         return timelines
 
 
-def create_config_file_studies_in_database(config_path: str):
+def create_config_file_studies_in_database(config_path: str) -> list[dict[str, object]]:
     """Create studies in the database based on info in the studies_config.json configuration file"""
 
+    import_results: list[dict[str, object]] = []
     studies_config: CfgFileStudies = load_studies_config(config_path)
     logger.info(
         f"Checking whether studies need to be created based on config file at '{config_path}'"
@@ -664,6 +665,14 @@ def create_config_file_studies_in_database(config_path: str):
                     session.commit()
                     logger.info(
                         f"Study already exists: '{study_config.name_short}' with long name: '{study_config.name}'"
+                    )
+                    import_results.append(
+                        {
+                            "study_name_short": study_config.name_short,
+                            "created": False,
+                            "reason": "already exists in database",
+                            "is_error": False,
+                        }
                     )
                     continue  # Skip to next study
 
@@ -922,6 +931,14 @@ def create_config_file_studies_in_database(config_path: str):
 
                 session.commit()  # Commit all related entities atomically
                 logger.info(f"Created study: {study_config.name}")
+                import_results.append(
+                    {
+                        "study_name_short": study_config.name_short,
+                        "created": True,
+                        "reason": "",
+                        "is_error": False,
+                    }
+                )
 
             except Exception as e:
                 session.rollback()  # Rollback on error
@@ -929,11 +946,21 @@ def create_config_file_studies_in_database(config_path: str):
                     logger.warning(
                         f"Study '{study_config.name_short}' may already exist: {e}"
                     )
+                    import_results.append(
+                        {
+                            "study_name_short": study_config.name_short,
+                            "created": False,
+                            "reason": "already exists in database",
+                            "is_error": False,
+                        }
+                    )
                 else:
                     logger.error(
                         f"Error creating study '{study_config.name_short}': {e}"
                     )
                     raise
+
+    return import_results
 
 
 def get_session() -> Generator[Session, None, None]:
