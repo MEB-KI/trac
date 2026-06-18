@@ -458,6 +458,7 @@ The E2E test command uses the `e2e` service in `docker-compose.dev.yml`, which i
 * create commit with the mentioned changes, with a commit message like 'Bump version to and log changes for v0.x.y'
 * tag the commit with the new version_ `git tag v0.x.y <hash>`
 * run `git push --tags` to publish
+* manually run the GitHub Actions workflow `TUD Backend Integration Tests (DBMS Matrix, Manual)` and confirm postgres, mariadb, and mssql jobs pass
 * in the `backend/` dir, run `uv build` to create the wheel artefact
 * log into Github account, draft/publish a new release based on the tag, copy change notes from CHANGES in there and attach the wheel artefact
 * API docs are attached automatically on release publish via GitHub Actions as release assets (`openapi.json`, `index.html`, and a tar.gz bundle), no manual docs upload needed
