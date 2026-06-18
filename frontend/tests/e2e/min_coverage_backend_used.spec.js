@@ -29,16 +29,32 @@ test('frontend uses backend activities-config for adult_pilot_de2 (min_coverage 
   );
 
   // Navigate to the app and ensure frontend loaded the backend activities-config
-  await page.goto('index.html?study_name=adult_pilot_de2&lang=de&pid=bernd', {
-    waitUntil: 'domcontentloaded',
-  });
+  await page.goto(
+    'index.html?study_name=adult_pilot_de2&lang=de&pid=bernd&instructions=completed',
+    {
+      waitUntil: 'domcontentloaded',
+    }
+  );
 
   // Wait for the frontend to populate the activities config cache
-  await expect.poll(async () => {
-    return await page.evaluate(() => {
-      return window.activitiesConfigCache ? 1 : 0;
-    });
-  }, { timeout: 30000 }).toBe(1);
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(() => {
+            return window.activitiesConfigCache ? 1 : 0;
+          });
+        } catch (error) {
+          const message = String(error?.message || '');
+          if (message.includes('Execution context was destroyed')) {
+            return 0;
+          }
+          throw error;
+        }
+      },
+      { timeout: 30000 }
+    )
+    .toBe(1);
 
   const minCoverage = await page.evaluate(() => {
     try {
