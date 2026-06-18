@@ -18,8 +18,15 @@ function isTransientNavigationError(error) {
     message.includes('WebKit encountered an internal error') ||
     message.includes('Target page, context or browser has been closed') ||
     message.includes('net::ERR_ABORTED') ||
-    message.includes('Navigation failed because page was closed')
+    message.includes('Navigation failed because page was closed') ||
+    message.includes('Execution context was destroyed')
   );
+}
+
+function sleep(delayMs) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
 }
 
 async function gotoWithRetry(page, url, options = {}, maxAttempts = 5) {
@@ -36,8 +43,8 @@ async function gotoWithRetry(page, url, options = {}, maxAttempts = 5) {
         throw error;
       }
       // exponential backoff between retries
-      const waitMs = 500 * attempt;
-      await page.waitForTimeout(waitMs);
+      const backoffMs = 500 * attempt;
+      await sleep(backoffMs);
     }
   }
 

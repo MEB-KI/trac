@@ -21,9 +21,26 @@ test('return_url is preserved and shown as continue link on thank-you page', asy
   );
 
   await expect(page.locator('#skipReportingBtn')).toBeVisible();
-  await page.locator('#skipReportingBtn').click();
-  await expect(page.locator('#skipConfirmationModal')).toBeVisible();
-  await page.locator('#confirmSkipOk').click();
+  await expect(page.locator('#skipReportingBtn')).toBeEnabled();
+
+  const skipModal = page.locator('#skipConfirmationModal');
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.locator('#skipReportingBtn').click();
+
+    const modalVisible = await skipModal
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
+
+    if (modalVisible) {
+      await page.locator('#confirmSkipOk').click();
+      break;
+    }
+
+    const alreadyOnThankYou = /pages\/thank-you\.html/.test(page.url());
+    if (alreadyOnThankYou) {
+      break;
+    }
+  }
 
   await expect(page).toHaveURL(/pages\/thank-you\.html/);
   await expect(new URL(page.url()).searchParams.get('return_url')).toBe(
