@@ -20,6 +20,9 @@ Version 0.16.0 -- DBMS Diversity and admin interface for tasks
 - BRK: add i18n for the description field of studies in studies_config.json file. Move from `"description": "good"` to `"description": { "de" : "gut", "en": "good"}`
 - NEW: allow creation of study from studies config file with embedded activities in admin interface. This is the format we also use when exporting a studies_config file in admin interface.
 - FIX: add more test participants to closed test data studies and use them in tests to prevent clashes from several tests using same user at once, fixes #99
+- NEW: allow joining study as user from admin interface via link
+- NEW: on admin page, show for users whether they have completed timeuse and external tasks
+- NEW: show expected return URL for external tasks in admin interface
 
 
 Version 0.15.1 -- Lost in Translation
