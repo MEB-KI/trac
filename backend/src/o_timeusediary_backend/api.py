@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 import csv
 import json
 import re
+import zipfile
 from sqlmodel import Session, delete, select
 from urllib.parse import urlencode, quote, urlparse, parse_qsl, urlunparse
 from fastapi.templating import Jinja2Templates
@@ -77,7 +78,7 @@ from .api_deps.available_activities import (
 )
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, update
-from io import StringIO
+from io import StringIO, BytesIO
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Union
 import o_timeusediary_backend
@@ -2442,9 +2443,33 @@ def _validate_import_study_payload(study_payload: ImportStudiesConfigStudy) -> D
     }
 
 
+def _basename_from_config_file_reference(file_path: str) -> str:
+    """Return basename from file references that may use POSIX or Windows separators."""
+    normalized = str(file_path).strip().replace("\\", "/")
+    return Path(normalized).name
+
+
+def _sanitize_export_filename_part(value: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9_-]+", "-", (value or "").strip())
+    normalized = normalized.strip("-")
+    return normalized or "value"
+
+
+def _build_split_export_activities_relative_path(
+    study_name_short: str, language: str
+) -> str:
+    safe_study = _sanitize_export_filename_part(study_name_short)
+    safe_language = _sanitize_export_filename_part(language)
+    return (
+        f"activities/{safe_study}/"
+        f"activities_{safe_study}_{safe_language}.json"
+    )
+
+
 def _load_json_file_with_studies_config_base(file_path: str) -> dict:
     """Load a JSON file and resolve relative paths against the studies config directory."""
-    candidate = Path(file_path)
+    normalized_path = str(file_path).strip().replace("\\", "/")
+    candidate = Path(normalized_path)
     if not candidate.is_absolute():
         studies_config_parent = Path(settings.studies_config_path).resolve().parent
         candidate = (studies_config_parent / candidate).resolve()
@@ -2567,7 +2592,7 @@ async def _parse_activities_uploads_by_language(
             normalized_lang = _normalize_language_code(language)
             if not normalized_lang:
                 continue
-            basename = Path(expected_filename).name
+            basename = _basename_from_config_file_reference(expected_filename)
             upload = file_by_name.get(basename)
             if not upload:
                 raise ValueError(
@@ -3430,6 +3455,13 @@ async def export_runtime_studies_config(
     study_name: Optional[str] = Query(
         None, description="Optional study short name to export only one study"
     ),
+    mode: str = Query(
+        "embedded_json",
+        description=(
+            "Export mode: 'embedded_json' keeps activities embedded in a single JSON file; "
+            "'split_zip' returns a ZIP containing studies_config.json plus separate activities files"
+        ),
+    ),
     current_admin: str = Depends(verify_admin),
     session: Session = Depends(get_session),
 ):
@@ -3668,10 +3700,110 @@ async def export_runtime_studies_config(
     else:
         filename = f"studies_config_{export_date}.json"
 
-    return JSONResponse(
-        content=jsonable_encoder(response_payload),
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    if mode == "split_zip":
+        split_studies: List[Dict[str, Any]] = []
+        archive_buffer = BytesIO()
+
+        with zipfile.ZipFile(
+            archive_buffer,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as archive:
+            for exported_study in exported_studies:
+                study_name_short = str(exported_study.get("name_short", "")).strip()
+                supported_languages = list(
+                    exported_study.get("supported_languages") or []
+                )
+                activities_json_data = dict(
+                    exported_study.get("activities_json_data") or {}
+                )
+
+                activities_json_files: Dict[str, str] = {}
+                for language in supported_languages:
+                    activity_payload = activities_json_data.get(language)
+                    if not isinstance(activity_payload, dict):
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                "Split ZIP export requires DB-backed activities payloads for all "
+                                f"supported languages. Missing payload for study '{study_name_short}', language '{language}'."
+                            ),
+                        )
+                    if set(activity_payload.keys()) == {"error"}:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                "Split ZIP export requires DB-backed activities payloads. "
+                                f"Study '{study_name_short}', language '{language}' has no importable activities config."
+                            ),
+                        )
+
+                    relative_path = _build_split_export_activities_relative_path(
+                        study_name_short,
+                        str(language),
+                    )
+                    activities_json_files[str(language)] = relative_path
+                    archive.writestr(
+                        relative_path,
+                        json.dumps(
+                            jsonable_encoder(activity_payload),
+                            indent=2,
+                            ensure_ascii=False,
+                        ),
+                    )
+
+                study_entry = dict(exported_study)
+                study_entry.pop("activities_json_data", None)
+                study_entry["activities_json_files"] = activities_json_files
+                split_studies.append(jsonable_encoder(study_entry))
+
+            studies_config_payload = {"studies": split_studies}
+            archive.writestr(
+                "studies_config.json",
+                json.dumps(
+                    studies_config_payload,
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+            )
+            archive.writestr(
+                "export_manifest.json",
+                json.dumps(
+                    {
+                        "mode": "split_zip",
+                        "exported_at": utc_now().isoformat(),
+                        "study_count": len(split_studies),
+                        "tud_backend_version": tud_version,
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+            )
+
+        archive_buffer.seek(0)
+        zip_filename = filename.replace(".json", ".zip")
+        response = Response(
+            content=archive_buffer.getvalue(),
+            media_type="application/zip",
+        )
+        response.headers["Content-Disposition"] = (
+            f"attachment; filename={zip_filename}"
+        )
+        response.headers["Content-Type"] = "application/zip"
+        return response
+
+    if mode != "embedded_json":
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported mode. Allowed values: embedded_json, split_zip",
+        )
+
+    encoded_payload = jsonable_encoder(response_payload)
+    formatted_content = json.dumps(encoded_payload, indent=2, ensure_ascii=False)
+    response = Response(content=formatted_content, media_type="application/json")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
 
 
 @app.get(
