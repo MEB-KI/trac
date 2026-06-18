@@ -45,3 +45,24 @@ def test_admin_json_list_rejects_empty_entries(monkeypatch):
 
     with pytest.raises(ValueError, match="non-empty strings"):
         _ = settings.admin_usernames
+
+
+def test_frontend_url_uses_env_value_and_normalizes_trailing_slash(monkeypatch):
+    monkeypatch.setenv("TUD_FRONTEND_URL", "http://localhost:3000/report/")
+    monkeypatch.setenv("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
+
+    settings = TUDBackendSettings()
+
+    assert settings.frontend_url == "http://localhost:3000/report"
+
+
+def test_frontend_url_falls_back_to_first_allowed_origin(monkeypatch):
+    monkeypatch.delenv("TUD_FRONTEND_URL", raising=False)
+    monkeypatch.setenv(
+        "TUD_ALLOWED_ORIGINS",
+        '["https://frontend.example.org/", "https://alt.example.org"]',
+    )
+
+    settings = TUDBackendSettings()
+
+    assert settings.frontend_url == "https://frontend.example.org"

@@ -48,3 +48,21 @@ def test_diary_requirement_lock_enabled_returns_false_when_study_complete(monkey
     )
 
     assert is_locked is False
+
+
+def test_expected_return_url_template_fills_known_study_and_task(monkeypatch):
+    monkeypatch.setenv("TUD_FRONTEND_URL", "https://frontend.example.org/report/")
+
+    url = api._build_external_task_expected_return_url_template(
+        study_name_short="adult_pilot_de",
+        task_key="depression_survey",
+    )
+
+    assert (
+        url
+        == "https://frontend.example.org/report/pages/tasks.html"
+        "?study_name=adult_pilot_de"
+        "&pid={participant_id}"
+        "&callback_task_key=depression_survey"
+        "&callback_token={assigned_token}"
+    )

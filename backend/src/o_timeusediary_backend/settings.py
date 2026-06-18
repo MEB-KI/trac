@@ -60,6 +60,20 @@ class TUDBackendSettings:
         return os.getenv("TUD_ROOTPATH", "/")
 
     @property
+    def frontend_url(self) -> str:
+        """Get the frontend base URL used for participant-facing links.
+
+        Prefers `TUD_FRONTEND_URL` and falls back to the first configured CORS origin.
+        The returned URL has no trailing slash.
+        """
+        frontend_url = (os.getenv("TUD_FRONTEND_URL") or "").strip()
+        if frontend_url:
+            return frontend_url.rstrip("/")
+
+        first_allowed_origin = self.allowed_origins[0]
+        return str(first_allowed_origin).rstrip("/")
+
+    @property
     def admin_username(self):
         """Get the first configured admin username (backward-compatible single-admin accessor)."""
         return self.admin_usernames[0]
