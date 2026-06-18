@@ -915,6 +915,7 @@
                             <p><strong>Configured tokens:</strong> {{ external_task.token_count }}</p>
                             <p><strong>Assignments:</strong> {{ external_task.assignment_count }}</p>
                             <p><strong>URL:</strong> <a href="{{ external_task.url }}" target="_blank" rel="noopener noreferrer">{{ external_task.url }}</a></p>
+                            <p><strong>Expected Return URL:</strong> <span class="activity-path">{{ external_task.expected_return_url }}</span></p>
                             {% if external_task.description %}
                             <p><strong>Description:</strong> {{ external_task.description }}</p>
                             {% endif %}

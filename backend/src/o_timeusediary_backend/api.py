@@ -270,6 +270,22 @@ def _build_external_task_launch_url(
     )
 
 
+def _build_external_task_expected_return_url_template(
+    study_name_short: str,
+    task_key: str,
+) -> str:
+    frontend_url = settings.frontend_url
+    encoded_study = quote(study_name_short, safe="")
+    encoded_task = quote(task_key, safe="")
+    return (
+        f"{frontend_url}/pages/tasks.html"
+        f"?study_name={encoded_study}"
+        "&pid={participant_id}"
+        f"&callback_task_key={encoded_task}"
+        "&callback_token={assigned_token}"
+    )
+
+
 def _get_study_blob_languages(session: Session, study_id: int) -> List[str]:
     blob_languages = session.exec(
         select(StudyActivityConfigBlob.language)
@@ -1480,6 +1496,11 @@ async def admin_overview(
                 fallback_parts.append(
                     f"<li><strong>{html.escape(task_display_name)}</strong>"
                 )
+                fallback_parts.append(
+                    "<div><strong>Expected Return URL:</strong> "
+                    f"{html.escape(_build_external_task_expected_return_url_template(study.name_short, external_task.task_key))}"
+                    "</div>"
+                )
 
                 task_assignments = session.exec(
                     select(StudyExternalTaskAssignment)
@@ -1732,6 +1753,10 @@ async def admin_overview(
                     "name": external_task.name,
                     "description": external_task.description,
                     "url": external_task.url,
+                    "expected_return_url": _build_external_task_expected_return_url_template(
+                        study.name_short,
+                        external_task.task_key,
+                    ),
                     "confirmation_type": external_task.confirmation_type,
                     "token_count": len(external_task.tokens),
                     "assignment_count": len(assignment_rows),
