@@ -1,4 +1,7 @@
 import os
+from types import SimpleNamespace
+
+import pytest
 
 os.environ.setdefault("TUD_DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
@@ -24,6 +27,7 @@ def test_cli_studies_import_runs_schema_then_import(monkeypatch, tmp_path, capsy
 
     def _fake_import(path: str):
         calls.append(("import", path))
+        return [{"study_name_short": "demo", "created": True, "reason": "", "is_error": False}]
 
     monkeypatch.setattr(cli, "_get_db_counts", _fake_counts)
     monkeypatch.setattr(cli, "initialize_db_schema", _fake_initialize_schema)
@@ -37,8 +41,105 @@ def test_cli_studies_import_runs_schema_then_import(monkeypatch, tmp_path, capsy
     assert cli.settings.studies_config_path == str(config_path.resolve())
 
     output = capsys.readouterr().out
-    assert "Studies import completed successfully." in output
+    assert "Study import summary:" in output
+    assert "Created studies:" in output
+    assert "- demo" in output
     assert "studies 0->1" in output
+
+
+def test_cli_studies_import_supports_multiple_config_files(monkeypatch, tmp_path):
+    config_path_one = tmp_path / "studies_config_a.json"
+    config_path_two = tmp_path / "studies_config_b.json"
+    config_path_one.write_text('{"studies": []}', encoding="utf-8")
+    config_path_two.write_text('{"studies": []}', encoding="utf-8")
+
+    calls = []
+
+    monkeypatch.setattr(
+        cli,
+        "_get_db_counts",
+        lambda: {"studies": 0, "participants": 0, "activities": 0},
+    )
+
+    def _fake_initialize_schema():
+        calls.append("init")
+
+    def _fake_import(path: str):
+        calls.append(("import", path))
+        study_name = "a" if path == str(config_path_one.resolve()) else "b"
+        return [
+            {
+                "study_name_short": study_name,
+                "created": True,
+                "reason": "",
+                "is_error": False,
+            }
+        ]
+
+    monkeypatch.setattr(cli, "initialize_db_schema", _fake_initialize_schema)
+    monkeypatch.setattr(cli, "create_config_file_studies_in_database", _fake_import)
+
+    exit_code = cli.main(
+        [
+            "studies",
+            "import",
+            "--config",
+            str(config_path_one),
+            "--config",
+            str(config_path_two),
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls == [
+        "init",
+        ("import", str(config_path_one.resolve())),
+        ("import", str(config_path_two.resolve())),
+    ]
+    assert cli.settings.studies_config_path == str(config_path_two.resolve())
+
+
+def test_cli_studies_import_fails_early_on_duplicate_short_names(monkeypatch, tmp_path):
+    config_path_one = tmp_path / "study_alpha.json"
+    config_path_two = tmp_path / "study_beta.json"
+    config_path_one.write_text('{"studies": []}', encoding="utf-8")
+    config_path_two.write_text('{"studies": []}', encoding="utf-8")
+
+    def _fake_load(path: str):
+        if path == str(config_path_one.resolve()):
+            return SimpleNamespace(studies=[SimpleNamespace(name_short="pilot")])
+        if path == str(config_path_two.resolve()):
+            return SimpleNamespace(studies=[SimpleNamespace(name_short="pilot")])
+        raise AssertionError(f"Unexpected config path: {path}")
+
+    monkeypatch.setattr(cli, "load_studies_config", _fake_load)
+    monkeypatch.setattr(
+        cli,
+        "_get_db_counts",
+        lambda: pytest.fail("DB counts should not be queried when duplicate short names exist"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "initialize_db_schema",
+        lambda: pytest.fail("Schema initialization should not run on duplicate short names"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "create_config_file_studies_in_database",
+        lambda _: pytest.fail("Import should not start on duplicate short names"),
+    )
+
+    exit_code = cli.main(
+        [
+            "studies",
+            "import",
+            "--config",
+            str(config_path_one),
+            "--config",
+            str(config_path_two),
+        ]
+    )
+    assert exit_code == 1
 
 
 def test_cli_studies_import_no_ensure_schema(monkeypatch, tmp_path):
@@ -60,7 +161,10 @@ def test_cli_studies_import_no_ensure_schema(monkeypatch, tmp_path):
     monkeypatch.setattr(
         cli,
         "create_config_file_studies_in_database",
-        lambda path: calls.append(("import", path)),
+        lambda path: (
+            calls.append(("import", path))
+            or [{"study_name_short": "demo", "created": True, "reason": "", "is_error": False}]
+        ),
     )
 
     exit_code = cli.main(
@@ -75,6 +179,37 @@ def test_cli_studies_import_no_ensure_schema(monkeypatch, tmp_path):
 
     assert exit_code == 0
     assert calls == [("import", str(config_path.resolve()))]
+
+
+def test_cli_studies_import_reports_not_created_reason(monkeypatch, tmp_path, capsys):
+    config_path = tmp_path / "studies_config.json"
+    config_path.write_text('{"studies": []}', encoding="utf-8")
+
+    monkeypatch.setattr(
+        cli,
+        "_get_db_counts",
+        lambda: {"studies": 2, "participants": 5, "activities": 10},
+    )
+    monkeypatch.setattr(cli, "initialize_db_schema", lambda: None)
+    monkeypatch.setattr(
+        cli,
+        "create_config_file_studies_in_database",
+        lambda _path: [
+            {
+                "study_name_short": "existing_study",
+                "created": False,
+                "reason": "already exists in database",
+                "is_error": False,
+            }
+        ],
+    )
+
+    exit_code = cli.main(["studies", "import", "--config", str(config_path)])
+    assert exit_code == 0
+
+    output = capsys.readouterr().out
+    assert "Not created studies:" in output
+    assert "- existing_study: already exists in database" in output
 
 
 def test_cli_db_upgrade_dispatch(monkeypatch):

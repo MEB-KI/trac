@@ -77,6 +77,8 @@ cd backend/
 # 1) Prepare runtime state explicitly
 uv run tud db upgrade
 uv run tud studies import --config studies_config.json
+# or import multiple files (for example one file per study)
+uv run tud studies import --config studies_config_a.json --config studies_config_b.json
 
 # 2) Start backend (development)
 uv run gunicorn --reload -c ../deployment/gunicorn_conf.dev.py o_timeusediary_backend.api:app
@@ -112,7 +114,7 @@ As mentioned before, this should NOT be need for production.
 
 ### 3. Study Configuration
 
-Studies are defined in `backend/studies_config.json`. Each entry specifies the study name, supported languages, the days to cover, participant handling (open or invite-only via `allow_unlisted_participants`), and references to one or more activity list files (`backend/activities_*.json`). Import this file via admin endpoints or the CLI command shown above.
+Studies are defined in one or more `studies_config` files (for example `backend/studies_config.json`). Each entry specifies the study name, supported languages, the days to cover, participant handling (open or invite-only via `allow_unlisted_participants`), and references to one or more activity list files (`backend/activities_*.json`). You can import one file or multiple files via admin endpoints or the CLI command shown above.
 
 Each study uses `name_short` as its technical identifier. This short name is important because it is used by the frontend configuration and in participant invitation links via the `study_name` URL parameter.
 
