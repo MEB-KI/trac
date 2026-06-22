@@ -22,7 +22,7 @@ import logging
 import uuid
 import html
 from typing import Dict, List, Optional, Set, Tuple, Any, Union
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import csv
 import json
 import re
@@ -2006,6 +2006,123 @@ async def admin_study_detail(
         else None
     )
 
+    # --- Cumulative completion progress data ---
+    # Build per-day cumulative counts of participants who completed time-use diary
+    # and (for studies with external tasks) who completed everything.
+    study_start = _to_utc_naive(study.data_collection_start).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    study_end = _to_utc_naive(study.data_collection_end).replace(
+        hour=23, minute=59, second=59, microsecond=0
+    )
+    today = _to_utc_naive(now_utc).replace(
+        hour=23, minute=59, second=59, microsecond=0
+    )
+    chart_end = min(study_end, today)
+
+    # Find last activity date for each participant (proxy for time-use diary completion)
+    last_activity_per_participant: dict[str, date] = {}
+    if not mysql_like_backend:
+        try:
+            rows = session.exec(
+                select(
+                    Activity.participant_id,
+                    func.max(Activity.created_at),
+                )
+                .where(Activity.study_id == study.id)
+                .group_by(Activity.participant_id)
+            ).all()
+            for pid, last_created in rows:
+                if last_created is not None:
+                    last_activity_per_participant[pid] = _to_utc_naive(
+                        last_created
+                    ).date()
+        except TypeError as exc:
+            logger.warning(
+                "Skipping completion chart data for study '%s': %s",
+                study.name_short, exc,
+            )
+
+    # For ET studies, find the date each participant completed ALL external tasks
+    last_all_completed_per_participant: dict[str, date] = {}
+    study_has_external_tasks = len(external_task_rows) > 0
+    if study_has_external_tasks:
+        try:
+            # Get participant IDs who have confirmed all their assigned external tasks
+            et_task_ids = [et.id for et in external_task_rows]
+            if et_task_ids:
+                rows = session.exec(
+                    select(
+                        StudyExternalTaskAssignment.participant_id,
+                        func.max(StudyExternalTaskAssignment.confirmed_at),
+                    )
+                    .where(
+                        StudyExternalTaskAssignment.external_task_id.in_(et_task_ids),
+                        StudyExternalTaskAssignment.is_confirmed == True,
+                    )
+                    .group_by(StudyExternalTaskAssignment.participant_id)
+                ).all()
+                confirmed_dates: dict[str, date] = {}
+                for pid, confirmed_at in rows:
+                    if confirmed_at is not None:
+                        confirmed_dates[pid] = _to_utc_naive(confirmed_at).date()
+
+                # For each participant who has all tasks confirmed, use their latest confirmation date
+                for sp in study_participants:
+                    pid = sp.participant_id
+                    if pid in confirmed_dates:
+                        # Verify all tasks are confirmed for this participant
+                        all_confirmed = session.exec(
+                            select(func.count(StudyExternalTaskAssignment.id))
+                            .where(
+                                StudyExternalTaskAssignment.external_task_id.in_(
+                                    et_task_ids
+                                ),
+                                StudyExternalTaskAssignment.participant_id == pid,
+                                StudyExternalTaskAssignment.is_confirmed == False,
+                            )
+                        ).first()
+                        if all_confirmed is not None and all_confirmed == 0:
+                            last_all_completed_per_participant[pid] = confirmed_dates[
+                                pid
+                            ]
+        except TypeError as exc:
+            logger.warning(
+                "Skipping ET completion chart data for study '%s': %s",
+                study.name_short, exc,
+            )
+
+    # Build day-by-day cumulative series
+    completion_dates: list[str] = []
+    timeuse_cumulative: list[int] = []
+    all_completed_cumulative: list[int] = []
+    num_days = (chart_end - study_start).days + 1
+    tu_count = 0
+    all_count = 0
+    for offset in range(max(0, num_days)):
+        day = study_start + timedelta(days=offset)
+        day_str = day.strftime("%Y-%m-%d")
+        completion_dates.append(day_str)
+        tu_count += sum(
+            1
+            for d in last_activity_per_participant.values()
+            if d == day.date()
+        )
+        timeuse_cumulative.append(tu_count)
+        all_count += sum(
+            1
+            for d in last_all_completed_per_participant.values()
+            if d == day.date()
+        )
+        all_completed_cumulative.append(all_count)
+
+    completion_progress = {
+        "dates": completion_dates,
+        "timeuse_cumulative": timeuse_cumulative,
+        "all_completed_cumulative": all_completed_cumulative,
+        "has_external_tasks": study_has_external_tasks,
+    }
+
     context_dict = {
         "request": request,
         "current_admin": current_admin,
@@ -2031,6 +2148,7 @@ async def admin_study_detail(
         "is_actively_collecting": study_is_currently_collecting,
         "require_consent": bool(study.require_consent),
         "frontend_open_join_url": frontend_open_join_url,
+        "completion_progress": completion_progress,
         "current_time": utc_now(),
     }
     template = templates.get_template("admin_study_detail.html")
