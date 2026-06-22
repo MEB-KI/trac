@@ -13,12 +13,13 @@ from fastapi import (
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import logging
+import string
 import uuid
 import html
 from typing import Dict, List, Optional, Set, Tuple, Any, Union
@@ -4291,6 +4292,250 @@ async def import_external_task_tokens(
         },
         "errors": errors,
     }
+
+
+TOKEN_ALPHABET = string.ascii_letters + string.digits
+TOKEN_LENGTH = 20
+
+
+def _generate_token() -> str:
+    """Generate a random alphanumeric token of TOKEN_LENGTH characters."""
+    return "".join(secrets.choice(TOKEN_ALPHABET) for _ in range(TOKEN_LENGTH))
+
+
+@app.post(
+    "/api/admin/studies/{study_name_short}/generate-tokens",
+    name="Generate missing external task tokens",
+)
+async def generate_external_task_tokens(
+    study_name_short: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Generate random tokens for all participants missing external-task assignments.
+
+    For each external task in the study, iterates over all study participants in
+    order and generates a new unique token for each participant that does not yet
+    have an assignment for that task. Tokens are appended to the task's token pool
+    and individual assignment records are created.
+    """
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    external_tasks = session.exec(
+        select(StudyExternalTask)
+        .where(StudyExternalTask.study_id == study.id)
+        .order_by(StudyExternalTask.task_key)
+    ).all()
+    if not external_tasks:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Study '{study_name_short}' has no external tasks configured",
+        )
+
+    # Deduplicate participant IDs (defensive — StudyParticipant has a unique
+    # constraint but stale data could contain duplicates)
+    participant_ids_in_order = list(
+        dict.fromkeys(
+            row[0]
+            for row in session.exec(
+                select(StudyParticipant.participant_id)
+                .where(StudyParticipant.study_id == study.id)
+                .order_by(StudyParticipant.id)
+            ).all()
+        )
+    )
+
+    if not participant_ids_in_order:
+        return {
+            "ok": True,
+            "summary": {
+                "participants_in_study": 0,
+                "tokens_generated": 0,
+                "tokens_skipped_existing": 0,
+                "tasks": [],
+            },
+        }
+
+    tasks_summary = []
+    total_generated = 0
+    total_skipped = 0
+
+    for task in external_tasks:
+        existing_assignments = session.exec(
+            select(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id == task.id
+            )
+        ).all()
+        assigned_participants: set[str] = {
+            a.participant_id for a in existing_assignments
+        }
+
+        generated_for_task = 0
+        skipped_for_task = 0
+
+        for pid in participant_ids_in_order:
+            if pid in assigned_participants:
+                skipped_for_task += 1
+                continue
+
+            # Ensure the Participant record exists (StudyParticipant may exist
+            # without a corresponding Participant row if data is stale).
+            # Flush immediately to avoid FK issues during autoflush later.
+            if not session.get(Participant, pid):
+                session.add(Participant(id=pid))
+                session.flush()
+
+            # Generate a unique token that doesn't collide with any existing one
+            # for this task
+            existing_tokens = {a.assigned_token for a in existing_assignments}
+            existing_tokens.update(set(task.tokens or []))
+            for _ in range(100):
+                token = _generate_token()
+                if token not in existing_tokens:
+                    break
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to generate a unique token after 100 attempts",
+                )
+
+            # Add to token pool
+            task.tokens = (task.tokens or []) + [token]
+
+            # Create assignment
+            session.add(
+                StudyExternalTaskAssignment(
+                    external_task_id=task.id,
+                    participant_id=pid,
+                    assigned_token=token,
+                    assignment_order=len(existing_assignments) + generated_for_task,
+                )
+            )
+            # Track newly added participants so duplicates in the input list
+            # are also skipped
+            assigned_participants.add(pid)
+            generated_for_task += 1
+
+        tasks_summary.append(
+            {
+                "task_key": task.task_key,
+                "tokens_generated": generated_for_task,
+                "tokens_skipped_existing": skipped_for_task,
+            }
+        )
+        total_generated += generated_for_task
+        total_skipped += skipped_for_task
+
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Database commit failed: {e}"
+        )
+
+    audit_admin_action(
+        current_admin,
+        f"generated external task tokens for study '{study_name_short}': "
+        f"{total_generated} new tokens, {total_skipped} existing skipped",
+    )
+
+    return {
+        "ok": True,
+        "summary": {
+            "participants_in_study": len(participant_ids_in_order),
+            "tokens_generated": total_generated,
+            "tokens_skipped_existing": total_skipped,
+            "tasks": tasks_summary,
+        },
+    }
+
+
+@app.get(
+    "/api/admin/studies/{study_name_short}/export-tokens-csv",
+    name="Export participants and tokens as CSV",
+)
+async def export_tokens_csv(
+    study_name_short: str,
+    current_admin: str = Depends(verify_admin),
+    session: Session = Depends(get_session),
+):
+    """Export participants and their external-task tokens as a CSV file.
+
+    For studies with external tasks: returns CSV with header `pid` and one column
+    per external task (labeled by task_key). For studies without external tasks:
+    returns a single-column CSV with just `pid`.
+    """
+    study = session.exec(
+        select(Study).where(Study.name_short == study_name_short)
+    ).first()
+    if not study:
+        raise HTTPException(
+            status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    external_tasks = session.exec(
+        select(StudyExternalTask)
+        .where(StudyExternalTask.study_id == study.id)
+        .order_by(StudyExternalTask.task_key)
+    ).all()
+    task_keys = [t.task_key for t in external_tasks]
+
+    participants = session.exec(
+        select(Participant)
+        .join(StudyParticipant)
+        .where(StudyParticipant.study_id == study.id)
+        .order_by(StudyParticipant.id)
+    ).all()
+
+    # Build token lookup: (task_key, participant_id) -> token
+    token_lookup: dict[tuple[str, str], str] = {}
+    if task_keys:
+        task_ids = [t.id for t in external_tasks]
+        assignments = session.exec(
+            select(StudyExternalTaskAssignment).where(
+                StudyExternalTaskAssignment.external_task_id.in_(task_ids)
+            )
+        ).all()
+        task_key_by_id = {t.id: t.task_key for t in external_tasks}
+        for a in assignments:
+            key = task_key_by_id.get(a.external_task_id)
+            if key:
+                token_lookup[(key, a.participant_id)] = a.assigned_token
+
+    # Build CSV in-memory
+    output = StringIO()
+    writer = csv.writer(output)
+
+    header = ["pid"] + task_keys
+    writer.writerow(header)
+
+    for p in participants:
+        row = [p.id]
+        for key in task_keys:
+            row.append(token_lookup.get((key, p.id), ""))
+        writer.writerow(row)
+
+    csv_content = output.getvalue()
+    filename = f"{study_name_short}_participants_tokens.csv"
+
+    audit_admin_action(
+        current_admin,
+        f"exported participant tokens CSV for study '{study_name_short}' "
+        f"({len(participants)} participants, {len(task_keys)} task columns)",
+    )
+
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/admin/tools", name="Admin Tools Page", response_class=HTMLResponse)
