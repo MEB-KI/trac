@@ -272,6 +272,7 @@
         <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" onclick="switchTab('timelines-{{ study.name_short }}', this)">Timelines ({{ timeline_stats|length }})</button>
+            <button class="tab" onclick="switchTab('progress-{{ study.name_short }}', this)">📈 Progress</button>
             <button class="tab" onclick="switchTab('participants-{{ study.name_short }}', this)">Participants ({{ participant_count }})</button>
             <button class="tab" onclick="switchTab('externaltasks-{{ study.name_short }}', this)">External Tasks ({{ external_task_count }})</button>
             <button class="tab" onclick="switchTab('activities-{{ study.name_short }}', this)">DB Logged Activities ({{ total_activities_logged }})</button>
@@ -300,6 +301,27 @@
                         {% endif %}
                     </div>
                     {% endfor %}
+                </div>
+            </div>
+
+            <!-- Progress Tab -->
+            <div id="progress-{{ study.name_short }}" class="tab-panel">
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <h3 style="margin-bottom: 0.5rem;">📈 Cumulative Participant Completion</h3>
+                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
+                        Shows how many participants have completed the study up to each day.
+                        Helps estimate how many will participate over the remaining collection period.
+                    </p>
+                    <div style="position: relative;">
+                        <canvas id="completionChart-{{ study.name_short }}" width="750" height="400" style="width: 100%; height: auto; max-width: 750px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;"></canvas>
+                        <script id="chart-data-{{ study.name_short }}" type="application/json">{{ {"dates": completion_progress.dates, "tuSeries": completion_progress.timeuse_cumulative, "allSeries": completion_progress.all_completed_cumulative, "hasTasks": completion_progress.has_external_tasks} | tojson }}</script>
+                    </div>
+                    <div style="margin-top: 0.75rem; display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.85rem;">
+                        <span><span style="display: inline-block; width: 12px; height: 12px; background: #4f46e5; border-radius: 2px; margin-right: 0.3rem;"></span> Completed time-use diary</span>
+                        {% if completion_progress.has_external_tasks %}
+                        <span><span style="display: inline-block; width: 12px; height: 12px; background: #059669; border-radius: 2px; margin-right: 0.3rem;"></span> Completed everything (incl. external tasks)</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -631,12 +653,150 @@
             button.classList.add('active');
             const activePanel = document.getElementById(tabId);
             if (activePanel) activePanel.classList.add('active');
+
+            // Redraw completion chart when its tab becomes visible (canvas size may change)
+            if (tabId.startsWith('progress-')) {
+                const studyName = tabId.replace('progress-', '');
+                const chartCanvas = document.getElementById('completionChart-' + studyName);
+                if (chartCanvas) {
+                    // Re-query data from the script tag or global, then redraw
+                    // For simplicity, re-trigger the draw call from the data we already have
+                    const dataScript = document.getElementById('chart-data-' + studyName);
+                    if (dataScript) {
+                        const data = JSON.parse(dataScript.textContent);
+                        drawCompletionChart('completionChart-' + studyName, data.dates, data.tuSeries, data.allSeries, data.hasTasks);
+                    }
+                }
+            }
         }
 
         function onCfgLanguageChange(selectEl, studyNameShort) {
             const url = new URL(window.location.href);
             url.searchParams.set('cfg_lang', selectEl.value);
             window.location.href = url.toString();
+        }
+
+        function drawCompletionChart(canvasId, dates, tuSeries, allSeries, hasTasks) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !dates || dates.length < 2) return;
+
+            // Use explicit canvas attributes as fallback when the tab is hidden (display:none -> zero rect)
+            const cssWidth = canvas.getBoundingClientRect().width || canvas.width;
+            const cssHeight = canvas.getBoundingClientRect().height || canvas.height;
+
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = cssWidth * dpr;
+            canvas.height = cssHeight * dpr;
+            ctx.scale(dpr, dpr);
+            const w = cssWidth;
+            const h = cssHeight;
+            const pad = { top: 30, right: 30, bottom: 55, left: 55 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const maxVal = Math.max(...tuSeries, ...(allSeries || []), 1);
+            const xCount = dates.length;
+
+            const totalDays = (new Date(dates[dates.length - 1]) - new Date(dates[0])) / (1000 * 60 * 60 * 24);
+            const xStep = totalDays > 0 ? plotW / totalDays : plotW;
+            const yScale = plotH / Math.max(maxVal, 1);
+
+            function xPos(i) {
+                const dayOffset = (new Date(dates[i]) - new Date(dates[0])) / (1000 * 60 * 60 * 24);
+                return pad.left + dayOffset * xStep;
+            }
+            function yPos(v) { return pad.top + plotH - v * yScale; }
+
+            // Clear
+            ctx.clearRect(0, 0, w, h);
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(28,28,28,0.08)';
+            ctx.lineWidth = 1;
+            const yTicks = 5;
+            for (let i = 0; i <= yTicks; i++) {
+                const v = Math.round((maxVal / yTicks) * i);
+                const y = yPos(v);
+                ctx.beginPath();
+                ctx.moveTo(pad.left, y);
+                ctx.lineTo(w - pad.right, y);
+                ctx.stroke();
+                ctx.fillStyle = 'var(--muted, #6b7280)';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(String(v), pad.left - 8, y + 4);
+            }
+
+            // Y-axis label
+            ctx.save();
+            ctx.translate(14, pad.top + plotH / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillStyle = 'var(--muted, #6b7280)';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Participants', 0, 0);
+            ctx.restore();
+
+            // X-axis labels (show ~8 labels)
+            const xLabelCount = Math.min(8, xCount);
+            const xStepLabels = Math.max(1, Math.floor(xCount / xLabelCount));
+            for (let i = 0; i < xCount; i += xStepLabels) {
+                const x = xPos(i);
+                ctx.fillStyle = 'var(--muted, #6b7280)';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                const parts = dates[i].split('-');
+                ctx.fillText(parts[1] + '/' + parts[2], x, pad.top + plotH + 16);
+            }
+            ctx.fillText('Date', pad.left + plotW / 2, h - 5);
+
+            // Draw time-use line
+            function drawSeries(data, color) {
+                if (!data || data.length < 2) return;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2.5;
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                for (let i = 0; i < data.length; i++) {
+                    const x = xPos(i);
+                    const y = yPos(data[i]);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                // Fill under the line
+                ctx.lineTo(xPos(data.length - 1), yPos(0));
+                ctx.lineTo(xPos(0), yPos(0));
+                ctx.closePath();
+                ctx.fillStyle = color + '18';
+                ctx.fill();
+            }
+
+            drawSeries(tuSeries, '#4f46e5');
+            if (hasTasks && allSeries && allSeries.length > 0) {
+                drawSeries(allSeries, '#059669');
+            }
+
+            // Current date vertical line
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayIdx = dates.findIndex(d => d >= todayStr);
+            if (todayIdx >= 0 && todayIdx < dates.length) {
+                const x = xPos(todayIdx);
+                ctx.strokeStyle = 'rgba(220,38,38,0.5)';
+                ctx.setLineDash([4, 3]);
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, pad.top);
+                ctx.lineTo(x, pad.top + plotH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(220,38,38,0.7)';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Today', x, pad.top - 8);
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -653,6 +813,20 @@
             if (requestedTabId) {
                 const tabButton = document.querySelector(`.tab[onclick*="'${requestedTabId}'"]`);
                 if (tabButton) switchTab(requestedTabId, tabButton);
+            }
+
+            // Draw completion chart using embedded data
+            const chartStudyName = '{{ study.name_short }}';
+            const chartDataScript = document.getElementById('chart-data-' + chartStudyName);
+            if (chartDataScript) {
+                const chartData = JSON.parse(chartDataScript.textContent);
+                drawCompletionChart(
+                    'completionChart-' + chartStudyName,
+                    chartData.dates,
+                    chartData.tuSeries,
+                    chartData.allSeries,
+                    chartData.hasTasks
+                );
             }
         });
     </script>
