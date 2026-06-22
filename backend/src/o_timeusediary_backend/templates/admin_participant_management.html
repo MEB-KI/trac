@@ -478,6 +478,9 @@
 
     <script>
         const rootPath = "{{ request.scope.root_path }}";
+        // Use absolute origin for fetch() to avoid credential-in-URL errors
+        // when the page is loaded with embedded Basic Auth credentials.
+        const apiBase = window.location.origin + rootPath;
 
         function parseParticipantIds(input) {
             if (!input) return [];
@@ -517,7 +520,7 @@
             status.style.color = '#4f46e5';
 
             try {
-                const response = await fetch(`${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/assign-participants`, {
+                const response = await fetch(`${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/assign-participants`, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
@@ -554,7 +557,7 @@
 
             try {
                 const response = await fetch(
-                    `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/participants/${encodeURIComponent(participantId)}`,
+                    `${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/participants/${encodeURIComponent(participantId)}`,
                     { method: 'DELETE', credentials: 'same-origin' }
                 );
 
@@ -655,7 +658,7 @@
                     try {
                         const form = new FormData();
                         form.append('file', f);
-                        const resp = await fetch(`${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/import-external-tokens`, {
+                        const resp = await fetch(`${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/import-external-tokens`, {
                             method: 'POST',
                             credentials: 'same-origin',
                             body: form,
@@ -721,7 +724,7 @@
                 previewSection.style.display = 'none';
 
                 try{
-                    const url = `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/delete-tokens/${mode==='by_pid'?'by-pid':'by-token'}/preview`;
+                    const url = `${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/delete-tokens/${mode==='by_pid'?'by-pid':'by-token'}/preview`;
                     const body = mode==='by_pid'? { task_key: task, participant_ids: inputs } : { task_key: task, tokens: inputs };
                     const resp = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
                     const json = await resp.json().catch(()=>({}));
@@ -759,7 +762,7 @@
                 commitBtn.disabled = true;
 
                 try{
-                    const url = `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/delete-tokens/${mode==='by_pid'?'by-pid':'by-token'}/commit`;
+                    const url = `${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/delete-tokens/${mode==='by_pid'?'by-pid':'by-token'}/commit`;
                     const body = mode==='by_pid'? { task_key: task, participant_ids: inputs } : { task_key: task, tokens: inputs };
                     const resp = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
                     const json = await resp.json().catch(()=>({}));
@@ -791,7 +794,7 @@
 
                     try {
                         const resp = await fetch(
-                            `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/generate-tokens`,
+                            `${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/generate-tokens`,
                             { method: 'POST', credentials: 'same-origin' }
                         );
                         const body = await resp.json().catch(() => ({}));
@@ -802,10 +805,14 @@
                         const s = body.summary || {};
                         statusEl.textContent = `Generated ${s.tokens_generated} tokens (${s.tokens_skipped_existing} participants already had tokens)`;
                         statusEl.style.color = '#059669';
+
+                        // Reload the page to show tokens in the participant table
+                        setTimeout(() => {
+                            window.location.href = `${rootPath}/admin/participant-management?study_name_short=${encodeURIComponent(studyName)}`;
+                        }, 900);
                     } catch (err) {
                         statusEl.textContent = err.message;
                         statusEl.style.color = '#dc2626';
-                    } finally {
                         generateBtn.disabled = false;
                     }
                 });
@@ -818,7 +825,7 @@
                     if (!studyName) { alert('Please select a study first.'); return; }
 
                     // Direct download: navigate to the CSV endpoint
-                    const url = `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/export-tokens-csv`;
+                    const url = `${apiBase}/api/admin/studies/${encodeURIComponent(studyName)}/export-tokens-csv`;
                     window.location.href = url;
                 });
             }
