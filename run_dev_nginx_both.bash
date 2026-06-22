@@ -13,6 +13,33 @@ CURRENT_DIR=$(pwd)
 
 echo "yo yo"
 
+# ── Pre-flight: clean up leftover processes from previous runs ──
+# Kill old nginx started by this script (user-level, no root needed)
+if [ -f "$HOME/nginx-dev.pid" ]; then
+    OLD_NGINX_PID=$(cat "$HOME/nginx-dev.pid" 2>/dev/null)
+    if [ -n "$OLD_NGINX_PID" ] && kill -0 "$OLD_NGINX_PID" 2>/dev/null; then
+        echo "  Stopping old nginx (PID $OLD_NGINX_PID)..."
+        kill -QUIT "$OLD_NGINX_PID" 2>/dev/null
+        sleep 1
+    fi
+    rm -f "$HOME/nginx-dev.pid"
+fi
+
+# Kill any process still holding port 8000 (stale gunicorn/uvicorn workers)
+if ss -tlnp | grep -q ':8000 '; then
+    echo "  Port 8000 in use — killing old backend process..."
+    fuser -k 8000/tcp 2>/dev/null
+    sleep 1
+fi
+
+# Kill any process still holding port 3000 (stale nginx not tracked by pidfile)
+if ss -tlnp | grep -q ':3000 '; then
+    echo "  Port 3000 in use — killing old nginx..."
+    fuser -k 3000/tcp 2>/dev/null
+    sleep 1
+fi
+# ── End pre-flight ──
+
 NGINX_CONF_DIR="./dev_tools/local_nginx/webserver_config/"
 
 if [ ! -d "$NGINX_CONF_DIR" ]; then
