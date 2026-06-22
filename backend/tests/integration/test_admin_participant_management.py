@@ -143,3 +143,130 @@ async def test_admin_participant_management_page_and_actions_work():
             assert resp4.status_code == 200
             data4 = resp4.json()
             assert "deleted" in data4
+
+
+@pytest.mark.asyncio
+async def test_admin_generate_tokens_creates_assignments():
+    """Generate tokens for a study with external tasks and verify assignments."""
+    study_name_short = "adult_pilot_de2"
+    # Use a unique participant that won't collide with other tests
+    pid = f"it_gen_{uuid.uuid4().hex[:8]}"
+
+    async with httpx.AsyncClient() as client:
+        # First assign a participant to the study
+        assign_resp = await client.post(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/assign-participants",
+            json={"participant_ids": [pid]},
+            auth=ADMIN_AUTH,
+        )
+        assert assign_resp.status_code == 200
+
+        # Now generate tokens
+        gen_resp = await client.post(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/generate-tokens",
+            auth=ADMIN_AUTH,
+        )
+        assert gen_resp.status_code == 200
+        gen_data = gen_resp.json()
+        assert gen_data["ok"] is True
+        summary = gen_data["summary"]
+        assert summary["tokens_generated"] >= 1
+        assert summary["participants_in_study"] >= 1
+
+        # Second call should skip (participant already has tokens)
+        gen_resp2 = await client.post(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/generate-tokens",
+            auth=ADMIN_AUTH,
+        )
+        assert gen_resp2.status_code == 200
+        gen_data2 = gen_resp2.json()
+        assert gen_data2["summary"]["tokens_generated"] == 0
+        assert gen_data2["summary"]["tokens_skipped_existing"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_admin_generate_tokens_study_not_found():
+    """Call generate-tokens for a non-existent study."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BASE_URL}/api/admin/studies/nonexistent_study/generate-tokens",
+            auth=ADMIN_AUTH,
+        )
+        assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admin_generate_tokens_no_external_tasks():
+    """Call generate-tokens for a study without external tasks."""
+    study_name_short = "default"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/generate-tokens",
+            auth=ADMIN_AUTH,
+        )
+        assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_admin_export_tokens_csv_includes_participants():
+    """Export tokens CSV for a study with external tasks and verify content."""
+    study_name_short = "adult_pilot_de2"
+    pid = f"it_exp_{uuid.uuid4().hex[:8]}"
+
+    async with httpx.AsyncClient() as client:
+        # Assign participant and generate tokens first
+        await client.post(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/assign-participants",
+            json={"participant_ids": [pid]},
+            auth=ADMIN_AUTH,
+        )
+        await client.post(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/generate-tokens",
+            auth=ADMIN_AUTH,
+        )
+
+        # Export CSV
+        csv_resp = await client.get(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/export-tokens-csv",
+            auth=ADMIN_AUTH,
+        )
+        assert csv_resp.status_code == 200
+        assert csv_resp.headers["content-type"].startswith("text/csv")
+        assert "attachment" in csv_resp.headers.get("content-disposition", "")
+
+        text = csv_resp.text
+        assert "pid" in text
+        assert pid in text
+        # Should have at least depression_survey and payment_info columns
+        assert "depression_survey" in text
+        assert "payment_info" in text
+
+
+@pytest.mark.asyncio
+async def test_admin_export_tokens_csv_no_external_tasks():
+    """Export CSV for a study without external tasks — only pid column."""
+    study_name_short = "default"
+
+    async with httpx.AsyncClient() as client:
+        csv_resp = await client.get(
+            f"{BASE_URL}/api/admin/studies/{study_name_short}/export-tokens-csv",
+            auth=ADMIN_AUTH,
+        )
+        assert csv_resp.status_code == 200
+        text = csv_resp.text
+        lines = text.strip().split("\n")
+        header = lines[0].strip()
+        # Only pid column, no task columns
+        assert header == "pid"
+        assert len(lines) >= 1
+
+
+@pytest.mark.asyncio
+async def test_admin_export_tokens_csv_unauthorized():
+    """CSV export should require authentication."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{BASE_URL}/api/admin/studies/default/export-tokens-csv",
+        )
+        assert resp.status_code == 401

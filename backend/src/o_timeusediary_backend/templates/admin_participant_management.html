@@ -457,6 +457,22 @@
             <div class="empty">This study has no external tasks configured. Token deletion disabled for study {{ selected_study.name_short }}.</div>
             {% endif %}
         </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 0.75rem;">Export participants and tokens for study {{ selected_study.name_short }}</h2>
+            <div class="hint" style="margin-bottom: 0.75rem;">
+                Generate random tokens for participants that are missing external-task assignments,
+                then download them as a CSV file to share with external service operators.
+                Generated tokens are 20-character alphanumeric strings.
+            </div>
+            <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                {% if selected_study_external_task_keys|length > 0 %}
+                <button id="generateTokensBtn" class="btn-primary" type="button">Generate missing tokens</button>
+                {% endif %}
+                <button id="exportCsvBtn" class="btn-secondary" type="button">Export CSV</button>
+                <div id="exportStatus" class="status"></div>
+            </div>
+        </div>
         {% endif %}
     </div>
 
@@ -755,6 +771,57 @@
                     }, 800);
                 }catch(err){ statusEl.textContent = err.message; statusEl.style.color = '#dc2626'; commitBtn.disabled = false; }
             });
+        })();
+
+        // --- Generate missing tokens ---
+        (function() {
+            const generateBtn = document.getElementById('generateTokensBtn');
+            const exportBtn = document.getElementById('exportCsvBtn');
+            const statusEl = document.getElementById('exportStatus');
+
+            if (generateBtn) {
+                generateBtn.addEventListener('click', async () => {
+                    const select = document.getElementById('studySelect');
+                    const studyName = select?.value;
+                    if (!studyName) { alert('Please select a study first.'); return; }
+
+                    generateBtn.disabled = true;
+                    statusEl.textContent = 'Generating tokens...';
+                    statusEl.style.color = '#4f46e5';
+
+                    try {
+                        const resp = await fetch(
+                            `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/generate-tokens`,
+                            { method: 'POST', credentials: 'same-origin' }
+                        );
+                        const body = await resp.json().catch(() => ({}));
+                        if (!resp.ok) {
+                            throw new Error(body.detail || 'Generation failed');
+                        }
+
+                        const s = body.summary || {};
+                        statusEl.textContent = `Generated ${s.tokens_generated} tokens (${s.tokens_skipped_existing} participants already had tokens)`;
+                        statusEl.style.color = '#059669';
+                    } catch (err) {
+                        statusEl.textContent = err.message;
+                        statusEl.style.color = '#dc2626';
+                    } finally {
+                        generateBtn.disabled = false;
+                    }
+                });
+            }
+
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => {
+                    const select = document.getElementById('studySelect');
+                    const studyName = select?.value;
+                    if (!studyName) { alert('Please select a study first.'); return; }
+
+                    // Direct download: navigate to the CSV endpoint
+                    const url = `${rootPath}/api/admin/studies/${encodeURIComponent(studyName)}/export-tokens-csv`;
+                    window.location.href = url;
+                });
+            }
         })();
     </script>
 </body>
