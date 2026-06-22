@@ -4338,12 +4338,11 @@ async def generate_external_task_tokens(
             detail=f"Study '{study_name_short}' has no external tasks configured",
         )
 
-    # Deduplicate participant IDs (defensive — StudyParticipant has a unique
-    # constraint but stale data could contain duplicates)
+    # Note: select(StudyParticipant.participant_id) returns scalar values
+    # (strings), not Row objects. Iterating directly yields participant_id strings.
     participant_ids_in_order = list(
         dict.fromkeys(
-            row[0]
-            for row in session.exec(
+            session.exec(
                 select(StudyParticipant.participant_id)
                 .where(StudyParticipant.study_id == study.id)
                 .order_by(StudyParticipant.id)
