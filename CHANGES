@@ -1,6 +1,15 @@
 TRAC MPIAE Changes
 ===================
 
+Version 1.16.1 -- Improvements for external task tokens and more
+-----------------------------------------------------------------
+- NEW: Support shared secret and HMAC signed tokens (optional) for talking to remote system of external task
+- NEW: add endpoint and admin UI to gnerate tokens for external tasks in our app
+- NEW: show progress chart for study completion on study details page in admin interface
+- NEW: split the admin study overview page into a real short overview table and a new details page for ONE study
+- NEW: add validation for i18n study description, show in admin interface
+- NEW: add study participation button in admin interface also for open studies
+
 
 Version 0.16.0 -- DBMS Diversity and admin interface for tasks
 ---------------------------------------------------------------
