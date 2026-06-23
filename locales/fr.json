@@ -1,0 +1,185 @@
+{
+  "instructions": {
+    "pageTitle": "Instructions | Time Use Diary",
+    "title": "Instructions",
+    "welcomeTitle": "Welcome to Your Weekly Time Diary. Thank you for participating!",
+    "generalInfoTitle": "General Information on the Study",
+    "studyIntroDefault": "This is our time use study.<br><br>We are asking you to <b>reconstruct a typical week</b> of your daily activities using our time use tool.<br><br>Which week should I choose? Please think of your past week (the last 7 days).<br>Exception: If you were sick or on holiday last week, please choose a different recent week that better represents your normal routine.",
+    "timeSavingFeature": "Time-Saving Feature: You do not need to start from scratch every day. After you complete the first day, your schedule will automatically copy over to the next day as a template. Please adapt this template to reflect any changes in your activities for that day.",
+    "howToFillTitle": "How to fill out the diary",
+    "howToFillDescription": "You will see a list of activities at the bottom of the screen. You can drag and drop these activities onto the timeline to indicate what you were doing throughout the day.",
+    "howToFillTwoSteps": "You will enter information in two steps for each day:",
+    "mainActivityHelp": "<b>Main Activity (Level 1)</b> Drag and drop activities from the activities list onto the time line to show your main activity.",
+    "secondaryActivityHelp": "<b>Secondary Activity (Level 2)</b> Use this second timeline only if you were doing two things at once. This is for activities that were happening in the background or simultaneously with your Main Activity, e.g.:",
+    "secondaryExamples": {
+      "media": "Media Multitasking: If you were using a second form of media (e.g., listening to a Podcast while Gaming, or checking Social Media while watching TV).",
+      "other": "Other Multitasking: If you were doing a non-digital activity simultaneously (e.g., Reading while Commuting, or Knitting while watching TV).",
+      "note": "Note: If you were focused on only one thing, leave this level blank for that time block."
+    },
+    "visualGuideTitle": "Visual Illustrations of how to use the Interface",
+    "startPrompt": "Please click the blue Start button to begin your diary entry.",
+    "mainInstruction": "Pensez aux activités que vous avez faites <span class=\"emphasis\">hier</span>. Ensuite, remplissez la chronologie complète avec les activités que vous avez réalisées.",
+    "step1": {
+      "title": "Sélectionner et Placer une Activité",
+      "horizontal": "Choisissez une activité dans le menu en bas de l'écran, puis placez-la sur la chronologie.",
+      "vertical": "Appuyez sur le bouton (+) dans le coin inférieur droit pour ouvrir le menu des activités, puis sélectionnez une activité et appuyez où vous voulez la placer sur la chronologie."
+    },
+    "step2": {
+      "title": "Ajuster la Durée de l'Activité",
+      "horizontal": "Cliquez et faites glisser les bords horizontalement pour définir la durée. Sur ordinateur, vous pouvez aussi faire un clic droit sur une activité et choisir \"Afficher les infos\" ou \"Supprimer\".",
+      "vertical": "Faites glisser les bords verticalement pour définir la durée."
+    },
+    "step3": {
+      "title": "Soumettre votre Journal",
+      "description": "Une fois que vous avez enregistré toutes vos activités de la journée, cliquez sur le bouton Soumettre pour terminer votre journal.",
+      "submitHelp": "Cliquez pour soumettre votre journal terminé"
+    },
+    "helpfulTools": "Outils utiles",
+    "undoHelp": "Avez-vous fait une erreur ? Annulez votre dernière action",
+    "cleanRowHelp": "Vous voulez recommencer ? Nettoyez la ligne",
+    "customActivityHelp": "Activité non listée ? Ajoutez une activité personnalisée",
+    "customActivityName": "Autre non listé (entrer)"
+  },
+  "consent": {
+    "pageTitle": "Consentement | Journal d'utilisation du temps",
+    "title": "Consentement",
+    "eyebrow": "Consentement à l'étude",
+    "subtitle": "Veuillez lire les informations de consentement ci-dessous avant de commencer l'étude.",
+    "studyName": "Nom de l'étude",
+    "checkboxLabel": "J'ai lu et compris les informations de cette page.",
+    "checkboxTooltip": "Veuillez cocher la case ci-dessus",
+    "description": "Description",
+    "saving": "Enregistrement du consentement...",
+    "saveError": "Impossible d'enregistrer le consentement. Veuillez réessayer.",
+    "loadError": "Impossible de charger les informations de consentement."
+  },
+  "common": {
+    "language": "Language",
+    "chooseLanguage": "Choose language",
+    "day": "Day"
+  },
+  "buttons": {
+    "submit": "Soumettre",
+    "start": "Commencer",
+    "undo": "Annuler",
+    "cleanRow": "Nettoyer la Ligne",
+    "next": "Suivant",
+    "skipReporting": "Ignorer le rapport de temps",
+    "back": "Retour",
+    "backToInstructions": "Retour aux Instructions",
+    "giveConsent": "Je consens et je continue",
+    "declineConsent": "Je refuse de consentir",
+    "ok": "OK",
+    "cancel": "Annuler",
+    "save": "Sauvegarder",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "modals": {
+    "customActivity": {
+      "title": "Entrer une Activité Personnalisée",
+      "childItemTitle": "Entrer {parentActivity} personnalisé(e)",
+      "placeholder": "Entrez votre activité (max 30 caractères)",
+      "frequency": "Fréquence",
+      "frequencyNone": "Aucune fréquence particulière"
+    },
+    "addActivity": {
+      "title": "Ajouter une Activité"
+    },
+    "childItems": {
+      "title": "Sélectionnez une option",
+      "titleFor": "Sélectionnez une option pour \"{activityName}\""
+    },
+    "confirmSubmit": {
+      "title": "Envoyer les données pour {{dayLabel}} (jour {{currentDay}} sur {{totalDays}}) ?",
+      "message": "Vous ne pourrez pas modifier vos réponses pour le jour {{dayLabel}}.",
+      "infoOnTemplate": "Pour le jour suivant, vous verrez les données saisies aujourd'hui comme modèle pour faciliter votre rapport. Adaptez-les selon vos besoins.<br /><br /> N'oubliez pas que vous pouvez supprimer des données en appuyant longuement ou en survolant l'activité dans la chronologie avec la souris et en appuyant sur 'd' ou SUPPR.",
+      "studyEnd": "Cette soumission conclut l'étude.",
+      "submitDay": "Envoyer le jour {{dayLabel}}",
+      "submitDayAndFinish": "Envoyer le jour {{dayLabel}} et terminer l'étude"
+    },
+    "confirmSkip": {
+      "title": "Voulez-vous vraiment ignorer tout le rapport de temps ?",
+      "message": "Vous serez redirigé directement vers la page de remerciement."
+    },
+    "confirmCleanRow": {
+      "title": "Effacer la ligne de chronologie actuelle ?",
+      "message": "Êtes-vous sûr de vouloir supprimer toutes les activités de la ligne de chronologie actuelle ?"
+    },
+    "loading": {
+      "title": "Soumission de votre journal...",
+      "message": "Veuillez patienter pendant que nous sauvegardons vos réponses."
+    },
+    "activityContext": {
+      "showInfo": "Afficher les infos",
+      "delete": "Supprimer",
+      "infoTitle": "Détails de l'activité",
+      "start": "Début",
+      "end": "Fin",
+      "duration": "Durée",
+      "label": "Libellé",
+      "category": "Catégorie",
+      "name": "Nom",
+      "code": "Code"
+    }
+  },
+  "messages": {
+    "selectStudy": "Veuillez sélectionner une étude pour continuer",
+    "noStudiesAvailable": "Aucune étude disponible sur le serveur.",
+    "loading": "Chargement...",
+    "saving": "Sauvegarde...",
+    "saved": "Sauvegardé avec succès",
+    "error": "Une erreur s'est produite",
+    "noActivities": "Aucune activité trouvée",
+    "fillRequired": "Veuillez remplir toutes les activités requises",
+    "submitSuccess": "Journal soumis avec succès",
+    "submitError": "Erreur lors de la soumission du journal",
+    "sending_retry": "Nouvelle tentative d'enregistrement du journal (essai {{attempt}}/{{maxRetries}})...",
+    "timelineCoverageMet": "✓",
+    "timelineCoverageMetAria": "Couverture minimale atteinte",
+    "timelineCoverageMissing": "{{covered}} sur {{required}} minutes requises couvertes",
+    "timelineMissing": "Il manque des informations dans cette chronologie. Souhaitez-vous ajouter quelque chose ?",
+    "timelineHoverInactive": "Cliquez pour passer à cette chronologie",
+    "timelineHoverActiveNoSelection": "Sélectionnez une activité ci-dessous, puis placez-la ici.",
+    "timelineHoverActiveWithSelection": "Cliquez pour placer l'activité sélectionnée ici.",
+    "invalidPlacement": "Cannot place activity here due to invalid position.",
+    "timelineValidationError": "Timeline validation error: {{message}}",
+    "templateLoadedBanner": "Nous avons chargé vos activités du <strong>{{day}}</strong> comme point de départ. Cliquez sur <strong>'Nettoyer la Ligne'</strong> pour repartir de zéro ou modifiez les activités ci-dessous. Sur mobile, supprimez une activité par appui long. Sur ordinateur, faites un clic droit sur une activité et choisissez <strong>'Supprimer'</strong> (ou survolez-la et appuyez sur DEL ou 'd').",
+    "reportingForDay": "Reporting for day:",
+    "studyDayOf": "Jour {{current}} sur {{total}}",
+    "currentDayTooltip": "{{dayName}} (Jour {{current}} sur {{total}})",
+    "goBackToEditPreviousDays": "Aller au jour :"
+  },
+  "errors": {
+    "loadingActivitiesConfigurationTitle": "Error loading activities configuration:",
+    "loadingActivitiesConfigurationHelp": "The application requires a valid backend connection to load the appropriate activities for your study.",
+    "loadingActivitiesShort": "Error loading activities. Please refresh the page to try again. Error:"
+  },
+  "banner": {
+    "dayOneInstructions": "Instructions : Sélectionnez une activité ci-dessous, puis cliquez sur la chronologie pour la placer et faites glisser les bords pour l'étendre. Pour supprimer une activité, maintenez-la appuyée sur mobile ou utilisez le menu contextuel sur ordinateur."
+  },
+  "activities": {
+    "otherNotListed": "Autre non listé (entrer)"
+  },
+  "thankYou": {
+    "title": "Merci - TRAC",
+    "heading": "Merci !",
+    "subtitle": "Votre soumission a été complétée avec succès.",
+    "message": "Merci de participer à notre étude <span class=\"app-name\">TRAC</span>. Vos réponses ont été enregistrées et contribueront à des recherches précieuses.",
+    "continueLink": "Cliquez ici pour continuer."
+  },
+  "taskPage": {
+    "title": "TRAC Tâches",
+    "heading": "Tâches finales",
+    "subtitle": "Veuillez effectuer les tâches suivantes avant de terminer l'étude.",
+    "continueLink": "Continuer vers la page finale"
+  },
+  "footer": {
+    "title": "TRAC",
+    "backend_status_connecting": "Connexion au backend...",
+    "backend_status_connected": "Connecté au backend",
+    "backend_status_error": "Erreur de connexion au backend"
+  }
+}

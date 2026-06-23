@@ -1,0 +1,185 @@
+{
+  "instructions": {
+    "pageTitle": "Ohjeet | Ajankäyttöpäiväkirja",
+    "title": "Ohjeet",
+    "welcomeTitle": "Tervetuloa viikoittaiseen ajankäyttöpäiväkirjaasi. Kiitos osallistumisestasi!",
+    "generalInfoTitle": "Yleistä tietoa tutkimuksesta",
+    "studyIntroDefault": "Tämä on ajankäyttötutkimuksemme.<br><br>Pyydämme sinua <b>rekonstruoimaan tyypillisen viikon</b> päivittäisistä toiminnoistasi ajankäyttötyökalumme avulla.<br><br>Minkä viikon minun tulisi valita? Ajattele viime viikkoa (viimeiset 7 päivää).<br>Poikkeus: Jos olit viime viikolla sairas tai lomalla, valitse jokin muu viimeaikainen viikko, joka kuvaa paremmin normaalia arkeasi.",
+    "timeSavingFeature": "Aikaa säästävä ominaisuus: Sinun ei tarvitse aloittaa alusta joka päivä. Kun olet täyttänyt ensimmäisen päivän, aikataulusi kopioidaan automaattisesti seuraavalle päivälle malliksi. Muokkaa tätä mallia vastaamaan kyseisen päivän muutoksia.",
+    "howToFillTitle": "Kuinka täyttää päiväkirja",
+    "howToFillDescription": "Näet näytön alareunassa listan toiminnoista. Voit vetää ja pudottaa nämä toiminnot aikajanalle osoittaaksesi, mitä teit päivän aikana.",
+    "howToFillTwoSteps": "Syötät tiedot kahdessa vaiheessa jokaiselle päivälle:",
+    "mainActivityHelp": "<b>Päätoiminto (Taso 1)</b> Vedä ja pudota toimintoja listasta aikajanalle näyttääksesi päätoimintosi.",
+    "secondaryActivityHelp": "<b>Sivutoiminto (Taso 2)</b> Käytä tätä toista aikajanaa vain, jos teit kahta asiaa samanaikaisesti. Tämä koskee toimintoja, jotka tapahtuivat taustalla tai yhtä aikaa päätoimintosi kanssa, esim.:",
+    "secondaryExamples": {
+      "media": "Median moniajo: Jos käytit toista mediaa samanaikaisesti (esim. kuuntelit podcastia pelatessa tai selasit sosiaalista mediaa katsoessasi televisiota).",
+      "other": "Muu moniajo: Jos teit samanaikaisesti ei-digitaalista toimintaa (esim. luit matkustaessasi tai neuloit katsoessasi televisiota).",
+      "note": "Huom: Jos keskityit vain yhteen asiaan, jätä tämä taso tyhjäksi kyseiseltä ajanjaksolta."
+    },
+    "visualGuideTitle": "Visuaaliset ohjeet käyttöliittymän käyttöön",
+    "startPrompt": "Klikkaa sinistä Aloita-painiketta aloittaaksesi päiväkirjan täyttämisen.",
+    "mainInstruction": "Ajattele toimintoja, joita teit <span class=\"emphasis\">eilen</span>. Täytä sitten koko aikajana tekemilläsi toiminnoilla.",
+    "step1": {
+      "title": "Valitse ja sijoita toiminto",
+      "horizontal": "Valitse toiminto näytön alareunan valikosta ja sijoita se aikajanalle.",
+      "vertical": "Napauta oikeassa alakulmassa olevaa (+)-painiketta avataksesi toimintovalikon, valitse toiminto ja napauta kohtaa aikajanalla, johon haluat sijoittaa sen."
+    },
+    "step2": {
+      "title": "Säädä toiminnon kestoa",
+      "horizontal": "Klikkaa ja vedä reunoja vaakasuunnassa asettaaksesi keston. Tietokoneella voit myös napsauttaa toimintoa hiiren oikealla ja valita \"Näytä tiedot\" tai \"Poista\".",
+      "vertical": "Vedä reunoja pystysuunnassa asettaaksesi keston."
+    },
+    "step3": {
+      "title": "Lähetä päiväkirja",
+      "description": "Kun olet kirjannut kaikki päivän toiminnot, klikkaa Lähetä-painiketta viimeistelläksesi päiväkirjan.",
+      "submitHelp": "Klikkaa lähettääksesi täytetyn päiväkirjan"
+    },
+    "helpfulTools": "Hyödylliset työkalut",
+    "undoHelp": "Kumoa viimeisin toiminto",
+    "cleanRowHelp": "Haluatko aloittaa alusta? Tyhjennä rivi",
+    "customActivityHelp": "Eikö toimintoa ole listalla? Lisää oma toiminto",
+    "customActivityName": "Muu (kirjoita)"
+  },
+  "consent": {
+    "pageTitle": "Suostumus | Ajankäyttöpäiväkirja",
+    "title": "Suostumus",
+    "eyebrow": "Tutkimuksen suostumus",
+    "subtitle": "Lue alla olevat suostumustiedot ennen kuin aloitat tutkimuksen.",
+    "studyName": "Tutkimuksen nimi",
+    "checkboxLabel": "Olen lukenut ja ymmärtänyt tällä sivulla esitetyt tiedot.",
+    "checkboxTooltip": "Valitse yllä oleva valintaruutu",
+    "description": "Kuvaus",
+    "saving": "Tallennetaan suostumusta...",
+    "saveError": "Suostumuksen tallentaminen epäonnistui. Yritä uudelleen.",
+    "loadError": "Suostumustietojen lataaminen epäonnistui."
+  },
+  "common": {
+    "language": "Kieli",
+    "chooseLanguage": "Valitse kieli",
+    "day": "Päivä"
+  },
+  "buttons": {
+    "submit": "Lähetä päivä",
+    "start": "Aloita",
+    "undo": "Kumoa",
+    "cleanRow": "Tyhjennä rivi",
+    "next": "Seuraava aikajana",
+    "skipReporting": "Ohita ajankäytön raportointi",
+    "back": "Takaisin",
+    "backToInstructions": "Takaisin ohjeisiin",
+    "giveConsent": "Annan suostumukseni ja jatkan",
+    "declineConsent": "En anna suostumustani",
+    "ok": "OK",
+    "cancel": "Peruuta",
+    "save": "Tallenna",
+    "close": "Sulje",
+    "confirm": "Vahvista",
+    "yes": "Kyllä",
+    "no": "Ei"
+  },
+  "modals": {
+    "customActivity": {
+      "title": "Syötä oma toiminto",
+      "childItemTitle": "Syötä arvo kohteelle: {parentActivity}",
+      "placeholder": "Syötä toiminto (max 30 merkkiä)",
+      "frequency": "Taajuus",
+      "frequencyNone": "Ei erityistä taajuutta"
+    },
+    "addActivity": {
+      "title": "Lisää toiminto"
+    },
+    "childItems": {
+      "title": "Valitse vaihtoehto",
+      "titleFor": "Valitse vaihtoehto \"{activityName}\""
+    },
+    "confirmSubmit": {
+      "title": "Lähetä tiedot: {{dayLabel}} (päivä {{currentDay}} / {{totalDays}})?",
+      "message": "Et voi enää muuttaa päivän {{dayLabel}} vastauksia.",
+      "infoOnTemplate": "Seuraavaa päivää varten näet tänään syöttämäsi tiedot mallina helpottamaan raportointia. Muokkaa niitä tarvittaessa.<br /><br /> Muista, että voit poistaa tietoja painamalla pitkään tai viemällä hiiren aikajanalla olevan aktiviteetin päälle ja painamalla 'd' tai DEL.",
+      "studyEnd": "Tämä lähetys päättää tutkimuksen.",
+      "submitDay": "Lähetä päivä {{dayLabel}}",
+      "submitDayAndFinish": "Lähetä päivä {{dayLabel}} ja lopeta tutkimus"
+    },
+    "confirmSkip": {
+      "title": "Haluatko varmasti ohittaa ajankäytön raportoinnin?",
+      "message": "Sinut ohjataan suoraan kiitossivulle."
+    },
+    "confirmCleanRow": {
+      "title": "Tyhjennetäänkö nykyinen aikajanarivi?",
+      "message": "Haluatko varmasti poistaa kaikki aktiviteetit nykyiseltä aikajanariviltä?"
+    },
+    "loading": {
+      "title": "Päiväkirjaa lähetetään...",
+      "message": "Odota, kun tallennamme vastauksesi."
+    },
+    "activityContext": {
+      "showInfo": "Näytä tiedot",
+      "delete": "Poista",
+      "infoTitle": "Toiminnon tiedot",
+      "start": "Alku",
+      "end": "Loppu",
+      "duration": "Kesto",
+      "label": "Nimike",
+      "category": "Kategoria",
+      "name": "Nimi",
+      "code": "Koodi"
+    }
+  },
+  "messages": {
+    "selectStudy": "Valitse tutkimus jatkaaksesi",
+    "noStudiesAvailable": "Palvelimella ei ole saatavilla tutkimuksia.",
+    "loading": "Ladataan...",
+    "saving": "Tallennetaan...",
+    "saved": "Tallennettu onnistuneesti",
+    "error": "Tapahtui virhe",
+    "noActivities": "Toimintoja ei löytynyt",
+    "fillRequired": "Täytä kaikki vaaditut toiminnot",
+    "submitSuccess": "Päiväkirja lähetetty onnistuneesti",
+    "submitError": "Virhe päiväkirjan lähetyksessä",
+    "sending_retry": "Yritetään tallentaa päiväkirjaa uudelleen (yritys {{attempt}}/{{maxRetries}})...",
+    "timelineCoverageMet": "✓",
+    "timelineCoverageMetAria": "Vähimmäiskattavuus täyttyi",
+    "timelineCoverageMissing": "{{covered}} / {{required}} vaaditusta minuutista katettu",
+    "timelineMissing": "Aikajanalta puuttuu tietoja. Haluatko lisätä jotain?",
+    "timelineHoverInactive": "Napsauta siirtyäksesi tähän aikajanaan",
+    "timelineHoverActiveNoSelection": "Valitse toiminto alhaalta ja sijoita se sitten tähän.",
+    "timelineHoverActiveWithSelection": "Napsauta sijoittaaksesi valitun toiminnon tähän.",
+    "invalidPlacement": "Toimintoa ei voi sijoittaa tähän virheellisen sijainnin vuoksi.",
+    "timelineValidationError": "Aikajanan validointivirhe: {{message}}",
+    "templateLoadedBanner": "Latasimme toimintosi päivästä <strong>{{day}}</strong> lähtökohdaksi. Klikkaa <strong>'Tyhjennä rivi'</strong> aloittaaksesi alusta tai muokkaa alla olevia toimintoja. Mobiilissa poistat yksittäisen toiminnon painamalla sitä pitkään. Tietokoneella napsauta toimintoa hiiren oikealla ja valitse <strong>'Poista'</strong> (tai pidä hiiren osoitin sen päällä ja paina DEL- tai 'd'-näppäintä).",
+    "reportingForDay": "Raportointi päivälle:",
+    "studyDayOf": "Päivä {{current}} / {{total}}",
+    "currentDayTooltip": "{{dayName}} (Päivä {{current}} / {{total}})",
+    "goBackToEditPreviousDays": "Vaihda päivään:"
+  },
+  "errors": {
+    "loadingActivitiesConfigurationTitle": "Virhe toimintojen konfiguraation latauksessa:",
+    "loadingActivitiesConfigurationHelp": "Sovellus tarvitsee toimivan backend-yhteyden ladatakseen tutkimukseen sopivat toiminnot.",
+    "loadingActivitiesShort": "Virhe toimintojen latauksessa. Päivitä sivu ja yritä uudelleen. Virhe:"
+  },
+  "banner": {
+    "dayOneInstructions": "Ohjeet: Valitse toiminto alta, napsauta sitten aikajanaa sijoittaaksesi sen ja vedä reunoista pidentääksesi. Poistaaksesi toiminnon, pidä sitä painettuna mobiilissa tai käytä tietokoneella hiiren oikean painikkeen valikkoa."
+  },
+  "activities": {
+    "otherNotListed": "Muu (kirjoita)"
+  },
+  "thankYou": {
+    "title": "Kiitos - TRAC",
+    "heading": "Kiitos!",
+    "subtitle": "Lähetys on suoritettu onnistuneesti.",
+    "message": "Kiitos osallistumisestasi <span class=\"app-name\">TRAC</span>-tutkimukseen. Vastauksesi on tallennettu ja ne edistävät arvokasta tutkimusta.",
+    "continueLink": "Jatka napsauttamalla tästä."
+  },
+  "taskPage": {
+    "title": "TRAC Tehtävät",
+    "heading": "Lopulliset tehtävät",
+    "subtitle": "Täytä seuraavat tehtävät ennen kuin lopetat tutkimuksen.",
+    "continueLink": "Jatka lopulliselle sivulle"
+  },
+  "footer": {
+    "title": "TRAC",
+    "backend_status_connecting": "Yhdistetään taustajärjestelmään...",
+    "backend_status_connected": "Yhdistetty taustajärjestelmään",
+    "backend_status_error": "Virhe yhdistettäessä taustajärjestelmään"
+  }
+}

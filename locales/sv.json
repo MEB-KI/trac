@@ -1,0 +1,185 @@
+{
+  "instructions": {
+    "pageTitle": "Instruktioner | Tidsdagbok",
+    "title": "Instruktioner",
+    "welcomeTitle": "Välkommen till din veckovisa tidsdagbok. Tack för att du deltar!",
+    "generalInfoTitle": "Allmän information om studien",
+    "studyIntroDefault": "Detta är vår tidsanvändningsstudie.<br><br>Vi ber dig att <b>återskapa en typisk vecka</b> av dina dagliga aktiviteter med hjälp av vårt tidsanvändningsverktyg.<br><br>Vilken vecka ska jag välja? Tänk på din senaste vecka (de senaste 7 dagarna).<br>Undantag: Om du var sjuk eller på semester förra veckan, välj en annan nylig vecka som bättre representerar din vanliga rutin.",
+    "timeSavingFeature": "Tidsbesparande funktion: Du behöver inte börja från början varje dag. Efter att du har slutfört den första dagen kopieras ditt schema automatiskt till nästa dag som en mall. Anpassa gärna mallen så att den speglar förändringar i dina aktiviteter den dagen.",
+    "howToFillTitle": "Så fyller du i dagboken",
+    "howToFillDescription": "Du ser en lista med aktiviteter längst ner på skärmen. Du kan dra och släppa dessa aktiviteter på tidslinjen för att visa vad du gjorde under dagen.",
+    "howToFillTwoSteps": "Du fyller i information i två steg för varje dag:",
+    "mainActivityHelp": "<b>Huvudaktivitet (Nivå 1)</b> Dra och släpp aktiviteter från aktivitetslistan till tidslinjen för att visa din huvudaktivitet.",
+    "secondaryActivityHelp": "<b>Sekundär aktivitet (Nivå 2)</b> Använd denna andra tidslinje endast om du gjorde två saker samtidigt. Den är till för aktiviteter som pågick i bakgrunden eller samtidigt med din huvudaktivitet, t.ex.:",
+    "secondaryExamples": {
+      "media": "Mediemultitasking: Om du använde en andra medieform (t.ex. lyssnade på en podd medan du spelade, eller kollade sociala medier medan du tittade på TV).",
+      "other": "Annan multitasking: Om du gjorde en icke-digital aktivitet samtidigt (t.ex. läste medan du pendlade, eller stickade medan du tittade på TV).",
+      "note": "Obs: Om du fokuserade på endast en sak, lämna den här nivån tom för det tidsblocket."
+    },
+    "visualGuideTitle": "Visuella illustrationer av hur du använder gränssnittet",
+    "startPrompt": "Klicka på den blå Starta-knappen för att börja din dagboksregistrering.",
+    "mainInstruction": "Tänk på de aktiviteter du gjorde <span class=\"emphasis\">igår</span>. Fyll sedan i hela tidslinjen med de aktiviteter du gjorde.",
+    "step1": {
+      "title": "Välj och placera en aktivitet",
+      "horizontal": "Välj en aktivitet från menyn längst ner på skärmen och placera den på tidslinjen.",
+      "vertical": "Tryck på (+) knappen i det nedre högra hörnet för att öppna aktivitetsmenyn, välj sedan en aktivitet och tryck där du vill placera den på tidslinjen."
+    },
+    "step2": {
+      "title": "Justera aktivitetens längd",
+      "horizontal": "Klicka och dra kanterna horisontellt för att ställa in längden. På dator kan du också högerklicka på en aktivitet och välja \"Visa info\" eller \"Ta bort\".",
+      "vertical": "Dra kanterna vertikalt för att ställa in längden."
+    },
+    "step3": {
+      "title": "Skicka in din dagbok",
+      "description": "När du har registrerat alla dina aktiviteter för dagen, klicka på Skicka-knappen för att slutföra din dagbok.",
+      "submitHelp": "Klicka för att skicka in din ifyllda dagbok"
+    },
+    "helpfulTools": "Användbara verktyg",
+    "undoHelp": "Gjorde du ett misstag? Ångra din senaste åtgärd",
+    "cleanRowHelp": "Vill du börja om? Rensa raden",
+    "customActivityHelp": "Aktiviteten finns inte med? Lägg till en egen aktivitet",
+    "customActivityName": "Annat som inte finns med (ange)"
+  },
+  "consent": {
+    "pageTitle": "Samtycke | Tidsdagbok",
+    "title": "Samtycke",
+    "eyebrow": "Samtycke till studien",
+    "subtitle": "Läs samtyckesinformationen nedan innan du börjar studien.",
+    "studyName": "Studiets namn",
+    "checkboxLabel": "Jag har läst och förstått informationen på denna sida.",
+    "checkboxTooltip": "Vänligen bocka i rutan ovan",
+    "description": "Beskrivning",
+    "saving": "Sparar samtycke...",
+    "saveError": "Kunde inte spara samtycket. Försök igen.",
+    "loadError": "Kunde inte läsa in samtyckesinformationen."
+  },
+  "common": {
+    "language": "Språk",
+    "chooseLanguage": "Välj språk",
+    "day": "Dag"
+  },
+  "buttons": {
+    "submit": "Skicka dagen",
+    "start": "Starta",
+    "undo": "Ångra",
+    "cleanRow": "Rensa rad",
+    "next": "Nästa tidslinje",
+    "skipReporting": "Hoppa över tidsrapportering",
+    "back": "Tillbaka",
+    "backToInstructions": "Tillbaka till instruktioner",
+    "giveConsent": "Jag samtycker och fortsätter",
+    "declineConsent": "Jag samtycker inte",
+    "ok": "OK",
+    "cancel": "Avbryt",
+    "save": "Spara",
+    "close": "Stäng",
+    "confirm": "Bekräfta",
+    "yes": "Ja",
+    "no": "Nej"
+  },
+  "modals": {
+    "customActivity": {
+      "title": "Ange egen aktivitet",
+      "childItemTitle": "Ange eget värde för: {parentActivity}",
+      "placeholder": "Ange din aktivitet (max 30 tecken)",
+      "frequency": "Frekvens",
+      "frequencyNone": "Ingen speciell frekvens"
+    },
+    "addActivity": {
+      "title": "Lägg till aktivitet"
+    },
+    "childItems": {
+      "title": "Välj ett alternativ",
+      "titleFor": "Välj ett alternativ för \"{activityName}\""
+    },
+    "confirmSubmit": {
+      "title": "Skicka in data för {{dayLabel}} (dag {{currentDay}} av {{totalDays}})?",
+      "message": "Du kommer inte att kunna ändra dina svar för dag {{dayLabel}}.",
+      "infoOnTemplate": "För nästa dag visas de data du angav idag som en mall för att hjälpa dig rapportera enklare. Anpassa dem efter behov.<br /><br /> Kom ihåg att du kan ta bort data genom att hålla ned eller hålla muspekaren över aktiviteten i tidslinjen och trycka på 'd' eller DEL.",
+      "studyEnd": "Den här inlämningen avslutar studien.",
+      "submitDay": "Skicka in dag {{dayLabel}}",
+      "submitDayAndFinish": "Skicka in dag {{dayLabel}} och avsluta studien"
+    },
+    "confirmSkip": {
+      "title": "Vill du verkligen hoppa över all tidsrapportering?",
+      "message": "Du kommer att skickas direkt till tack-sidan."
+    },
+    "confirmCleanRow": {
+      "title": "Rensa aktuell tidslinjerad?",
+      "message": "Är du säker på att du vill ta bort alla aktiviteter i den aktuella tidslinjeraden?"
+    },
+    "loading": {
+      "title": "Skickar din dagbok...",
+      "message": "Var god vänta medan vi sparar dina svar."
+    },
+    "activityContext": {
+      "showInfo": "Visa info",
+      "delete": "Ta bort",
+      "infoTitle": "Aktivitetsdetaljer",
+      "start": "Start",
+      "end": "Slut",
+      "duration": "Varaktighet",
+      "label": "Etikett",
+      "category": "Kategori",
+      "name": "Namn",
+      "code": "Kod"
+    }
+  },
+  "messages": {
+    "selectStudy": "Välj en studie för att fortsätta",
+    "noStudiesAvailable": "Inga studier finns på servern.",
+    "loading": "Laddar...",
+    "saving": "Sparar...",
+    "saved": "Sparat framgångsrikt",
+    "error": "Ett fel uppstod",
+    "noActivities": "Inga aktiviteter hittades",
+    "fillRequired": "Fyll i alla obligatoriska aktiviteter",
+    "submitSuccess": "Dagbok inskickad framgångsrikt",
+    "submitError": "Fel vid inskickning av dagbok",
+    "sending_retry": "Nytt försök att spara dagboken (försök {{attempt}}/{{maxRetries}})...",
+    "timelineCoverageMet": "✓",
+    "timelineCoverageMetAria": "Minsta täckning uppfylld",
+    "timelineCoverageMissing": "{{covered}} av {{required}} obligatoriska minuter täckta",
+    "timelineMissing": "Det saknas information på den här tidslinjen. Vill du lägga till något?",
+    "timelineHoverInactive": "Klicka för att byta till den här tidslinjen",
+    "timelineHoverActiveNoSelection": "Välj en aktivitet nedan och placera den sedan här.",
+    "timelineHoverActiveWithSelection": "Klicka för att placera den valda aktiviteten här.",
+    "invalidPlacement": "Kan inte placera aktiviteten här på grund av ogiltig position.",
+    "timelineValidationError": "Valideringsfel i tidslinje: {{message}}",
+    "templateLoadedBanner": "Vi har laddat dina aktiviteter från <strong>{{day}}</strong> som utgångspunkt. Klicka på <strong>'Rensa rad'</strong> för att börja om eller redigera aktiviteterna nedan. På mobil tar du bort en enskild aktivitet genom att hålla länge på den. På dator högerklickar du på en aktivitet och väljer <strong>'Ta bort'</strong> (eller håller muspekaren över den och trycker på DEL eller 'd').",
+    "reportingForDay": "Rapportering för dag:",
+    "studyDayOf": "Dag {{current}} av {{total}}",
+    "currentDayTooltip": "{{dayName}} (Dag {{current}} av {{total}})",
+    "goBackToEditPreviousDays": "Byt till dag:"
+  },
+  "errors": {
+    "loadingActivitiesConfigurationTitle": "Fel vid laddning av aktivitetskonfiguration:",
+    "loadingActivitiesConfigurationHelp": "Applikationen kräver en giltig backend-anslutning för att ladda rätt aktiviteter för din studie.",
+    "loadingActivitiesShort": "Fel vid laddning av aktiviteter. Uppdatera sidan och försök igen. Fel:"
+  },
+  "banner": {
+    "dayOneInstructions": "Instruktioner: Välj en aktivitet nedan, klicka sedan på tidslinjen för att placera den och dra i kanterna för att justera längden. För att ta bort en aktivitet, håll den nedtryckt på mobil eller använd högerklicksmenyn på dator."
+  },
+  "activities": {
+    "otherNotListed": "Annat som inte finns med (ange)"
+  },
+  "thankYou": {
+    "title": "Tack - TRAC",
+    "heading": "Tack!",
+    "subtitle": "Din inskickning har slutförts framgångsrikt.",
+    "message": "Tack för att du deltar i vår <span class=\"app-name\">TRAC</span>-studie. Dina svar har registrerats och kommer att bidra till värdefull forskning.",
+    "continueLink": "Klicka här för att fortsätta."
+  },
+  "taskPage": {
+    "title": "TRAC Uppgifter",
+    "heading": "Slutliga uppgifter",
+    "subtitle": "Vänligen genomför följande uppgifter innan du avslutar studien.",
+    "continueLink": "Fortsätt till slutsidan"
+  },
+  "footer": {
+    "title": "TRAC",
+    "backend_status_connecting": "Ansluter till backend...",
+    "backend_status_connected": "Ansluten till backend",
+    "backend_status_error": "Fel vid anslutning till backend"
+  }
+}
