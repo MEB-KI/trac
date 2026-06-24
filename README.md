@@ -142,13 +142,6 @@ All invitation URL parameters are listed below. Parameters are read from the que
 
 ¹ `pid` is required for invite-only studies. For open studies (`allow_unlisted_participants: true`) a missing `pid` is replaced with a randomly generated, fresh ID automatically.
 
-**Internal parameters** — these are set by the frontend during page navigation and should **not** be included in invitation links:
-
-| Parameter | Purpose |
-|---|---|
-| `instructions` | Set to `completed` after the participant finishes the instructions page. |
-| `completion_status` | Set to `completed` (normal) or `noconsent` (participant declined consent). |
-| `day_label_index` | 0-based index tracking which study day is currently displayed. |
 
 Examples:
 
