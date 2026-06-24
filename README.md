@@ -130,13 +130,25 @@ TRAC identifies participants primarily through the `pid` URL parameter together 
 https://your.domain.example.com/report/index.html?study_name=default&pid=PARTICIPANT_ID
 ```
 
-Supported URL parameters include:
+All invitation URL parameters are listed below. Parameters are read from the query string of `index.html` and preserved across page navigations (instructions, consent, tasks, thank-you) automatically.
 
-- `study_name`: the study short name (`name_short` in `studies_config.json`)
-- `pid`: the participant identifier
-- `lang`: optional language override, for example `en`, `sv`, or `de`
-- `template_user`: optional participant ID whose data should be used as a template when the link is first used
-- `return_url`: optional encoded URL to which the user can be sent back after completion
+| Parameter | Required | Description |
+|---|---|---|
+| `study_name` | Yes | The study short name (`name_short` in `studies_config.json`). Identifies which study configuration to load. |
+| `pid` | Yes¹ | The participant identifier. For invite-only studies this must match a pre-assigned participant; for open studies any value is accepted and a new participant record is created if needed. |
+| `lang` | No | Language override as an ISO 639-1 two-letter code (e.g., `en`, `de`, `sv`). When omitted, the browser language is used if supported by the study; otherwise the study's `default_language` is used. |
+| `template_user` | No | Participant ID of another user whose timeline entries should be copied as a starting point when the participant first opens the diary. Useful when a parent enters similar data for siblings, for example. |
+| `return_url` | No | A fully URL-encoded absolute URL to which the participant is redirected after completing the study (shown as a link on the thank-you page). Must be properly encoded (e.g., `https%3A%2F%2Fexample.org%2Ffinish`). |
+
+¹ `pid` is required for invite-only studies. For open studies (`allow_unlisted_participants: true`) a missing `pid` is replaced with a randomly generated, fresh ID automatically.
+
+**Internal parameters** — these are set by the frontend during page navigation and should **not** be included in invitation links:
+
+| Parameter | Purpose |
+|---|---|
+| `instructions` | Set to `completed` after the participant finishes the instructions page. |
+| `completion_status` | Set to `completed` (normal) or `noconsent` (participant declined consent). |
+| `day_label_index` | 0-based index tracking which study day is currently displayed. |
 
 Examples:
 
@@ -153,8 +165,6 @@ https://your.domain.example.com/report/index.html?study_name=study1&pid=c303282d
 # Return to an external system after completion
 https://your.domain.example.com/report/index.html?study_name=default&pid=c303282d&return_url=https%3A%2F%2Fexample.org%2Ffinish%3Ftoken%3Dabc123
 ```
-
-The `template_user` parameter is intended for cases where one participant's entries should be copied as a starting point for another participant, for example when a parent enters similar data for siblings. The `return_url` parameter should be URL-encoded before being placed into the link.
 
 #### External Tasks (external integrations)
 
