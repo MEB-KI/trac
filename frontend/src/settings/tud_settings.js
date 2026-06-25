@@ -1,7 +1,7 @@
 // Application settings for Time Used Diary (TUD) frontend.
 
 const TUD_SETTINGS = {
-    API_BASE_URL: 'http://localhost:8000/tud_backend/api',
+    API_BASE_URL: 'http://localhost:8001/tud_backend/api',
     DEFAULT_STUDY_NAME: 'default',
     DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
     // Maintenance notice: set to true before short server maintenance to warn

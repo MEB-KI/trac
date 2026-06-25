@@ -11,6 +11,7 @@ podman volume create trac-postgres-data
 # Create a private network for the service containers
 podman network create trac-dev-net
 
+
 # Run the PostgreSQL database container on the network
 cd database
 
@@ -21,7 +22,11 @@ podman run -d --name db --network trac-net \
   --health-interval 5s \
   --health-timeout 5s \
   --health-retries 10 \
+<<<<<<< HEAD
   --env-file ../.env
+=======
+  --env-file ../backend.env
+>>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
   -e POSTGRES_PASSWORD=systemuserpassword \
   -v ./initscript:/docker-entrypoint-initdb.d \
   -v trac-postgres-data:/var/lib/postgresql \
@@ -49,7 +54,10 @@ podman run -d --name backend --network trac-net \
 cd ..
 
 # Run the web (Nginx) container on the same network
+<<<<<<< HEAD
 # make sure to edit frontend/src/settings/tud_settings.js before!
+=======
+>>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
 podman run -d --name web --network trac-net \
   -v ./frontend/src:/usr/share/nginx/html/report:ro \
   -v ./frontend/src/settings/tud_settings.js:/usr/share/nginx/html/report/settings/tud_settings.js:ro \
