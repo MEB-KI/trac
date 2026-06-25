@@ -8,4 +8,7 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /workspace/backend
 
-CMD ["sh", "-lc", "uv sync --dev && uv run gunicorn --reload -c /workspace/dev_tools/docker/gunicorn_conf.docker.py o_timeusediary_backend.api:app"]
+CMD ["sh", \
+    "-lc", \
+    "uv run tud db upgrade && uv run tud studies import --config studies_config.json && uv run gunicorn -c /workspace/deployement/gunicorn_conf.py o_timeusediary_backend.api:app"\
+]

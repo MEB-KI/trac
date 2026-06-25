@@ -6,48 +6,53 @@ Here's the sequence of bash/Podman commands. Run them in order from the project 
 
 ```bash
 # Create named volumes for data persistence
-podman volume create trac-dev-postgres-data
-podman volume create trac-dev-backend-venv
-podman volume create trac-dev-uv-cache
-
-# Build the backend image (from the backend directory)
-cd backend
-podman build -t trac-backend -f ../dev_tools/docker/backend.Dockerfile .
-cd ..
+podman volume create trac-postgres-data
 
 # Create a private network for the service containers
 podman network create trac-dev-net
 
+
 # Run the PostgreSQL database container on the network
-podman run -d --name db --network trac-dev-net \
+cd database
+
+## TODO: the health-cmd hardcodes user and database, fix that
+podman run -d --name db --network trac-net \
   --network-alias db \
   --health-cmd "pg_isready -U timeusediary_user -d timeusediary_db" \
   --health-interval 5s \
   --health-timeout 5s \
   --health-retries 10 \
-  -e POSTGRES_DB=timeusediary_db \
-  -e POSTGRES_USER=timeusediary_user \
-  -e POSTGRES_PASSWORD=timeusediary_password \
-  -v trac-dev-postgres-data:/var/lib/postgresql \
+  --env-file ../backend.env
+  -e POSTGRES_PASSWORD=systemuserpassword \
+  -v ./initscript:/docker-entrypoint-initdb.d \
+  -v trac-postgres-data:/var/lib/postgresql \
   postgres:18-alpine
 
+cd ..
+
+# Build the backend image (from the backend directory)
+cd backend
+  podman build -t trac-backend -f ./Dockerfile .
+cd ..
+
+podman volume create trac-backend-venv
+podman volume create trac-uv-cache
+
 # Run the backend container on the same network
-podman run -d --name backend --network trac-dev-net \
+podman run -d --name backend --network trac-net \
   -w /workspace/backend \
-  --entrypoint sh \
-  -v ./backend:/workspace/backend \
-  -v ./dev_tools/docker:/workspace/dev_tools/docker:ro \
-  -v trac-dev-backend-venv:/workspace/backend/.venv \
-  -v trac-dev-uv-cache:/root/.cache/uv \
-  -v ./dev_tools/docker/backend_settings/.env.dev-docker:/workspace/backend/.env:ro \
+  -v .:/workspace/backend:Z \
+  -v trac-backend-venv:/workspace/backend/.venv \
+  -v trac-uv-cache:/root/.cache/uv \
   -p 8001:8000 \
-  trac-backend \
-  -c "uv sync --dev && uv run gunicorn --reload -c /workspace/dev_tools/docker/gunicorn_conf.docker.py o_timeusediary_backend.api:app"
+  trac-backend
+
+cd ..
 
 # Run the web (Nginx) container on the same network
-podman run -d --name web --network trac-dev-net \
+podman run -d --name web --network trac-net \
   -v ./frontend/src:/usr/share/nginx/html/report:ro \
-  -v ./dev_tools/docker/frontend_settings/tud_settings.dev-docker.js:/usr/share/nginx/html/report/settings/tud_settings.js:ro \
+  -v ./frontend/src/settings/tud_settings.js:/usr/share/nginx/html/report/settings/tud_settings.js:ro \
   -v ./dev_tools/docker/webserver_config/dev.docker.nginx.conf:/etc/nginx/conf.d/default.conf:ro \
   -p 3001:3000 \
   nginx:1.30-alpine
