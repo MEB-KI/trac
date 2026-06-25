@@ -11,7 +11,6 @@ podman volume create trac-postgres-data
 # Create a private network for the service containers
 podman network create trac-dev-net
 
-
 # Run the PostgreSQL database container on the network
 cd database
 
@@ -22,7 +21,7 @@ podman run -d --name db --network trac-net \
   --health-interval 5s \
   --health-timeout 5s \
   --health-retries 10 \
-  --env-file ../backend.env
+  --env-file ../.env
   -e POSTGRES_PASSWORD=systemuserpassword \
   -v ./initscript:/docker-entrypoint-initdb.d \
   -v trac-postgres-data:/var/lib/postgresql \
@@ -50,6 +49,7 @@ podman run -d --name backend --network trac-net \
 cd ..
 
 # Run the web (Nginx) container on the same network
+# make sure to edit frontend/src/settings/tud_settings.js before!
 podman run -d --name web --network trac-net \
   -v ./frontend/src:/usr/share/nginx/html/report:ro \
   -v ./frontend/src/settings/tud_settings.js:/usr/share/nginx/html/report/settings/tud_settings.js:ro \
@@ -66,8 +66,8 @@ podman logs -f backend
 # To stop and clean up
 podman stop backend web db
 podman rm backend web db
-podman network rm trac-dev-net
-podman volume rm trac-dev-postgres-data trac-dev-backend-venv trac-dev-uv-cache  # if you want to remove volumes
+podman network rm trac-net
+podman volume rm trac-postgres-data trac-backend-venv trac-uv-cache  # if you want to remove volumes
 ```
 
 **Notes:**

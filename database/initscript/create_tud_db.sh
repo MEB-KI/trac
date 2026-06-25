@@ -2,22 +2,7 @@
 #
 # Script to set up PostgreSQL database and user based on .env file.
 #
-# This script will create the database and database user, but the postgresql server must be
-# running and accessible.
-# Note that it does NOT create any tables or relations in the database. The backend application
-# will create the required tables automatically when it is started for the first time.
-#
-# This is a development setup script and is not intended for production use. It assumes that:
-#  1) you are developing on your local machine, and not using Docker
-#  2) you have sudo access to the postgres user
-#  3) the database server is running on the same machine
-#  4) peer authentication is enabled in postgres for local connections
-#
-# Usage: in the repo root, as a user with sudo access to the postgres system user, run:
-#
-#    ./database/create_tud_db.sh .env
-#
-
+# Based on the original database creation script, but adapted to be run as a Docker entrypoint script. It will create the database and database user.
 echo "=== Database setup for TUD backend ==="
 echo " This script creates the database and database user with password as specified in the .env file."
 echo " It requires sudo access to the 'postgres' user on a local PostgreSQL server."
@@ -25,23 +10,7 @@ echo "Note that the TUD_DATABASE_USER and TUD_DATABASE_PASSWORD read from the .e
 echo "not the superuser credentials that will be used by this script to connect to the postgres server."
 echo ""
 
-## use --env-file option to specify a custom .env
-# Default .env location
-# DEFAULT_ENV_PATH=".env"
-# 
-# # Allow custom .env path
-# ENV_PATH="${ENV_PATH:-$DEFAULT_ENV_PATH}"
-# 
-# if [ ! -f "$ENV_PATH" ]; then
-#     echo "ERROR: .env file not found at path: '$ENV_PATH'"
-#     echo "Please create it first or specify a custom path:"
-#     echo "  ./create_tud_db.sh /path/to/your/.env"
-#     exit 1
-# fi
-# 
-# echo "Loading configuration from env file: '$ENV_PATH'"
-# source "$ENV_PATH"
-
+## use --env-file option to podman build/run to specify the .env file
 
 TUD_DATABASE_HOST=${TUD_DATABASE_HOST:-localhost}
 TUD_DATABASE_PORT=${TUD_DATABASE_PORT:-5432}
