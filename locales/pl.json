@@ -5,17 +5,6 @@
     "welcomeTitle": "Witaj w Twoim cotygodniowym dzienniku czasu. Dziękujemy za udział!",
     "generalInfoTitle": "Ogólne informacje o badaniu",
     "studyIntroDefault": "To jest nasze badanie dotyczące wykorzystania czasu.<br><br>Prosimy, abyś <b>odtworzył typowy tydzień</b> swoich codziennych aktywności przy użyciu naszego narzędzia do rejestrowania czasu.<br><br>Który tydzień powinienem wybrać? Proszę pomyśleć o minionym tygodniu (ostatnie 7 dni).<br>Wyjątek: Jeśli byłeś chory lub na urlopie w zeszłym tygodniu, wybierz inny, niedawny tydzień, który lepiej odzwierciedla Twój normalny plan dnia.",
-    "timeSavingFeature": "Funkcja oszczędzania czasu: Nie musisz zaczynać od zera każdego dnia. Po ukończeniu pierwszego dnia, Twój plan dnia automatycznie skopiuje się na następny dzień jako szablon. Proszę dostosować ten szablon do zmian w Twoich aktywnościach w danym dniu.",
-    "howToFillTitle": "Jak wypełnić dziennik",
-    "howToFillDescription": "Na dole ekranu zobaczysz listę aktywności. Możesz przeciągnąć i upuścić te aktywności na osi czasu, aby wskazać, co robiłeś przez cały dzień.",
-    "howToFillTwoSteps": "Wprowadzisz informacje w dwóch krokach dla każdego dnia:",
-    "mainActivityHelp": "<b>Główna aktywność (Poziom 1)</b> Przeciągnij i upuść aktywności z listy na osi czasu, aby pokazać swoją główną aktywność.",
-    "secondaryActivityHelp": "<b>Aktywność poboczna (Poziom 2)</b> Użyj tej drugiej osi czasu tylko wtedy, gdy robiłeś dwie rzeczy jednocześnie. Jest to dla aktywności, które działy się w tle lub równolegle z Twoją główną aktywnością, np.:",
-    "secondaryExamples": {
-      "media": "Multitasking medialny: Jeśli używałeś drugiego medium (np. słuchanie podcastu podczas grania, lub sprawdzanie mediów społecznościowych podczas oglądania telewizji).",
-      "other": "Inny multitasking: Jeśli wykonywałeś jednocześnie aktywność niedigitalną (np. czytanie podczas podróży, lub robienie na drutach podczas oglądania telewizji).",
-      "note": "Uwaga: Jeśli skupiłeś się tylko na jednej rzeczy, pozostaw ten poziom pusty dla tego okresu czasu."
-    },
     "visualGuideTitle": "Wizualne instrukcje korzystania z interfejsu",
     "startPrompt": "Kliknij niebieski przycisk 'Rozpocznij', aby rozpocząć wypełnianie dziennika.",
     "mainInstruction": "Pomyśl o aktywnościach, które wykonywałeś <span class=\"emphasis\">wczoraj</span>. Następnie wypełnij całą oś czasu swoimi aktywnościami.",
@@ -35,7 +24,7 @@
       "submitHelp": "Kliknij, aby wysłać wypełniony dziennik"
     },
     "helpfulTools": "Pomocne narzędzia",
-    "undoHelp": "Cofnij ostatnią akcję",
+    "removeLastHelp": "Usuń ostatnio umieszczoną aktywność",
     "cleanRowHelp": "Chcesz zacząć od nowa? Wyczyść rząd",
     "customActivityHelp": "Brak aktywności na liście? Dodaj własną aktywność",
     "customActivityName": "Inne (wpisz)"
@@ -52,7 +41,8 @@
     "studyNameShort": "Skrócona nazwa badania",
     "saving": "Zapisywanie zgody...",
     "saveError": "Nie udało się zapisać zgody. Spróbuj ponownie.",
-    "loadError": "Nie udało się wczytać informacji o zgodzie."
+    "loadError": "Nie udało się wczytać informacji o zgodzie.",
+    "studyNotFound": "Żądane badanie nie istnieje."
   },
   "common": {
     "language": "Język",
@@ -61,12 +51,14 @@
   },
   "buttons": {
     "submit": "Wyślij dzień",
+    "saveDay": "Zapisz dzień",
+    "finishStudy": "Wyślij dzień i zakończ badanie",
     "start": "Rozpocznij",
-    "undo": "Cofnij",
+    "removeLast": "Usuń ostatnią",
     "cleanRow": "Wyczyść rząd",
     "next": "Następna oś czasu",
     "skipReporting": "Pomiń raportowanie czasu",
-    "back": "Wstecz",
+    "previousTimeline": "Poprzednia oś czasu",
     "backToInstructions": "Wróć do instrukcji",
     "giveConsent": "Wyrażam zgodę i kontynuuję",
     "declineConsent": "Nie wyrażam zgody",
@@ -99,7 +91,8 @@
       "infoOnTemplate": "Następnego dnia zobaczysz dane wprowadzone dzisiaj jako szablon ułatwiający raportowanie. Dostosuj je według potrzeb.<br /><br /> Pamiętaj, że możesz usunąć dane, przytrzymując lub najeżdżając na aktywność na osi czasu myszką i naciskając 'd' lub DEL.",
       "studyEnd": "To przesłanie kończy badanie.",
       "submitDay": "Wyślij dzień {{dayLabel}}",
-      "submitDayAndFinish": "Wyślij dzień {{dayLabel}} i zakończ badanie"
+      "submitDayAndFinish": "Wyślij dzień {{dayLabel}} i zakończ badanie",
+      "submitDayNoDay": "Wyślij dzień"
     },
     "confirmSkip": {
       "title": "Czy na pewno chcesz pominąć raportowanie czasu?",
@@ -114,6 +107,7 @@
       "message": "Proszę czekać, podczas gdy zapisujemy Twoje odpowiedzi."
     },
     "activityContext": {
+      "copy": "Kopiuj",
       "showInfo": "Pokaż informacje",
       "delete": "Usuń",
       "infoTitle": "Szczegóły aktywności",
@@ -129,6 +123,7 @@
   "messages": {
     "selectStudy": "Wybierz badanie, aby kontynuować",
     "noStudiesAvailable": "Brak dostępnych badań na serwerze.",
+    "studyNotFound": "Żądane badanie nie istnieje.",
     "loading": "Ładowanie...",
     "saving": "Zapisuję...",
     "saved": "Zapisano pomyślnie",
@@ -140,6 +135,7 @@
     "sending_retry": "Ponawianie próby zapisania dziennika (próba {{attempt}}/{{maxRetries}})...",
     "timelineCoverageMet": "✓",
     "timelineCoverageMetAria": "Minimalne pokrycie spełnione",
+    "dayCompleteAria": "Dzień ukończony (spełniono minimalne pokrycie)",
     "timelineCoverageMissing": "Pokryto {{covered}} z {{required}} wymaganych minut",
     "timelineMissing": "Brakuje informacji na tej osi czasu. Chcesz dodać coś?",
     "timelineHoverInactive": "Kliknij, aby przełączyć się na tę oś czasu",
@@ -148,10 +144,25 @@
     "invalidPlacement": "Nie można umieścić aktywności w tym miejscu z powodu niewłaściwej pozycji.",
     "timelineValidationError": "Błąd walidacji osi czasu: {{message}}",
     "templateLoadedBanner": "Załadowaliśmy Twoje aktywności z dnia <strong>{{day}}</strong> jako punkt wyjścia. Kliknij <strong>'Wyczyść rząd'</strong>, aby zacząć od nowa lub edytuj poniższe aktywności. Na urządzeniu mobilnym usuń pojedynczą aktywność przez długie naciśnięcie. Na komputerze kliknij aktywność prawym przyciskiem myszy i wybierz <strong>'Usuń'</strong> (lub najedź kursorem i naciśnij klawisz DEL albo 'd').",
+    "templateCopiedBanner": "Wstępnie wypełniliśmy Twój dziennik aktywnościami uczestnika wzorcowego. Kliknij <strong>'Wyczyść rząd'</strong>, aby zacząć od nowa lub edytuj poniższe aktywności.",
     "reportingForDay": "Raportowanie dla dnia:",
     "studyDayOf": "Dzień {{current}} z {{total}}",
     "currentDayTooltip": "{{dayName}} (Dzień {{current}} z {{total}})",
-    "goBackToEditPreviousDays": "Przełącz na dzień:"
+    "goBackToEditPreviousDays": "Przełącz na dzień:",
+    "copyDayLink": "Skopiuj ten dzień",
+    "copyToDay": "Skopiuj na inny dzień",
+    "copySuccess": "Skopiowano {{sourceDay}} do {{targetDay}}",
+    "copyError": "Nie udało się skopiować: {{message}}",
+    "copyEmptySource": "Dzień źródłowy nie ma aktywności do skopiowania.",
+    "completeMinimumActivitiesBeforeSwitching": "Uzupełnij minimalne aktywności przed zmianą dnia.",
+    "completeMinimumActivitiesBeforeCopying": "Uzupełnij minimalne aktywności przed skopiowaniem bieżącego dnia.",
+    "completeOtherDaysFirst": "Uzupełnij najpierw {{days}}, aby zakończyć badanie.",
+    "daySavedStayOnPage": "Day saved.",
+    "copyDayEmpty": "empty",
+    "copyDayHasData": "has data",
+    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
+    "submitStudyIncomplete": "Incomplete days: {{days}}",
+    "submitStudySuccess": "Study submitted successfully!"
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Błąd przy ładowaniu konfiguracji aktywności:",
@@ -175,12 +186,28 @@
     "title": "TRAC Zadania",
     "heading": "Zadania końcowe",
     "subtitle": "Proszę wykonać następujące zadania przed zakończeniem badania.",
-    "continueLink": "Przejdź do strony końcowej"
+    "continueLink": "Przejdź do strony końcowej",
+    "statusAlreadyCompleted": "Już ukończone",
+    "statusNotCompleted": "Nie ukończono",
+    "statusLocked": "Najpierw wykonaj inne zadania",
+    "diaryTaskTitle": "Wypełnij dziennik",
+    "diaryTaskDescription": "Wypełnij swój dziennik wykorzystania czasu dla wszystkich dni badania.",
+    "diaryTaskStatusCompleted": "Ukończono",
+    "diaryTaskStatusNotCompleted": "Nie ukończono"
   },
   "footer": {
     "title": "TRAC",
     "backend_status_connecting": "Łączenie z backendem...",
     "backend_status_connected": "Połączono z backendem",
     "backend_status_error": "Błąd przy łączeniu z backendem"
+  },
+  "idleTimeout": {
+    "tooltip": "Limit czasu bezczynności. Kliknij, aby potwierdzić, że wciąż tu jesteś i zresetować licznik czasu."
+  },
+  "openStudies": {
+    "pageTitle": "Otwarte badania | TRAC",
+    "heading": "TRAC -- Otwarte badania",
+    "noStudies": "Brak dostępnych otwartych badań.",
+    "accessLink": "Przejdź do badania"
   }
 }

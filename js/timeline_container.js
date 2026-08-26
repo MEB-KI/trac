@@ -1,3 +1,4 @@
+// @ts-check
 import { TimelineMarker } from './timeline_marker.js';
 
 export class TimelineContainer {
@@ -29,7 +30,7 @@ export class TimelineContainer {
       this.timeline.style.height = '2500px';
       this.timeline.style.width = '100%';
       this.timeline.parentElement.style.height = '2500px';
-      this.timeline.parentElement.style.width = '180px';
+      this.timeline.parentElement.style.width = '100%';
     } else {
       this.timeline.style.height = '';
       this.timeline.style.width = '100%';
@@ -76,8 +77,9 @@ export class TimelineContainer {
     if (isMobile) {
       const minHeight = '2500px';
       this.timeline.style.height = minHeight;
-      this.timeline.style.width = '';
+      this.timeline.style.width = '100%';
       this.timeline.parentElement.style.height = minHeight;
+      this.timeline.parentElement.style.width = '100%';
 
       this.hourLabelsContainer.style.height = '100%';
       this.hourLabelsContainer.style.width = 'auto';

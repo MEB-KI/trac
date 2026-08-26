@@ -1,3 +1,4 @@
+// @ts-check
 // settings/study_config_manager.js - IMPROVED
 console.log('=== Study Config Manager Loading ===');
 
@@ -138,6 +139,13 @@ function getPreferredLanguage(
   );
 }
 
+/**
+ * Normalize day labels, resolving per-language display names for the target
+ * language. Mirrors what getDayDisplayLabel() does for a single label.
+ * @param {{ default_language?: string, day_labels?: Array<import('./api_types.js').ApiDayLabel | string> }} study
+ * @param {string|null} [language]
+ * @returns {Array<import('./api_types.js').ApiDayLabel | string>}
+ */
 function normalizeDayLabels(study, language = null) {
   const targetLanguage =
     normalizeLanguageCode(language) ||
@@ -152,6 +160,7 @@ function normalizeDayLabels(study, language = null) {
       return label;
     }
 
+    /** @type {string | Record<string,string> | undefined} */
     let displayName = label.display_name;
     if (
       !displayName &&
@@ -161,18 +170,24 @@ function normalizeDayLabels(study, language = null) {
       displayName = label.display_names;
     }
 
-    if (displayName && typeof displayName === 'object') {
+    if (typeof displayName === 'string') {
+      // Already a plain string; keep it (empty string falls back to name below).
+    } else if (displayName) {
+      // display_name is a {lang: string} map (legacy) or came from display_names.
+      const names = /** @type {Record<string,string>} */ (displayName);
       displayName =
-        displayName[targetLanguage] ||
-        displayName[defaultLanguage] ||
-        displayName.en ||
-        Object.values(displayName).find((value) => typeof value === 'string') ||
+        names[targetLanguage] ||
+        names[defaultLanguage] ||
+        names.en ||
+        Object.values(names).find((value) => typeof value === 'string') ||
         label.name;
     }
 
     return {
       ...label,
-      display_name: displayName || label.name,
+      // displayName is guaranteed to be a plain string here: any map was
+      // resolved by the branch above (a truthy object always entered it).
+      display_name: /** @type {string} */ (displayName || label.name),
       // Preserve the full translations map so syncWithBackendConfig() and
       // getDayDisplayLabel() can re-resolve for any language later.
       ...(label.display_names && typeof label.display_names === 'object'
@@ -182,6 +197,13 @@ function normalizeDayLabels(study, language = null) {
   });
 }
 
+/**
+ * Resolve a study text that may be a plain string or a language->text map.
+ * @param {string|Record<string,string>|null|undefined} textValue
+ * @param {string} selectedLanguage
+ * @param {string} [defaultLanguage]
+ * @returns {string|null}
+ */
 function resolveLocalizedStudyText(
   textValue,
   selectedLanguage,
@@ -210,7 +232,8 @@ async function loadStudiesConfigFromFile() {
     // Determine studies file to load. If TUD_SETTINGS.DEFAULT_STUDIES_FILE is
     // missing or empty, skip local fallback entirely.
     const studiesFile =
-      TUD_SETTINGS && typeof TUD_SETTINGS.DEFAULT_STUDIES_FILE === 'string' &&
+      TUD_SETTINGS &&
+      typeof TUD_SETTINGS.DEFAULT_STUDIES_FILE === 'string' &&
       TUD_SETTINGS.DEFAULT_STUDIES_FILE.trim()
         ? TUD_SETTINGS.DEFAULT_STUDIES_FILE
         : null;
@@ -224,9 +247,7 @@ async function loadStudiesConfigFromFile() {
 
     const response = await fetch(studiesFile);
     if (!response.ok) {
-      throw new Error(
-        `Failed to load ${studiesFile}: ${response.status}`
-      );
+      throw new Error(`Failed to load ${studiesFile}: ${response.status}`);
     }
     STUDIES_CONFIG_CACHE = await response.json();
 
@@ -236,9 +257,7 @@ async function loadStudiesConfigFromFile() {
       ? STUDIES_CONFIG_CACHE.studies
       : [];
 
-    CURRENT_STUDY_CACHE = studies.find(
-      (s) => s.name_short === studyName
-    );
+    CURRENT_STUDY_CACHE = studies.find((s) => s.name_short === studyName);
 
     if (!CURRENT_STUDY_CACHE) {
       throw new Error(`Study "${studyName}" not found in ${studiesFile}`);
@@ -289,6 +308,11 @@ async function loadStudiesConfigFromFile() {
       selectedLanguage,
       CURRENT_STUDY_CACHE.default_language || 'en'
     );
+    CURRENT_STUDY_CACHE.study_text_instructions = resolveLocalizedStudyText(
+      CURRENT_STUDY_CACHE.study_text_instructions,
+      selectedLanguage,
+      CURRENT_STUDY_CACHE.default_language || 'en'
+    );
 
     // Resolve study description to a single-language string for frontend consumption.
     CURRENT_STUDY_CACHE.description = resolveLocalizedStudyText(
@@ -303,7 +327,9 @@ async function loadStudiesConfigFromFile() {
     return CURRENT_STUDY_CACHE;
   } catch (error) {
     console.error(
-      `Error loading ${TUD_SETTINGS?.DEFAULT_STUDIES_FILE || 'local studies file'}:`,
+      `Error loading ${
+        TUD_SETTINGS?.DEFAULT_STUDIES_FILE || 'local studies file'
+      }:`,
       error.message
     );
     CURRENT_STUDY_CACHE = null;
@@ -331,9 +357,16 @@ async function syncWithBackendConfig() {
       let listResp = null;
       try {
         listResp = await fetchWithBackgroundRetry(openListUrl, 1, 800);
-        console.log('active_open_study_names response status:', listResp && listResp.status);
+        console.log(
+          'active_open_study_names response status:',
+          listResp && listResp.status
+        );
       } catch (err) {
-        console.log('Failed to fetch active open study names:', err.message, err);
+        console.log(
+          'Failed to fetch active open study names:',
+          err.message,
+          err
+        );
         const noStudiesError = new Error(
           'No studies available because backend is unreachable and no local fallback is configured.'
         );
@@ -364,7 +397,6 @@ async function syncWithBackendConfig() {
           throw choiceError;
         }
       }
-
     }
 
     if (!studyName) {
@@ -385,14 +417,28 @@ async function syncWithBackendConfig() {
       apiUrl.searchParams.set('lang', selectedLanguageFromContext);
     }
 
-    console.log(`Attempting to sync study config from backend: ${apiUrl.toString()}`);
-    console.log('TUD_SETTINGS.API_BASE_URL:', TUD_SETTINGS.API_BASE_URL, 'studyName:', studyName, 'participantId:', participantId, 'selectedLanguage:', selectedLanguageFromContext);
+    console.log(
+      `Attempting to sync study config from backend: ${apiUrl.toString()}`
+    );
+    console.log(
+      'TUD_SETTINGS.API_BASE_URL:',
+      TUD_SETTINGS.API_BASE_URL,
+      'studyName:',
+      studyName,
+      'participantId:',
+      participantId,
+      'selectedLanguage:',
+      selectedLanguageFromContext
+    );
 
     // Use simple retry for background sync (silent backoff, no UI notifications)
     let response;
     try {
       response = await fetchWithBackgroundRetry(apiUrl.toString(), 2, 1200);
-      console.log('study-config fetch response status:', response && response.status);
+      console.log(
+        'study-config fetch response status:',
+        response && response.status
+      );
     } catch (error) {
       if (!CURRENT_STUDY_CACHE) {
         const noStudiesError = new Error(
@@ -401,12 +447,17 @@ async function syncWithBackendConfig() {
         noStudiesError.code = 'NO_STUDIES_AVAILABLE';
         throw noStudiesError;
       }
-      console.log('Backend unavailable after retries, using file config:', error && error.message, error);
+      console.log(
+        'Backend unavailable after retries, using file config:',
+        error && error.message,
+        error
+      );
       CURRENT_STUDY_CACHE.source = 'file';
       return CURRENT_STUDY_CACHE;
     }
 
     if (response.ok) {
+      /** @type {import('./api_types.js').StudyConfigResponse} */
       const backendConfig = await response.json();
       console.log('Backend study config received');
       console.log(
@@ -567,10 +618,7 @@ async function syncWithBackendConfig() {
         selectedLanguage,
         defaultLanguage
       );
-      if (
-        resolvedNoConsent &&
-        !CURRENT_STUDY_CACHE.study_text_end_noconsent
-      ) {
+      if (resolvedNoConsent && !CURRENT_STUDY_CACHE.study_text_end_noconsent) {
         CURRENT_STUDY_CACHE.study_text_end_noconsent = resolvedNoConsent;
       }
 
@@ -583,12 +631,47 @@ async function syncWithBackendConfig() {
         CURRENT_STUDY_CACHE.study_text_consent = resolvedConsent;
       }
 
+      const resolvedInstructions = resolveLocalizedStudyText(
+        backendConfig.study_text_instructions,
+        selectedLanguage,
+        defaultLanguage
+      );
+      if (
+        resolvedInstructions &&
+        !CURRENT_STUDY_CACHE.study_text_instructions
+      ) {
+        CURRENT_STUDY_CACHE.study_text_instructions = resolvedInstructions;
+      }
+
       if (backendConfig.require_consent !== undefined) {
         CURRENT_STUDY_CACHE.require_consent = backendConfig.require_consent;
       }
       if (backendConfig.allow_skip_timeuse !== undefined) {
         CURRENT_STUDY_CACHE.allow_skip_timeuse =
           backendConfig.allow_skip_timeuse;
+      }
+
+      // Inactivity timeout configuration
+      if (backendConfig.inactivity_timeout_minutes !== undefined) {
+        CURRENT_STUDY_CACHE.inactivity_timeout_minutes =
+          backendConfig.inactivity_timeout_minutes;
+      }
+      if (backendConfig.inactivity_timeout_stress_time_left !== undefined) {
+        CURRENT_STUDY_CACHE.inactivity_timeout_stress_time_left =
+          backendConfig.inactivity_timeout_stress_time_left;
+      }
+      if (backendConfig.inactivity_page_custom_text !== undefined) {
+        CURRENT_STUDY_CACHE.inactivity_page_custom_text =
+          backendConfig.inactivity_page_custom_text;
+      }
+
+      // Study-specific footer links
+      if (backendConfig.footer_links != null) {
+        CURRENT_STUDY_CACHE.footer_links = backendConfig.footer_links;
+      }
+      if (backendConfig.hide_server_wide_links != null) {
+        CURRENT_STUDY_CACHE.hide_server_wide_links =
+          backendConfig.hide_server_wide_links;
       }
 
       if (backendConfig.consent_given !== undefined) {
@@ -671,8 +754,7 @@ async function syncWithBackendConfig() {
       );
       return CURRENT_STUDY_CACHE;
     } else if (response.status === 403) {
-      let errorMessage =
-        'You are not authorized to participate in this study.';
+      let errorMessage = 'You are not authorized to participate in this study.';
       let errorCode = 'STUDY_NOT_AUTHORIZED';
       try {
         const payload = await response.json();
@@ -705,6 +787,13 @@ async function syncWithBackendConfig() {
       participantIdRequiredError.code = 'STUDY_PARTICIPANT_ID_REQUIRED';
       participantIdRequiredError.status = 400;
       throw participantIdRequiredError;
+    } else if (response.status === 404) {
+      const notFoundError = new Error(
+        `Study '${studyName}' not found on server.`
+      );
+      notFoundError.code = 'STUDY_NOT_FOUND';
+      notFoundError.status = 404;
+      throw notFoundError;
     } else {
       if (!CURRENT_STUDY_CACHE) {
         const noStudiesError = new Error('No studies available.');
@@ -719,7 +808,8 @@ async function syncWithBackendConfig() {
     if (
       error?.code === 'STUDY_NOT_AUTHORIZED' ||
       error?.code === 'STUDY_UNAVAILABLE' ||
-      error?.code === 'STUDY_PARTICIPANT_ID_REQUIRED'
+      error?.code === 'STUDY_PARTICIPANT_ID_REQUIRED' ||
+      error?.code === 'STUDY_NOT_FOUND'
     ) {
       throw error;
     }
@@ -792,12 +882,16 @@ async function initializeStudyConfig() {
       error?.code === 'STUDY_NOT_AUTHORIZED' ||
       error?.code === 'STUDY_UNAVAILABLE' ||
       error?.code === 'STUDY_PARTICIPANT_ID_REQUIRED' ||
+      error?.code === 'STUDY_NOT_FOUND' ||
       error?.code === 'NO_STUDIES_AVAILABLE' ||
       error?.code === 'STUDY_CHOICES_AVAILABLE'
     ) {
       throw error;
     }
-    console.log('Background sync failed:', error && error.message ? error.message : error);
+    console.log(
+      'Background sync failed:',
+      error && error.message ? error.message : error
+    );
   }
 
   if (!CURRENT_STUDY_CACHE) {
@@ -805,6 +899,10 @@ async function initializeStudyConfig() {
     noStudiesError.code = 'NO_STUDIES_AVAILABLE';
     throw noStudiesError;
   }
+
+  // Notify footer.js and other consumers that study config is ready
+  window.TUD_STUDY_CONFIG = CURRENT_STUDY_CACHE;
+  window.dispatchEvent(new CustomEvent('tud:studyConfigReady'));
 
   return CURRENT_STUDY_CACHE;
 }
@@ -948,4 +1046,8 @@ export {
   getDayLabel,
   getDayDisplayLabel,
   getStudyDaysCount,
+  // Pure helpers, exported for unit testing.
+  normalizeDayLabels,
+  resolveLocalizedStudyText,
+  normalizeLanguageCode,
 };

@@ -1,3 +1,4 @@
+// @ts-check
 // Time constants
 export const MINUTES_PER_DAY = 24 * 60;
 export const INCREMENT_MINUTES = 10;
@@ -7,4 +8,4 @@ export const TIMELINE_HOURS = 24;
 
 // Debug mode
 export const DEBUG_MODE = true;
-export const TUD_FRONTEND_VERSION = '0.16.0';
+export const TUD_FRONTEND_VERSION = '0.19.0';

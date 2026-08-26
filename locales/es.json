@@ -5,17 +5,6 @@
     "welcomeTitle": "Welcome to Your Weekly Time Diary. Thank you for participating!",
     "generalInfoTitle": "General Information on the Study",
     "studyIntroDefault": "This is our time use study.<br><br>We are asking you to <b>reconstruct a typical week</b> of your daily activities using our time use tool.<br><br>Which week should I choose? Please think of your past week (the last 7 days).<br>Exception: If you were sick or on holiday last week, please choose a different recent week that better represents your normal routine.",
-    "timeSavingFeature": "Time-Saving Feature: You do not need to start from scratch every day. After you complete the first day, your schedule will automatically copy over to the next day as a template. Please adapt this template to reflect any changes in your activities for that day.",
-    "howToFillTitle": "How to fill out the diary",
-    "howToFillDescription": "You will see a list of activities at the bottom of the screen. You can drag and drop these activities onto the timeline to indicate what you were doing throughout the day.",
-    "howToFillTwoSteps": "You will enter information in two steps for each day:",
-    "mainActivityHelp": "<b>Main Activity (Level 1)</b> Drag and drop activities from the activities list onto the time line to show your main activity.",
-    "secondaryActivityHelp": "<b>Secondary Activity (Level 2)</b> Use this second timeline only if you were doing two things at once. This is for activities that were happening in the background or simultaneously with your Main Activity, e.g.:",
-    "secondaryExamples": {
-      "media": "Media Multitasking: If you were using a second form of media (e.g., listening to a Podcast while Gaming, or checking Social Media while watching TV).",
-      "other": "Other Multitasking: If you were doing a non-digital activity simultaneously (e.g., Reading while Commuting, or Knitting while watching TV).",
-      "note": "Note: If you were focused on only one thing, leave this level blank for that time block."
-    },
     "visualGuideTitle": "Visual Illustrations of how to use the Interface",
     "startPrompt": "Please click the blue Start button to begin your diary entry.",
     "mainInstruction": "Piensa en las actividades que hiciste <span class=\"emphasis\">ayer</span>. Luego, completa la línea de tiempo con las actividades que realizaste.",
@@ -35,7 +24,7 @@
       "submitHelp": "Haz clic para enviar tu diario completado"
     },
     "helpfulTools": "Herramientas útiles",
-    "undoHelp": "¿Cometiste un error? Revierte tu última acción",
+    "removeLastHelp": "Elimina la última actividad colocada",
     "cleanRowHelp": "¿Quieres empezar de nuevo? Limpia la fila",
     "customActivityHelp": "¿Actividad no listada? Añade una actividad personalizada",
     "customActivityName": "Otra no listada (ingresar)"
@@ -52,7 +41,8 @@
     "studyNameShort": "Nombre corto del estudio",
     "saving": "Guardando consentimiento...",
     "saveError": "No se pudo guardar el consentimiento. Inténtalo de nuevo.",
-    "loadError": "No se pudo cargar la información de consentimiento."
+    "loadError": "No se pudo cargar la información de consentimiento.",
+    "studyNotFound": "El estudio solicitado no existe."
   },
   "common": {
     "language": "Language",
@@ -61,12 +51,14 @@
   },
   "buttons": {
     "submit": "Enviar",
+    "saveDay": "Guardar día",
+    "finishStudy": "Enviar día y finalizar el estudio",
     "start": "Comenzar",
-    "undo": "Deshacer",
+    "removeLast": "Eliminar última",
     "cleanRow": "Limpiar Fila",
     "next": "Siguiente",
     "skipReporting": "Omitir reporte de tiempo",
-    "back": "Atrás",
+    "previousTimeline": "Línea de tiempo anterior",
     "backToInstructions": "Volver a Instrucciones",
     "giveConsent": "Doy mi consentimiento y continúo",
     "declineConsent": "No doy mi consentimiento",
@@ -99,7 +91,8 @@
       "infoOnTemplate": "Para el día siguiente verás los datos ingresados hoy como plantilla para ayudarte a reportar más fácilmente. Adáptala según sea necesario.<br /><br /> Recuerda que puedes eliminar datos manteniendo presionado o pasando el cursor sobre la actividad en la línea de tiempo y presionando 'd' o DEL.",
       "studyEnd": "Esta entrega concluye el estudio.",
       "submitDay": "Enviar día {{dayLabel}}",
-      "submitDayAndFinish": "Enviar día {{dayLabel}} y finalizar estudio"
+      "submitDayAndFinish": "Enviar día {{dayLabel}} y finalizar estudio",
+      "submitDayNoDay": "Enviar día"
     },
     "confirmSkip": {
       "title": "¿Realmente quieres omitir todo el reporte de tiempo?",
@@ -114,6 +107,7 @@
       "message": "Por favor espera mientras guardamos tus respuestas."
     },
     "activityContext": {
+      "copy": "Copiar",
       "showInfo": "Mostrar información",
       "delete": "Eliminar",
       "infoTitle": "Detalles de la actividad",
@@ -129,6 +123,7 @@
   "messages": {
     "selectStudy": "Seleccione un estudio para continuar",
     "noStudiesAvailable": "No hay estudios disponibles en el servidor.",
+    "studyNotFound": "El estudio solicitado no existe.",
     "loading": "Cargando...",
     "saving": "Guardando...",
     "saved": "Guardado exitosamente",
@@ -140,6 +135,7 @@
     "sending_retry": "Reintentando guardar tu diario (intento {{attempt}}/{{maxRetries}})...",
     "timelineCoverageMet": "✓",
     "timelineCoverageMetAria": "Cobertura mínima cumplida",
+    "dayCompleteAria": "Día completado (cobertura mínima alcanzada)",
     "timelineCoverageMissing": "{{covered}} de {{required}} minutos requeridos cubiertos",
     "timelineMissing": "Falta información en esta línea de tiempo. ¿Te gustaría añadir algo?",
     "timelineHoverInactive": "Haz clic para cambiar a esta línea de tiempo",
@@ -148,10 +144,25 @@
     "invalidPlacement": "Cannot place activity here due to invalid position.",
     "timelineValidationError": "Timeline validation error: {{message}}",
     "templateLoadedBanner": "Hemos cargado tus actividades del <strong>{{day}}</strong> como punto de partida. Haz clic en <strong>'Limpiar Fila'</strong> para empezar de cero o edita las actividades a continuación. En móvil, elimina una actividad con una pulsación larga. En escritorio, haz clic derecho sobre una actividad y elige <strong>'Eliminar'</strong> (o pasa el cursor por encima y pulsa la tecla DEL o 'd').",
+    "templateCopiedBanner": "Hemos precargado tu diario con las actividades de un participante de plantilla. Haz clic en <strong>'Limpiar Fila'</strong> para empezar de cero o edita las actividades a continuación.",
     "reportingForDay": "Reporting for day:",
     "studyDayOf": "Día {{current}} de {{total}}",
     "currentDayTooltip": "{{dayName}} (Día {{current}} de {{total}})",
-    "goBackToEditPreviousDays": "Cambiar al día:"
+    "goBackToEditPreviousDays": "Cambiar al día:",
+    "copyDayLink": "Copiar este día",
+    "copyToDay": "Copiar a otro día",
+    "copySuccess": "Se copió {{sourceDay}} a {{targetDay}}",
+    "copyError": "Error al copiar: {{message}}",
+    "copyEmptySource": "El día de origen no tiene actividades para copiar.",
+    "completeMinimumActivitiesBeforeSwitching": "Completa las actividades mínimas antes de cambiar de día.",
+    "completeMinimumActivitiesBeforeCopying": "Complete las actividades mínimas antes de copiar el día actual.",
+    "completeOtherDaysFirst": "Completa primero {{days}} para finalizar el estudio.",
+    "daySavedStayOnPage": "Day saved.",
+    "copyDayEmpty": "empty",
+    "copyDayHasData": "has data",
+    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
+    "submitStudyIncomplete": "Incomplete days: {{days}}",
+    "submitStudySuccess": "Study submitted successfully!"
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Error loading activities configuration:",
@@ -175,12 +186,28 @@
     "title": "TRAC Tareas",
     "heading": "Tareas finales",
     "subtitle": "Por favor, complete las siguientes tareas antes de finalizar el estudio.",
-    "continueLink": "Continuar a la página final"
+    "continueLink": "Continuar a la página final",
+    "statusAlreadyCompleted": "Ya completado",
+    "statusNotCompleted": "No completado",
+    "statusLocked": "Complete otras tareas primero",
+    "diaryTaskTitle": "Rellenar el diario",
+    "diaryTaskDescription": "Complete su diario de uso del tiempo para todos los días del estudio.",
+    "diaryTaskStatusCompleted": "Completado",
+    "diaryTaskStatusNotCompleted": "No completado"
   },
   "footer": {
     "title": "TRAC",
     "backend_status_connecting": "Conectando al backend...",
     "backend_status_connected": "Conectado al backend",
     "backend_status_error": "Error al conectar con el backend"
+  },
+  "idleTimeout": {
+    "tooltip": "Tiempo de inactividad agotado. Haga clic para confirmar que sigue aquí y reiniciar el temporizador."
+  },
+  "openStudies": {
+    "pageTitle": "Estudios abiertos | TRAC",
+    "heading": "TRAC -- Estudios abiertos",
+    "noStudies": "No hay estudios abiertos disponibles.",
+    "accessLink": "Acceder al estudio"
   }
 }

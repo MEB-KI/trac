@@ -5,17 +5,6 @@
     "welcomeTitle": "Tervetuloa viikoittaiseen ajankäyttöpäiväkirjaasi. Kiitos osallistumisestasi!",
     "generalInfoTitle": "Yleistä tietoa tutkimuksesta",
     "studyIntroDefault": "Tämä on ajankäyttötutkimuksemme.<br><br>Pyydämme sinua <b>rekonstruoimaan tyypillisen viikon</b> päivittäisistä toiminnoistasi ajankäyttötyökalumme avulla.<br><br>Minkä viikon minun tulisi valita? Ajattele viime viikkoa (viimeiset 7 päivää).<br>Poikkeus: Jos olit viime viikolla sairas tai lomalla, valitse jokin muu viimeaikainen viikko, joka kuvaa paremmin normaalia arkeasi.",
-    "timeSavingFeature": "Aikaa säästävä ominaisuus: Sinun ei tarvitse aloittaa alusta joka päivä. Kun olet täyttänyt ensimmäisen päivän, aikataulusi kopioidaan automaattisesti seuraavalle päivälle malliksi. Muokkaa tätä mallia vastaamaan kyseisen päivän muutoksia.",
-    "howToFillTitle": "Kuinka täyttää päiväkirja",
-    "howToFillDescription": "Näet näytön alareunassa listan toiminnoista. Voit vetää ja pudottaa nämä toiminnot aikajanalle osoittaaksesi, mitä teit päivän aikana.",
-    "howToFillTwoSteps": "Syötät tiedot kahdessa vaiheessa jokaiselle päivälle:",
-    "mainActivityHelp": "<b>Päätoiminto (Taso 1)</b> Vedä ja pudota toimintoja listasta aikajanalle näyttääksesi päätoimintosi.",
-    "secondaryActivityHelp": "<b>Sivutoiminto (Taso 2)</b> Käytä tätä toista aikajanaa vain, jos teit kahta asiaa samanaikaisesti. Tämä koskee toimintoja, jotka tapahtuivat taustalla tai yhtä aikaa päätoimintosi kanssa, esim.:",
-    "secondaryExamples": {
-      "media": "Median moniajo: Jos käytit toista mediaa samanaikaisesti (esim. kuuntelit podcastia pelatessa tai selasit sosiaalista mediaa katsoessasi televisiota).",
-      "other": "Muu moniajo: Jos teit samanaikaisesti ei-digitaalista toimintaa (esim. luit matkustaessasi tai neuloit katsoessasi televisiota).",
-      "note": "Huom: Jos keskityit vain yhteen asiaan, jätä tämä taso tyhjäksi kyseiseltä ajanjaksolta."
-    },
     "visualGuideTitle": "Visuaaliset ohjeet käyttöliittymän käyttöön",
     "startPrompt": "Klikkaa sinistä Aloita-painiketta aloittaaksesi päiväkirjan täyttämisen.",
     "mainInstruction": "Ajattele toimintoja, joita teit <span class=\"emphasis\">eilen</span>. Täytä sitten koko aikajana tekemilläsi toiminnoilla.",
@@ -35,7 +24,7 @@
       "submitHelp": "Klikkaa lähettääksesi täytetyn päiväkirjan"
     },
     "helpfulTools": "Hyödylliset työkalut",
-    "undoHelp": "Kumoa viimeisin toiminto",
+    "removeLastHelp": "Poista viimeksi sijoitettu toiminto",
     "cleanRowHelp": "Haluatko aloittaa alusta? Tyhjennä rivi",
     "customActivityHelp": "Eikö toimintoa ole listalla? Lisää oma toiminto",
     "customActivityName": "Muu (kirjoita)"
@@ -52,7 +41,8 @@
     "studyNameShort": "Tutkimuksen lyhytnimi",
     "saving": "Tallennetaan suostumusta...",
     "saveError": "Suostumuksen tallentaminen epäonnistui. Yritä uudelleen.",
-    "loadError": "Suostumustietojen lataaminen epäonnistui."
+    "loadError": "Suostumustietojen lataaminen epäonnistui.",
+    "studyNotFound": "Pyydettyä tutkimusta ei ole olemassa."
   },
   "common": {
     "language": "Kieli",
@@ -61,12 +51,14 @@
   },
   "buttons": {
     "submit": "Lähetä päivä",
+    "saveDay": "Tallenna päivä",
+    "finishStudy": "Lähetä päivä ja lopeta tutkimus",
     "start": "Aloita",
-    "undo": "Kumoa",
+    "removeLast": "Poista viimeisin",
     "cleanRow": "Tyhjennä rivi",
     "next": "Seuraava aikajana",
     "skipReporting": "Ohita ajankäytön raportointi",
-    "back": "Takaisin",
+    "previousTimeline": "Edellinen aikajana",
     "backToInstructions": "Takaisin ohjeisiin",
     "giveConsent": "Annan suostumukseni ja jatkan",
     "declineConsent": "En anna suostumustani",
@@ -99,7 +91,8 @@
       "infoOnTemplate": "Seuraavaa päivää varten näet tänään syöttämäsi tiedot mallina helpottamaan raportointia. Muokkaa niitä tarvittaessa.<br /><br /> Muista, että voit poistaa tietoja painamalla pitkään tai viemällä hiiren aikajanalla olevan aktiviteetin päälle ja painamalla 'd' tai DEL.",
       "studyEnd": "Tämä lähetys päättää tutkimuksen.",
       "submitDay": "Lähetä päivä {{dayLabel}}",
-      "submitDayAndFinish": "Lähetä päivä {{dayLabel}} ja lopeta tutkimus"
+      "submitDayAndFinish": "Lähetä päivä {{dayLabel}} ja lopeta tutkimus",
+      "submitDayNoDay": "Lähetä päivä"
     },
     "confirmSkip": {
       "title": "Haluatko varmasti ohittaa ajankäytön raportoinnin?",
@@ -114,6 +107,7 @@
       "message": "Odota, kun tallennamme vastauksesi."
     },
     "activityContext": {
+      "copy": "Kopioi",
       "showInfo": "Näytä tiedot",
       "delete": "Poista",
       "infoTitle": "Toiminnon tiedot",
@@ -129,6 +123,7 @@
   "messages": {
     "selectStudy": "Valitse tutkimus jatkaaksesi",
     "noStudiesAvailable": "Palvelimella ei ole saatavilla tutkimuksia.",
+    "studyNotFound": "Pyydettyä tutkimusta ei ole olemassa.",
     "loading": "Ladataan...",
     "saving": "Tallennetaan...",
     "saved": "Tallennettu onnistuneesti",
@@ -140,6 +135,7 @@
     "sending_retry": "Yritetään tallentaa päiväkirjaa uudelleen (yritys {{attempt}}/{{maxRetries}})...",
     "timelineCoverageMet": "✓",
     "timelineCoverageMetAria": "Vähimmäiskattavuus täyttyi",
+    "dayCompleteAria": "Päivä valmis (vähimmäiskattavuus täytetty)",
     "timelineCoverageMissing": "{{covered}} / {{required}} vaaditusta minuutista katettu",
     "timelineMissing": "Aikajanalta puuttuu tietoja. Haluatko lisätä jotain?",
     "timelineHoverInactive": "Napsauta siirtyäksesi tähän aikajanaan",
@@ -148,10 +144,25 @@
     "invalidPlacement": "Toimintoa ei voi sijoittaa tähän virheellisen sijainnin vuoksi.",
     "timelineValidationError": "Aikajanan validointivirhe: {{message}}",
     "templateLoadedBanner": "Latasimme toimintosi päivästä <strong>{{day}}</strong> lähtökohdaksi. Klikkaa <strong>'Tyhjennä rivi'</strong> aloittaaksesi alusta tai muokkaa alla olevia toimintoja. Mobiilissa poistat yksittäisen toiminnon painamalla sitä pitkään. Tietokoneella napsauta toimintoa hiiren oikealla ja valitse <strong>'Poista'</strong> (tai pidä hiiren osoitin sen päällä ja paina DEL- tai 'd'-näppäintä).",
+    "templateCopiedBanner": "Olemme esitäyttäneet päiväkirjasi malliosallistujan toiminnoilla. Klikkaa <strong>'Tyhjennä rivi'</strong> aloittaaksesi alusta tai muokkaa alla olevia toimintoja.",
     "reportingForDay": "Raportointi päivälle:",
     "studyDayOf": "Päivä {{current}} / {{total}}",
     "currentDayTooltip": "{{dayName}} (Päivä {{current}} / {{total}})",
-    "goBackToEditPreviousDays": "Vaihda päivään:"
+    "goBackToEditPreviousDays": "Vaihda päivään:",
+    "copyDayLink": "Kopioi tämä päivä",
+    "copyToDay": "Kopioi toiselle päivälle",
+    "copySuccess": "Kopioitu {{sourceDay}} päivälle {{targetDay}}",
+    "copyError": "Kopiointi epäonnistui: {{message}}",
+    "copyEmptySource": "Lähdepäivällä ei ole toimintoja kopioitavaksi.",
+    "completeMinimumActivitiesBeforeSwitching": "Täytä vähimmäisaktiviteetit ennen päivän vaihtamista.",
+    "completeMinimumActivitiesBeforeCopying": "Täytä vähimmäisaktiviteetit ennen nykyisen päivän kopioimista.",
+    "completeOtherDaysFirst": "Täytä ensin {{days}} päättääksesi tutkimuksen.",
+    "daySavedStayOnPage": "Day saved.",
+    "copyDayEmpty": "empty",
+    "copyDayHasData": "has data",
+    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
+    "submitStudyIncomplete": "Incomplete days: {{days}}",
+    "submitStudySuccess": "Study submitted successfully!"
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Virhe toimintojen konfiguraation latauksessa:",
@@ -175,12 +186,28 @@
     "title": "TRAC Tehtävät",
     "heading": "Lopulliset tehtävät",
     "subtitle": "Täytä seuraavat tehtävät ennen kuin lopetat tutkimuksen.",
-    "continueLink": "Jatka lopulliselle sivulle"
+    "continueLink": "Jatka lopulliselle sivulle",
+    "statusAlreadyCompleted": "Jo suoritettu",
+    "statusNotCompleted": "Ei suoritettu",
+    "statusLocked": "Suorita muut tehtävät ensin",
+    "diaryTaskTitle": "Täytä päiväkirja",
+    "diaryTaskDescription": "Täytä ajankäyttöpäiväkirjasi kaikilta tutkimuksen päiviltä.",
+    "diaryTaskStatusCompleted": "Suoritettu",
+    "diaryTaskStatusNotCompleted": "Ei suoritettu"
   },
   "footer": {
     "title": "TRAC",
     "backend_status_connecting": "Yhdistetään taustajärjestelmään...",
     "backend_status_connected": "Yhdistetty taustajärjestelmään",
     "backend_status_error": "Virhe yhdistettäessä taustajärjestelmään"
+  },
+  "idleTimeout": {
+    "tooltip": "Passiivisuuden aikakatkaisu. Napsauta vahvistaaksesi, että olet vielä paikalla, ja nollaa ajastin."
+  },
+  "openStudies": {
+    "pageTitle": "Avoimet tutkimukset | TRAC",
+    "heading": "TRAC -- Avoimet tutkimukset",
+    "noStudies": "Ei avoimia tutkimuksia saatavilla.",
+    "accessLink": "Siirry tutkimukseen"
   }
 }

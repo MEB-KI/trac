@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TRAC Tasks</title>
-    <link href="/assets/fonts/inter/inter.css" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/fonts/fontawesome/css/all.min.css">
+    <link href="../assets/fonts/inter/inter.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/fonts/fontawesome/css/all.min.css">
     <style>
         :root {
             --primary-color: #2563eb;
@@ -113,6 +113,19 @@
             color: #334155;
         }
 
+        .task-status.is-locked {
+            background: #f1f5f9;
+            color: #94a3b8;
+        }
+
+        .task-item.is-locked {
+            opacity: 0.55;
+        }
+
+        .task-item.is-locked .task-title {
+            color: #94a3b8;
+        }
+
         .task-description {
             font-size: 14px;
             color: var(--secondary-color);
@@ -150,12 +163,6 @@
             display: none;
         }
 
-        .info {
-            color: var(--secondary-color);
-            font-size: 14px;
-            margin-top: 18px;
-        }
-
         @media (max-width: 480px) {
             body {
                 grid-template-columns: 12px 1fr 12px;
@@ -178,8 +185,6 @@
         <p id="tasks-subtitle" class="subtitle" data-i18n="taskPage.subtitle">Please complete the following tasks before finishing the study.</p>
 
         <ul id="tasks-list" class="task-list"></ul>
-
-        <p id="tasks-info" class="info"></p>
 
         <div id="continue-wrapper" class="footer-actions hidden">
             <a id="continue-link" class="continue-btn" href="#">
@@ -260,6 +265,15 @@
             }
         }
 
+        function buildDiaryUrl() {
+            const currentUrl = new URL(window.location.href);
+            const diaryUrl = new URL('../index.html', currentUrl.href);
+            currentUrl.searchParams.forEach((value, key) => {
+                diaryUrl.searchParams.set(key, value);
+            });
+            return diaryUrl.toString();
+        }
+
         function buildThankYouUrl() {
             const currentUrl = new URL(window.location.href);
             const redirectUrl = new URL('thank-you.html', currentUrl.href);
@@ -308,8 +322,16 @@
 
         function getCallbackParams() {
             const urlParams = getUrlParams();
-            const taskKey = (urlParams.get('callback_task_key') || '').trim();
-            const assignedToken = (urlParams.get('callback_token') || '').trim();
+            const taskKey = (
+                urlParams.get('callback_task_key') ||
+                urlParams.get('task_key') ||
+                ''
+            ).trim();
+            const assignedToken = (
+                urlParams.get('callback_token') ||
+                urlParams.get('token') ||
+                ''
+            ).trim();
 
             if (!taskKey || !assignedToken) {
                 return null;
@@ -411,19 +433,60 @@
 
         function renderTaskList(studyConfig) {
             const tasksList = document.getElementById('tasks-list');
-            const tasksInfo = document.getElementById('tasks-info');
             const continueWrapper = document.getElementById('continue-wrapper');
             const continueLink = document.getElementById('continue-link');
 
-            if (!tasksList || !tasksInfo || !continueWrapper || !continueLink) {
+            if (!tasksList || !continueWrapper || !continueLink) {
                 return;
             }
 
             tasksList.innerHTML = '';
 
+            const statusCompleted = getLocalizedText('taskPage.statusAlreadyCompleted', 'Already completed');
+            const statusPending = getLocalizedText('taskPage.statusNotCompleted', 'Not completed');
+            const statusLocked = getLocalizedText('taskPage.statusLocked', 'Complete other tasks first');
+
+            const diaryTitle = getLocalizedText('taskPage.diaryTaskTitle', 'Fill out diary');
+            const diaryDescription = getLocalizedText('taskPage.diaryTaskDescription', 'Complete your time-use diary for all days of the study.');
+            const diaryCompletedLabel = getLocalizedText('taskPage.diaryTaskStatusCompleted', 'Completed');
+            const diaryNotCompletedLabel = getLocalizedText('taskPage.diaryTaskStatusNotCompleted', 'Not completed');
+
+            const diaryCompleted = studyConfig?.participant_has_completed_study === true;
+
+            const diaryLi = document.createElement('li');
+            diaryLi.className = 'task-item';
+
+            const diaryTitleRow = document.createElement('div');
+            diaryTitleRow.className = 'task-title-row';
+
+            const diaryTitleEl = document.createElement(diaryCompleted ? 'span' : 'a');
+            diaryTitleEl.className = diaryCompleted ? 'task-title' : 'task-title task-link';
+            diaryTitleEl.textContent = diaryTitle;
+            if (!diaryCompleted) {
+                diaryTitleEl.href = buildDiaryUrl();
+            }
+
+            const diaryStatus = document.createElement('span');
+            if (diaryCompleted) {
+                diaryStatus.className = 'task-status is-completed';
+                diaryStatus.textContent = diaryCompletedLabel;
+            } else {
+                diaryStatus.className = 'task-status';
+                diaryStatus.textContent = diaryNotCompletedLabel;
+            }
+
+            diaryTitleRow.appendChild(diaryTitleEl);
+            diaryTitleRow.appendChild(diaryStatus);
+            diaryLi.appendChild(diaryTitleRow);
+
+            const diaryDesc = document.createElement('p');
+            diaryDesc.className = 'task-description';
+            diaryDesc.textContent = diaryDescription;
+            diaryLi.appendChild(diaryDesc);
+
+            tasksList.appendChild(diaryLi);
+
             const eligibleTasks = getEligibleTasks(studyConfig);
-            const statusCompleted = getLocalizedText('thankYou.statusAlreadyCompleted', 'Already completed');
-            const statusPending = getLocalizedText('thankYou.statusNotCompleted', 'Not completed');
 
             eligibleTasks.forEach((task) => {
                 const li = document.createElement('li');
@@ -432,27 +495,33 @@
                 const titleRow = document.createElement('div');
                 titleRow.className = 'task-title-row';
 
-                const title = document.createElement(task?.is_confirmed === true ? 'span' : 'a');
-                title.className = task?.is_confirmed === true ? 'task-title' : 'task-title task-link';
+                const hasContinuationUrl = typeof task?.continuation_url === 'string' && task.continuation_url.trim() !== '';
+                const isLink = task?.is_confirmed !== true && hasContinuationUrl;
+                const isLocked = task?.is_confirmed !== true && !hasContinuationUrl;
+
+                const title = document.createElement(isLink ? 'a' : 'span');
+                title.className = isLink ? 'task-title task-link' : 'task-title';
                 title.textContent =
                     typeof task?.name === 'string' && task.name.trim() !== ''
                         ? task.name.trim()
                         : getLocalizedText('thankYou.continueLink', 'Click here to continue.');
 
-                if (task?.is_confirmed !== true) {
-                    if (typeof task?.continuation_url === 'string' && task.continuation_url.trim() !== '') {
-                        title.href = appendReturnUrlToTargetUrl(task.continuation_url);
-                    } else {
-                        title.href = '#';
-                        title.classList.remove('task-link');
-                    }
+                if (isLink) {
+                    title.href = appendReturnUrlToTargetUrl(task.continuation_url);
                 }
 
                 const status = document.createElement('span');
-                status.className = task?.is_confirmed === true
-                    ? 'task-status is-completed'
-                    : 'task-status';
-                status.textContent = task?.is_confirmed === true ? statusCompleted : statusPending;
+                if (task?.is_confirmed === true) {
+                    status.className = 'task-status is-completed';
+                    status.textContent = statusCompleted;
+                } else if (isLocked) {
+                    status.className = 'task-status is-locked';
+                    status.textContent = statusLocked;
+                    li.classList.add('is-locked');
+                } else {
+                    status.className = 'task-status';
+                    status.textContent = statusPending;
+                }
 
                 titleRow.appendChild(title);
                 titleRow.appendChild(status);
@@ -470,16 +539,8 @@
 
             const pending = hasPendingTasks(studyConfig);
             if (pending) {
-                tasksInfo.textContent = getLocalizedText(
-                    'thankYou.subtitle',
-                    'Please complete all tasks above and return here.'
-                );
                 continueWrapper.classList.add('hidden');
             } else {
-                tasksInfo.textContent = getLocalizedText(
-                    'thankYou.subtitle',
-                    'All tasks are complete. You can continue to the final page.'
-                );
                 continueLink.href = buildThankYouUrl();
                 continueWrapper.classList.remove('hidden');
             }

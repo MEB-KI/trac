@@ -10,7 +10,6 @@ import {
 import {
   getCurrentTimelineData,
   getCurrentTimelineKey,
-  createTimelineDataFrame,
   sendData,
   getPostDiaryRedirectPath,
   validateMinCoverage,
@@ -45,10 +44,29 @@ import {
   TIMELINE_HOURS,
   TUD_FRONTEND_VERSION,
 } from './constants.js';
+import { startIdleTimer, stopIdleTimer } from './idle_timeout.js';
 import { checkAndRequestPID } from './utils.js';
 
-// Make window.selectedActivity a global property that persists across DOM changes
-window.selectedActivity = null;
+// Make window.selectedActivity a global property that persists across DOM changes.
+// Using a property setter so the body cursor updates automatically whenever an
+// activity is selected (→ crosshair to indicate "carrying" it) or cleared.
+(function () {
+  let _selectedActivity = null;
+  Object.defineProperty(window, 'selectedActivity', {
+    get() {
+      return _selectedActivity;
+    },
+    set(value) {
+      _selectedActivity = value;
+      if (value) {
+        document.body.classList.add('carrying-activity');
+      } else {
+        document.body.classList.remove('carrying-activity');
+      }
+    },
+    configurable: true,
+  });
+})();
 
 // Single timeline management object
 window.timelineManager = {
@@ -68,6 +86,30 @@ window.customInputContext = {
   parentActivity: null,
   categoryName: null,
 };
+
+// ── Copy Days: sessionStorage helpers for template suppression ───────────
+// When a user saves a day (even empty), we record it so templates aren't
+// re-loaded on the next visit within the same browser session.  If the user
+// closes the tab and returns, templates are offered again — that's a fresh
+// session and the head-start is useful.
+
+function _daySavedKey(study, pid, dayIndex) {
+  return 'tud_saved_' + study + '_' + pid + '_' + dayIndex;
+}
+
+function markDaySaved(study, pid, dayIndex) {
+  try {
+    sessionStorage.setItem(_daySavedKey(study, pid, dayIndex), '1');
+  } catch (_) { /* storage full or unavailable — best effort */ }
+}
+
+function wasDaySaved(study, pid, dayIndex) {
+  try {
+    return sessionStorage.getItem(_daySavedKey(study, pid, dayIndex)) === '1';
+  } catch (_) { return false; }
+}
+
+window.markDaySaved = markDaySaved;
 
 function clearSelectedActivityButtons() {
   document.querySelectorAll('.activity-button.selected').forEach((btn) => {
@@ -110,6 +152,61 @@ function getFrequencyOptionsForActivity(activity, childItem = null) {
   return normalizeFrequencyOptions(childItem || activity);
 }
 
+// ---- Saved custom activity texts (per activity code, persisted in localStorage) ----
+const CUSTOM_TEXT_STORAGE_KEY = 'tud_custom_activity_texts';
+
+function _loadCustomTexts() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TEXT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function _saveCustomTexts(texts) {
+  try {
+    localStorage.setItem(CUSTOM_TEXT_STORAGE_KEY, JSON.stringify(texts));
+  } catch {
+    // storage full or unavailable — ignore silently
+  }
+}
+
+function getSavedCustomText(activityCode) {
+  if (!activityCode) return '';
+  return _loadCustomTexts()[activityCode] || '';
+}
+
+function saveCustomText(activityCode, text) {
+  if (!activityCode) return;
+  const texts = _loadCustomTexts();
+  const trimmed = (text || '').trim();
+  if (trimmed) {
+    texts[activityCode] = trimmed;
+  } else {
+    delete texts[activityCode];
+  }
+  _saveCustomTexts(texts);
+}
+
+function clearSavedCustomText(activityCode) {
+  if (!activityCode) return;
+  const texts = _loadCustomTexts();
+  delete texts[activityCode];
+  _saveCustomTexts(texts);
+}
+
+// Expose for the clear button in the modal to access
+window.tudClearCustomActivityText = function (activityCode) {
+  clearSavedCustomText(activityCode);
+  const input = document.getElementById('customActivityInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+};
+// ---- End saved custom texts ----
+
 function getActivityDetailsModalElements() {
   const modal = document.getElementById('customActivityModal');
   if (!modal) {
@@ -134,9 +231,10 @@ function createFrequencyIndicator() {
   const indicator = document.createElement('span');
   indicator.className = 'activity-frequency-indicator';
   indicator.textContent = '⟳';
-  indicator.title = window.i18n && window.i18n.isReady()
-    ? window.i18n.t('modals.customActivity.frequency')
-    : 'Frequency';
+  indicator.title =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t('modals.customActivity.frequency')
+      : 'Frequency';
   indicator.setAttribute('aria-hidden', 'true');
   return indicator;
 }
@@ -150,9 +248,10 @@ function populateFrequencySelect(selectElement, options, selectedKey = '') {
 
   const placeholderOption = document.createElement('option');
   placeholderOption.value = '';
-  placeholderOption.textContent = window.i18n && window.i18n.isReady()
-    ? window.i18n.t('modals.customActivity.frequencyNone')
-    : 'No special frequency';
+  placeholderOption.textContent =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t('modals.customActivity.frequencyNone')
+      : 'No special frequency';
   selectElement.appendChild(placeholderOption);
 
   options.forEach((option) => {
@@ -172,6 +271,7 @@ function openActivityDetailsModal({
   inputPlaceholder = '',
   frequencyOptions = [],
   selectedFrequencyKey = '',
+  activityCode = null,
   onConfirm,
 }) {
   const elements = getActivityDetailsModalElements();
@@ -194,12 +294,24 @@ function openActivityDetailsModal({
     titleElement.textContent = title;
   }
 
+  // Determine the initial value: explicit inputValue takes precedence over saved text
+  const savedText =
+    !inputValue && activityCode ? getSavedCustomText(activityCode) : '';
+  const initialValue = inputValue || savedText;
+
   if (inputContainer && input) {
     inputContainer.style.display = showInput ? 'block' : 'none';
-    input.value = showInput ? inputValue : '';
+    input.value = showInput ? initialValue : '';
     if (inputPlaceholder) {
       input.placeholder = inputPlaceholder;
     }
+  }
+
+  // Update clear-button visibility based on whether we have an activityCode
+  const clearBtn = document.getElementById('customActivityClearBtn');
+  if (clearBtn) {
+    clearBtn.style.display =
+      activityCode && savedText ? 'inline-block' : 'none';
   }
 
   const normalizedFrequencyOptions = Array.isArray(frequencyOptions)
@@ -209,9 +321,10 @@ function openActivityDetailsModal({
     const shouldShowFrequency = normalizedFrequencyOptions.length > 0;
     frequencyContainer.style.display = shouldShowFrequency ? 'block' : 'none';
     if (frequencyLabel && shouldShowFrequency) {
-      frequencyLabel.textContent = window.i18n && window.i18n.isReady()
-        ? window.i18n.t('modals.customActivity.frequency')
-        : 'Frequency';
+      frequencyLabel.textContent =
+        window.i18n && window.i18n.isReady()
+          ? window.i18n.t('modals.customActivity.frequency')
+          : 'Frequency';
     }
     populateFrequencySelect(
       frequencySelect,
@@ -226,6 +339,20 @@ function openActivityDetailsModal({
   if (showInput && input) {
     const newInput = input.cloneNode(true);
     input.parentNode.replaceChild(newInput, input);
+
+    // Re-wire the clear button since the input container was cloned
+    const clonedClearBtn = document.getElementById('customActivityClearBtn');
+    if (clonedClearBtn) {
+      const reWiredClearBtn = clonedClearBtn.cloneNode(true);
+      clonedClearBtn.parentNode.replaceChild(reWiredClearBtn, clonedClearBtn);
+      reWiredClearBtn.addEventListener('click', () => {
+        window.tudClearCustomActivityText(activityCode);
+      });
+      reWiredClearBtn.style.display =
+        activityCode && getSavedCustomText(activityCode)
+          ? 'inline-block'
+          : 'none';
+    }
   }
 
   const refreshedInput = document.getElementById('customActivityInput');
@@ -251,6 +378,11 @@ function openActivityDetailsModal({
     if (showInput && !customText) {
       refreshedInput?.focus();
       return;
+    }
+
+    // Persist the custom text for this activity code so it is pre-filled next time
+    if (activityCode && showInput && customText) {
+      saveCustomText(activityCode, customText);
     }
 
     onConfirm?.({ customText, frequencyKey });
@@ -407,7 +539,9 @@ function getInstructionBannerStorageKey() {
   const studyName =
     window.studyConfigManager?.getCurrentStudy?.()?.name_short ||
     urlParams.get('study_name') ||
-    (TUD_SETTINGS && TUD_SETTINGS.DEFAULT_STUDY_NAME ? TUD_SETTINGS.DEFAULT_STUDY_NAME : '');
+    (TUD_SETTINGS && TUD_SETTINGS.DEFAULT_STUDY_NAME
+      ? TUD_SETTINGS.DEFAULT_STUDY_NAME
+      : '');
   return `instructionBannerClosed:${studyName}:${pid}:day1`;
 }
 
@@ -567,12 +701,15 @@ function deleteActivityBlock(activityBlock) {
     console.error('timelineActivities not found for key:', timelineKey);
   }
 
-  // Update button states (coverage might have changed)
+  // Update button states (coverage might have changed).  renderPreviousDaysSwitchRow()
+  // is called from within updateButtonStates() so the day-switch buttons refresh too.
   updateButtonStates();
   persistPendingTimelineStateSoon();
 
   console.log(`=== DELETION COMPLETE ===`);
 }
+
+window.deleteActivityBlock = deleteActivityBlock;
 
 function initMobileDelete() {
   const LONG_PRESS_DURATION = 1200;
@@ -739,6 +876,81 @@ function initMobileDelete() {
   }
 }
 
+function initMobileSwipeNavigation() {
+  if (!getIsMobile()) return;
+
+  const SWIPE_THRESHOLD = 50;
+  const SWIPE_MAX_VERTICAL = 100;
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let isSwiping = false;
+
+  const timelineCanvas = document.querySelector('.timeline-canvas');
+  if (!timelineCanvas) return;
+
+  timelineCanvas.addEventListener('touchstart', handleTouchStart, {
+    passive: true,
+  });
+  timelineCanvas.addEventListener('touchmove', handleTouchMove, {
+    passive: true,
+  });
+  timelineCanvas.addEventListener('touchend', handleTouchEnd, {
+    passive: true,
+  });
+
+  function handleTouchStart(e) {
+    if (e.touches.length !== 1) return;
+
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+    isSwiping = false;
+  }
+
+  function handleTouchMove(e) {
+    if (e.touches.length !== 1) return;
+
+    const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+    const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+
+    if (deltaX > 20 && deltaX > deltaY) {
+      isSwiping = true;
+    }
+  }
+
+  function handleTouchEnd(e) {
+    if (!isSwiping) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = Math.abs(touchEndY - touchStartY);
+    const deltaTime = Date.now() - touchStartTime;
+
+    if (
+      Math.abs(deltaX) >= SWIPE_THRESHOLD &&
+      deltaY <= SWIPE_MAX_VERTICAL &&
+      deltaTime < 500
+    ) {
+      if (deltaX < 0) {
+        const nextBtn = document.getElementById('nextBtn');
+        if (nextBtn && !nextBtn.disabled) {
+          nextBtn.click();
+        }
+      } else {
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn && backBtn.style.display !== 'none') {
+          backBtn.click();
+        }
+      }
+    }
+
+    isSwiping = false;
+  }
+}
+
 function translateOrFallback(key, fallback) {
   if (!window.i18n?.isReady()) {
     return fallback;
@@ -810,9 +1022,9 @@ function ensureActivityInfoModal() {
   modalOverlay.id = 'activityInfoModal';
   modalOverlay.className = 'modal-overlay';
   modalOverlay.innerHTML = `
-        <div class="modal activity-info-modal">
+        <div class="modal activity-info-modal" role="dialog" aria-modal="true" aria-labelledby="activityInfoModalTitle">
             <div class="modal-header">
-                <h3>${translateOrFallback(
+                <h3 id="activityInfoModalTitle">${translateOrFallback(
                   'modals.activityContext.infoTitle',
                   'Activity details'
                 )}</h3>
@@ -903,6 +1115,44 @@ function showActivityInfoModal(activityBlock) {
   modalOverlay.style.display = 'block';
 }
 
+function handleCopyActivity(activityBlock) {
+  if (!activityBlock || !activityBlock.isConnected) {
+    return;
+  }
+
+  const activityId = activityBlock.dataset.id;
+  const timelineKey = activityBlock.dataset.timelineKey;
+  const timelineActivities =
+    window.timelineManager.activities[timelineKey] || [];
+  const storedActivity = timelineActivities.find((activity) =>
+    activityIdsEqual(activity.id, activityId)
+  );
+
+  if (!storedActivity) {
+    console.error('Cannot copy: activity not found in timeline data');
+    return;
+  }
+
+  clearSelectedActivityButtons();
+
+  window.selectedActivity = {
+    name: storedActivity.activity,
+    category: storedActivity.category,
+    code: storedActivity.code,
+    codes: storedActivity.codes,
+    color: storedActivity.color,
+    parentName: storedActivity.parentName,
+    parentCode: storedActivity.parentCode,
+    selected: storedActivity.selected,
+    isCustomInput: storedActivity.isCustomInput,
+    originalSelection: storedActivity.originalSelection,
+    frequencyKey: storedActivity.frequencyKey || null,
+    selections: storedActivity.selections || undefined,
+    availableOptions: storedActivity.availableOptions || undefined,
+    blockLength: storedActivity.blockLength || DEFAULT_ACTIVITY_LENGTH,
+  };
+}
+
 function initDesktopActivityContextMenu() {
   const MENU_ID = 'activityContextMenu';
   let targetBlock = null;
@@ -917,6 +1167,10 @@ function initDesktopActivityContextMenu() {
     menu.id = MENU_ID;
     menu.className = 'activity-context-menu';
     menu.innerHTML = `
+            <button type="button" class="activity-context-menu-item" data-action="copy">${translateOrFallback(
+              'modals.activityContext.copy',
+              'Copy'
+            )}</button>
             <button type="button" class="activity-context-menu-item" data-action="show-info">${translateOrFallback(
               'modals.activityContext.showInfo',
               'Show info'
@@ -941,7 +1195,9 @@ function initDesktopActivityContextMenu() {
         return;
       }
 
-      if (action === 'show-info') {
+      if (action === 'copy') {
+        handleCopyActivity(blockForAction);
+      } else if (action === 'show-info') {
         showActivityInfoModal(blockForAction);
       } else if (action === 'delete') {
         deleteActivityBlock(blockForAction);
@@ -1205,6 +1461,17 @@ function createActivityBlock(activityData, isFromTemplate = false) {
 
   // No extra title attribute - child/custom label is shown inline in the block
 
+  // Give the focusable block an accessible name (activity + time range) so a
+  // screen reader can announce what the block is when it receives focus.
+  currentBlock.setAttribute('role', 'group');
+  const blockStartTime = currentBlock.dataset.start;
+  const blockEndTime = currentBlock.dataset.end;
+  const blockA11yLabel =
+    blockStartTime && blockEndTime
+      ? `${combinedActivityText}, ${blockStartTime}\u2013${blockEndTime}`
+      : combinedActivityText;
+  currentBlock.setAttribute('aria-label', blockA11yLabel);
+
   // Make block keyboard-focusable for arrow-key resize
   currentBlock.tabIndex = 0;
   currentBlock.addEventListener('keydown', (event) => {
@@ -1293,6 +1560,11 @@ function createActivityBlock(activityData, isFromTemplate = false) {
       activityEntry.endMinutes = newEnd;
       activityEntry.blockLength = newEnd - newStart;
     }
+
+    // Arrow-key changes to start/end time affect coverage, so refresh the
+    // Next/Submit and day-switch button states the same way drag/resize end
+    // does (updateButtonStates() also re-renders #previousDaysSwitchRow).
+    updateButtonStates();
   });
 
   // Positioning logic
@@ -1468,12 +1740,7 @@ function recreateActivityBlockFromTemplate(activityData) {
 
   // Create time label
   const timeLabel = createTimeLabel(currentBlock);
-  updateTimeLabel(
-    timeLabel,
-    activityData.startTime,
-    activityData.endTime,
-    currentBlock
-  );
+  updateTimeLabel(timeLabel);
 
   // Ensure the activity data in the manager matches
   console.log(
@@ -2359,6 +2626,9 @@ function createChildItemsModal() {
   modal.id = 'childItemsModal';
   modal.className = 'modal';
   modal.style.display = 'none';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'childItemsModalTitle');
 
   const modalContent = document.createElement('div');
   modalContent.className = 'modal-content';
@@ -2366,9 +2636,12 @@ function createChildItemsModal() {
   const modalHeader = document.createElement('div');
   modalHeader.className = 'modal-header';
 
-  const closeButton = document.createElement('span');
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
   closeButton.className = 'close';
   closeButton.innerHTML = '&times;';
+  closeButton.setAttribute('aria-label', 'Close');
+  closeButton.setAttribute('data-i18n-aria-label', 'buttons.close');
   closeButton.addEventListener('click', () => {
     modal.style.display = 'none';
   });
@@ -2537,7 +2810,15 @@ function renderChildItems(activity, categoryName) {
             frequencyOptions
           );
 
-          customActivityInput.value = ''; // Clear previous input
+          customActivityInput.value = getSavedCustomText(childItem.code); // Use saved text if available
+          // Update clear-button visibility
+          const clearBtn = document.getElementById('customActivityClearBtn');
+          if (clearBtn) {
+            clearBtn.style.display = getSavedCustomText(childItem.code)
+              ? 'inline-block'
+              : 'none';
+            clearBtn.setAttribute('data-activity-code', childItem.code || '');
+          }
           customActivityModal.style.display = 'block';
           customActivityInput.focus();
 
@@ -2553,12 +2834,30 @@ function renderChildItems(activity, categoryName) {
             const newInputField = inputField.cloneNode(true);
             inputField.parentNode.replaceChild(newInputField, inputField);
 
+            // Re-wire the clear button since the input was cloned
+            const newClearBtn = document.getElementById(
+              'customActivityClearBtn'
+            );
+            if (newClearBtn) {
+              const clonedClearBtn = newClearBtn.cloneNode(true);
+              newClearBtn.parentNode.replaceChild(clonedClearBtn, newClearBtn);
+              clonedClearBtn.addEventListener('click', () => {
+                clearSavedCustomText(childItem.code || '');
+                newInputField.value = '';
+                newInputField.focus();
+                clonedClearBtn.style.display = 'none';
+              });
+            }
+
             // Handle custom activity submission for child items
             const handleChildItemCustomActivity = () => {
               const customText = newInputField.value.trim();
               const selectedFrequencyKey =
                 customActivityFrequencySelect?.value || null;
               if (customText) {
+                // Persist the custom text for this activity code
+                saveCustomText(childItem.code, customText);
+
                 // Create child item structure with custom text
                 window.selectedActivity = {
                   name: customText,
@@ -2801,6 +3100,7 @@ function renderActivities(
               title: `Enter custom value for: ${activity.name}`,
               showInput: true,
               frequencyOptions,
+              activityCode: activity.code,
               onConfirm: ({ customText, frequencyKey }) => {
                 clearSelectedActivityButtons();
                 window.selectedActivity = {
@@ -3107,6 +3407,7 @@ function renderActivities(
               title: `Enter custom value for: ${activity.name}`,
               showInput: true,
               frequencyOptions,
+              activityCode: activity.code,
               onConfirm: ({ customText, frequencyKey }) => {
                 clearSelectedActivityButtons();
                 window.selectedActivity = {
@@ -4136,6 +4437,168 @@ function initTimelineInteraction(timeline) {
     },
   });
 
+  // Initialize interact.js draggable (desktop only)
+  if (!getIsMobile()) {
+    interact('.activity-block').draggable({
+      modifiers: [
+        // Snap to 10-minute grid horizontally
+        interact.modifiers.snap({
+          targets: [
+            interact.snappers.grid({
+              x: (timelineRect) => (10 / (24 * 60)) * timelineRect.width,
+              y: Infinity, // Don't snap vertically
+            }),
+          ],
+          range: Infinity,
+          relativePoints: [{ x: 0, y: 0 }],
+        }),
+        // Restrict to timeline bounds
+        interact.modifiers.restrict({
+          restriction: '.timeline',
+          endOnly: false,
+        }),
+      ],
+      inertia: false,
+      listeners: {
+        start(event) {
+          const target = event.target;
+          const rect = target.getBoundingClientRect();
+          const clickX = event.clientX;
+
+          // Check if click is within edge handle zones (10px from edges)
+          const EDGE_HANDLE_WIDTH = 10;
+          const isLeftEdge = clickX <= rect.left + EDGE_HANDLE_WIDTH;
+          const isRightEdge = clickX >= rect.right - EDGE_HANDLE_WIDTH;
+
+          if (isLeftEdge || isRightEdge) {
+            // Let resize handle this
+            event.stop();
+            return;
+          }
+
+          // Store original values
+          target.dataset.dragOriginalStartMinutes = target.dataset.startMinutes;
+          target.dataset.dragOriginalEndMinutes = target.dataset.endMinutes;
+          target.dataset.dragOriginalLeft = target.style.left;
+
+          target.classList.add('dragging');
+        },
+        move(event) {
+          const target = event.target;
+          const timeline = target.closest('.timeline');
+          if (!timeline) return;
+
+          const timelineRect = timeline.getBoundingClientRect();
+
+          // Calculate new left position using snapped coordinates
+          const newLeftPx = event.rect.left - timelineRect.left;
+          const newLeftPercent = (newLeftPx / timelineRect.width) * 100;
+
+          // Convert to minutes
+          const newStartMinutes = positionToMinutes(newLeftPercent);
+          const duration =
+            parseInt(target.dataset.dragOriginalEndMinutes) -
+            parseInt(target.dataset.dragOriginalStartMinutes);
+          const newEndMinutes = newStartMinutes + duration;
+
+          // Validate bounds
+          const TIMELINE_START = 240;
+          const TIMELINE_END = 1680;
+          if (
+            newStartMinutes < TIMELINE_START ||
+            newEndMinutes > TIMELINE_END
+          ) {
+            return;
+          }
+
+          // Validate no overlaps
+          if (
+            !canPlaceActivity(newStartMinutes, newEndMinutes, target.dataset.id)
+          ) {
+            target.classList.add('invalid');
+            setTimeout(() => target.classList.remove('invalid'), 400);
+            return;
+          }
+
+          // Update position
+          target.style.left = `${minutesToPercentage(newStartMinutes)}%`;
+
+          // Update data attributes
+          target.dataset.startMinutes = newStartMinutes;
+          target.dataset.endMinutes = newEndMinutes;
+          target.dataset.start = formatTimelineStart(newStartMinutes);
+          target.dataset.end = formatTimelineEnd(newEndMinutes);
+          target.dataset.length = duration;
+
+          // Update time label
+          const timeLabel = target.querySelector('.time-label');
+          if (timeLabel) {
+            updateTimeLabel(timeLabel);
+          }
+
+          // Update text class based on length
+          const textDiv = target.querySelector(
+            'div[class^="activity-block-text"]'
+          );
+          if (textDiv) {
+            textDiv.className =
+              duration >= 60
+                ? 'activity-block-text-narrow wide resized'
+                : 'activity-block-text-vertical';
+          }
+        },
+        end(event) {
+          const target = event.target;
+          target.classList.remove('dragging');
+
+          // Update activity data in timelineManager
+          const activityId = target.dataset.id;
+          const currentData = getCurrentTimelineData();
+          const activityIndex = currentData.findIndex((activity) =>
+            activityIdsEqual(activity.id, activityId)
+          );
+
+          if (activityIndex !== -1) {
+            const newStartMinutes = parseInt(target.dataset.startMinutes);
+            const newEndMinutes = parseInt(target.dataset.endMinutes);
+
+            currentData[activityIndex].startTime = target.dataset.start;
+            currentData[activityIndex].endTime = target.dataset.end;
+            currentData[activityIndex].startMinutes = newStartMinutes;
+            currentData[activityIndex].endMinutes = newEndMinutes;
+            currentData[activityIndex].blockLength = parseInt(
+              target.dataset.length
+            );
+
+            // Validate timeline
+            try {
+              const timelineKey = target.dataset.timelineKey;
+              if (timelineKey) {
+                window.timelineManager.metadata[timelineKey].validate();
+              }
+            } catch (error) {
+              console.error('Timeline validation failed:', error);
+              // Revert changes
+              target.dataset.startMinutes =
+                target.dataset.dragOriginalStartMinutes;
+              target.dataset.endMinutes = target.dataset.dragOriginalEndMinutes;
+              target.style.left = target.dataset.dragOriginalLeft;
+              return;
+            }
+          }
+
+          // Clean up temporary data attributes
+          delete target.dataset.dragOriginalStartMinutes;
+          delete target.dataset.dragOriginalEndMinutes;
+          delete target.dataset.dragOriginalLeft;
+
+          persistPendingTimelineStateSoon();
+          updateButtonStates();
+        },
+      },
+    });
+  }
+
   // Add click and touch handling with debounce
   let lastClickTime = 0;
   const CLICK_DELAY = 300; // milliseconds
@@ -4226,9 +4689,11 @@ function initTimelineInteraction(timeline) {
     }
 
     // In vertical mode, we only need the start time from the click position
-    // End time should always be start time + 10 minutes
+    // End time should always be start time + block length (default 10 minutes)
     const startMinutes = Math.round(clickMinutes / 10) * 10;
-    const endMinutes = startMinutes + 10;
+    const blockLength =
+      window.selectedActivity.blockLength || DEFAULT_ACTIVITY_LENGTH;
+    const endMinutes = startMinutes + blockLength;
 
     if (isNaN(startMinutes) || isNaN(endMinutes)) {
       console.error('Invalid minutes calculation:', {
@@ -4257,7 +4722,7 @@ function initTimelineInteraction(timeline) {
 
       // Calculate position percentages
       const startPositionPercent = minutesToPercentage(startMinutes);
-      const blockSize = (10 / 1440) * 100; // 10 minutes as percentage of day
+      const blockSize = (blockLength / 1440) * 100;
 
       if (isMobile) {
         block.style.height = `${blockSize}%`;
@@ -4334,12 +4799,7 @@ function initTimelineInteraction(timeline) {
 
     // Create time label for both mobile and desktop modes
     const timeLabel = createTimeLabel(currentBlock);
-    updateTimeLabel(
-      timeLabel,
-      formattedStartTime,
-      formattedEndTime,
-      currentBlock
-    );
+    updateTimeLabel(timeLabel);
     timeLabel.style.display = 'block'; // Ensure the new label is visible
 
     // On desktop, also re-show any labels that were hidden by earlier placements.
@@ -4627,9 +5087,11 @@ function minutesSinceMidnightToHHMM(minutes, isEndTime = false) {
   return formatTimeHHMM(minutes, isEndTime);
 }
 
-/// Transform backend activities response to frontend format.
-/// This is for answer from endpoint like /studies/{study_name}/participants/{participant_uid}/day_label_index/{day_index}/activities/.
-/// The backend uses some different field names and formats (snake_case instead of CamelCase), so we need to convert them.
+/**
+ * Transform backend activities response to frontend format.
+ * The backend uses snake_case field names; the frontend uses camelCase.
+ * @param {import('./api_types.js').ActivitiesResponse} backendData
+ */
 function transformBackendActivitiesResponse(backendData) {
   try {
     // Extract mapping logic into separate function
@@ -4685,7 +5147,7 @@ function transformBackendActivitiesResponse(backendData) {
   return backendData;
 }
 
-function showTemplateBanner(templateSourceDay) {
+function showTemplateBanner(templateSourceDay, messageKey) {
   // Check if banner already exists
   const existingBanner = document.getElementById('templateBanner');
   if (existingBanner) {
@@ -4717,13 +5179,17 @@ function showTemplateBanner(templateSourceDay) {
     `;
 
   const text = document.createElement('span');
-  text.innerHTML = i18n.t('messages.templateLoadedBanner', {
-    day: templateSourceDay,
-  });
+  const effectiveMessageKey = messageKey || 'messages.templateLoadedBanner';
+  text.innerHTML = i18n.t(
+    effectiveMessageKey,
+    templateSourceDay ? { day: templateSourceDay } : {}
+  );
 
   const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
   closeBtn.textContent = '×';
   closeBtn.title = i18n.t('buttons.close');
+  closeBtn.setAttribute('aria-label', i18n.t('buttons.close'));
   closeBtn.style.cssText = `
         background: none;
         border: none;
@@ -4774,11 +5240,48 @@ function resolveDisplayDayLabel(dayLabel) {
     return dayLabel;
   }
 
+  const studyConfig = window.timelineManager?.studyConfig;
+
+  // Resolve a day-label object (or the matched one) to a localized display
+  // string, preferring the user's currently selected language from the
+  // per-language `display_names` map. Mirrors getDayDisplayLabel() so the
+  // template banner stays consistent with the rest of the UI.
+  const resolveFromLabel = (label) => {
+    if (!label || typeof label !== 'object') {
+      return dayLabel;
+    }
+
+    if (label.display_names && typeof label.display_names === 'object') {
+      const selectedLanguage =
+        (typeof window.studyConfigManager?.getSelectedLanguage === 'function' &&
+          window.studyConfigManager.getSelectedLanguage()) ||
+        getPreferredLanguage(
+          studyConfig?.supported_languages || [],
+          studyConfig?.default_language || 'en'
+        ) ||
+        'en';
+      const defaultLanguage = studyConfig?.default_language || 'en';
+      const backendDisplayName =
+        typeof label.display_name === 'string' ? label.display_name : null;
+
+      return (
+        label.display_names[selectedLanguage] ||
+        backendDisplayName ||
+        label.display_names[defaultLanguage] ||
+        label.display_names.en ||
+        label.name ||
+        dayLabel
+      );
+    }
+
+    return label.display_name || label.name || dayLabel;
+  };
+
   if (typeof dayLabel === 'object') {
-    return dayLabel.display_name || dayLabel.name || String(dayLabel);
+    return resolveFromLabel(dayLabel);
   }
 
-  const studyDayLabels = window.timelineManager?.studyConfig?.day_labels;
+  const studyDayLabels = studyConfig?.day_labels;
   if (!Array.isArray(studyDayLabels)) {
     return dayLabel;
   }
@@ -4794,7 +5297,7 @@ function resolveDisplayDayLabel(dayLabel) {
     return dayLabel;
   }
 
-  return matched.display_name || matched.name || dayLabel;
+  return resolveFromLabel(matched);
 }
 
 function getCurrentDayIndex() {
@@ -4977,6 +5480,9 @@ function persistPendingTimelineStateSoon() {
   window.__TRAC_PERSIST_DRAFT_TIMER = window.setTimeout(() => {
     if (typeof window.__TRAC_CAPTURE_PENDING_STATE === 'function') {
       window.__TRAC_CAPTURE_PENDING_STATE();
+    }
+    if (window.timelineManager && hasAnyLocalActivities()) {
+      window.timelineManager._unsavedChanges = true;
     }
   }, 100);
 }
@@ -5187,7 +5693,6 @@ async function saveAndSwitchToDay(targetDayIndex) {
   });
 
   const result = await sendData({
-    mode: 'json',
     shouldRedirect: false,
     isLastDay: false,
     currentDayIndex,
@@ -5208,6 +5713,16 @@ async function saveAndSwitchToDay(targetDayIndex) {
     return;
   }
 
+  // Copy Days: mark the source day as saved so templates aren't re-loaded
+  // if the user intentionally saved an empty day.
+  const urlParams = new URLSearchParams(window.location.search);
+  const studyName = urlParams.get('study_name') ||
+    window.studyConfigManager?.getCurrentStudy?.()?.name_short;
+  const pid = urlParams.get('pid');
+  if (studyName && pid) {
+    markDaySaved(studyName, pid, currentDayIndex);
+  }
+
   const url = new URL(window.location.href);
   url.searchParams.set('day_label_index', String(targetDayIndex));
   window.location.href = url.toString();
@@ -5220,27 +5735,31 @@ function renderPreviousDaysSwitchRow() {
   }
 
   const currentDayIndex = getCurrentDayIndex();
-  const availableDayIndices = Array.isArray(
+
+  const studyDaysCount =
+    window.timelineManager?.studyDaysCount ||
+    window.studyConfigManager?.getStudyDaysCount() ||
+    0;
+
+  // Days that contain ANY data (protects against overwriting when copying).
+  const dayIndicesWithData = Array.isArray(
     window.timelineManager?.dayIndicesWithData
   )
     ? window.timelineManager.dayIndicesWithData
     : [];
 
-  const switchTargetDayIndices = [...new Set(availableDayIndices)]
-    .map((value) => Number(value))
-    .filter(
-      (value) =>
-        Number.isInteger(value) && value >= 0 && value !== currentDayIndex
-    )
-    .sort((left, right) => left - right);
+  // Days that are complete *according to min coverage* (the submit-gate
+  // notion).  Falls back to the "has any data" set for backends that do not
+  // send day_indices_meet_min_coverage yet.
+  const dayIndicesMeetMinCoverage = Array.isArray(
+    window.timelineManager?.dayIndicesMeetMinCoverage
+  )
+    ? window.timelineManager.dayIndicesMeetMinCoverage
+    : dayIndicesWithData;
 
-  const rowDayIndices = [
-    ...new Set([...switchTargetDayIndices, currentDayIndex]),
-  ].sort((left, right) => left - right);
-
-  const shouldShow =
-    Boolean(TUD_SETTINGS.SHOW_PREVIOUS_DAYS_BUTTONS) &&
-    switchTargetDayIndices.length > 0;
+  // Render the full day selector whenever the study spans more than one day.
+  // Copy Days: day buttons are always shown — free navigation is a core feature.
+  const shouldShow = studyDaysCount > 1;
 
   let existingRow = document.getElementById('previousDaysSwitchRow');
   if (!shouldShow) {
@@ -5268,11 +5787,29 @@ function renderPreviousDaysSwitchRow() {
       : 'Switch to day:';
   existingRow.appendChild(label);
 
-  for (const dayIndex of rowDayIndices) {
+  for (let dayIndex = 0; dayIndex < studyDaysCount; dayIndex++) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'btn previous-day-btn';
-    button.textContent = getDayButtonDisplayLabel(dayIndex);
+
+    const dayLabel = getDayButtonDisplayLabel(dayIndex);
+    button.appendChild(document.createTextNode(dayLabel));
+
+    // Green checkmark for days that meet the min_coverage requirement.
+    const meetsMinCoverage = dayIndicesMeetMinCoverage.includes(dayIndex);
+    if (meetsMinCoverage) {
+      button.classList.add('day-complete');
+      const check = document.createElement('span');
+      check.className = 'day-complete-check';
+      check.setAttribute('aria-hidden', 'true');
+      check.textContent = ' ✓';
+      button.appendChild(check);
+      const completeTitle =
+        window.i18n && window.i18n.isReady()
+          ? window.i18n.t('messages.dayCompleteAria')
+          : 'Day complete (meets minimum coverage)';
+      button.setAttribute('aria-label', `${dayLabel}, ${completeTitle}`);
+    }
 
     const isCurrentDay = dayIndex === currentDayIndex;
     if (isCurrentDay) {
@@ -5285,6 +5822,17 @@ function renderPreviousDaysSwitchRow() {
       button.addEventListener('click', async () => {
         await saveAndSwitchToDay(dayIndex);
       });
+
+      const hasData = dayIndicesWithData.includes(dayIndex);
+      if (hasData && !window.globals?.isMobile) {
+        button.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          showCopyTargetPicker(dayIndex, event);
+        });
+      }
+
+      // Copy Days: day switching is always allowed regardless of min_coverage.
+      // The green/gray indicator shows completion status.
     }
 
     existingRow.appendChild(button);
@@ -5330,6 +5878,48 @@ async function init() {
               : 'No studies available on server.';
           footerStatus.style.color = 'orange';
         }
+        // Hide footer action buttons (Submit, Skip) since no study is active
+        const footerActions = document.getElementById('instructionsFooter');
+        if (footerActions) footerActions.style.display = 'none';
+        return; // stop further initialization
+      } else if (initErr && initErr.code === 'STUDY_NOT_FOUND') {
+        console.warn('Study not found on server: ' + initErr.message);
+        const studyName =
+          new URLSearchParams(window.location.search).get('study_name') || '';
+        const msgText =
+          window.i18n && window.i18n.isReady()
+            ? window.i18n.t('messages.studyNotFound')
+            : 'The requested study does not exist.';
+        // Show message in UI and stop initialization
+        const timelinesWrapper = document.querySelector('.timelines-wrapper');
+        if (timelinesWrapper) {
+          timelinesWrapper.innerHTML = '';
+          const msg = document.createElement('div');
+          msg.className = 'no-studies-message';
+          msg.style.padding = '24px';
+          msg.style.textAlign = 'center';
+          msg.style.color = '#666';
+          msg.style.fontSize = '1.1rem';
+          msg.textContent = msgText;
+          if (studyName) {
+            const detail = document.createElement('div');
+            detail.style.marginTop = '8px';
+            detail.style.fontSize = '0.9rem';
+            detail.style.color = '#999';
+            detail.textContent = 'study_name=' + studyName;
+            msg.appendChild(detail);
+          }
+          timelinesWrapper.appendChild(msg);
+        }
+        // Update footer status
+        const footerStatus = document.getElementById('footer_backend_status');
+        if (footerStatus) {
+          footerStatus.textContent = msgText;
+          footerStatus.style.color = 'orange';
+        }
+        // Hide footer action buttons (Submit, Skip) since no study is active
+        const footerActions = document.getElementById('instructionsFooter');
+        if (footerActions) footerActions.style.display = 'none';
         return; // stop further initialization
       } else if (initErr && initErr.code === 'STUDY_CHOICES_AVAILABLE') {
         console.log('Multiple studies available; showing chooser');
@@ -5343,9 +5933,9 @@ async function init() {
 
           const title = document.createElement('h2');
           title.textContent =
-            (window.i18n && window.i18n.isReady()
+            window.i18n && window.i18n.isReady()
               ? window.i18n.t('messages.selectStudy')
-              : 'Please select a study to continue');
+              : 'Please select a study to continue';
           container.appendChild(title);
 
           const list = document.createElement('div');
@@ -5356,14 +5946,20 @@ async function init() {
 
           // Resolve a possibly-localized description (string or {lang:text} map)
           // to a plain string using the URL lang param or falling back to 'en'.
-          const urlLang = new URLSearchParams(window.location.search).get('lang') || 'en';
-          function resolveChooserDescription(desc) {
+          const urlLang =
+            new URLSearchParams(window.location.search).get('lang') || 'en';
+          const resolveChooserDescription = function (desc) {
             if (typeof desc === 'string') return desc;
             if (desc && typeof desc === 'object') {
-              return desc[urlLang] || desc['en'] || Object.values(desc).find(v => typeof v === 'string') || '';
+              return (
+                desc[urlLang] ||
+                desc['en'] ||
+                Object.values(desc).find((v) => typeof v === 'string') ||
+                ''
+              );
             }
             return '';
-          }
+          };
 
           const studies = window.availableOpenStudies || [];
           studies.forEach((s) => {
@@ -5373,7 +5969,11 @@ async function init() {
             btn.style.padding = '12px';
             btn.style.textAlign = 'left';
             const desc = resolveChooserDescription(s.description);
-            btn.innerHTML = `<strong>${s.name || s.name_short}</strong><div style="font-size:small;color:#666">${desc}</div><div style="font-size:x-small;color:#999;margin-top:2px">${s.name_short || ''}</div>`;
+            btn.innerHTML = `<strong>${
+              s.name || s.name_short
+            }</strong><div style="font-size:small;color:#666">${desc}</div><div style="font-size:x-small;color:#999;margin-top:2px">${
+              s.name_short || ''
+            }</div>`;
             btn.addEventListener('click', () => {
               const url = new URL(window.location.href);
               url.searchParams.set('study_name', s.name_short);
@@ -5434,6 +6034,15 @@ async function init() {
     window.timelineManager.studyDaysCount =
       window.studyConfigManager.getStudyDaysCount();
     window.timelineManager.dayLabels = currentStudy.day_labels;
+
+    // Start inactivity timeout timer if configured for this study
+    startIdleTimer({
+      inactivity_timeout_minutes: currentStudy.inactivity_timeout_minutes ?? 0,
+      inactivity_timeout_stress_time_left:
+        currentStudy.inactivity_timeout_stress_time_left ?? 5,
+      inactivity_page_custom_text:
+        currentStudy.inactivity_page_custom_text ?? null,
+    });
 
     // Now sync URL parameters so they are stored in timelineManager.study
     syncURLParamsToStudy();
@@ -5742,7 +6351,7 @@ async function init() {
       console.warn(
         `Day index ${dayIndex} is out of range. Adjusting to last day (${maxDayIndex})`
       );
-      urlParams.set('day_label_index', maxDayIndex);
+      urlParams.set('day_label_index', String(maxDayIndex));
       window.history.replaceState(
         {},
         '',
@@ -5752,9 +6361,18 @@ async function init() {
       console.log(`Current day index from URL: ${dayIndex}`);
     }
 
-    // Initialize first timeline using addNextTimeline
-    window.timelineManager.currentIndex = -1; // Start at -1 so first addNextTimeline() sets to 0
-    await addNextTimeline(); // Only add first timeline initially
+    // Copy Days: initialize ALL timelines immediately instead of revealing
+    // them one-by-one with "Next Timeline".  Users see the full picture from
+    // the start and can freely navigate between timelines.
+    window.timelineManager.currentIndex = -1;
+    for (let i = 0; i < window.timelineManager.keys.length; i++) {
+      await addNextTimeline();
+    }
+    // After adding all timelines, addNextTimeline leaves currentIndex on the
+    // last one.  Walk back to the first — it's the natural starting point.
+    while (window.timelineManager.currentIndex > 0) {
+      await goToPreviousTimeline();
+    }
 
     const restoredPendingState = await tryRestorePendingTimelineState(
       participantId,
@@ -5765,6 +6383,41 @@ async function init() {
       console.log(
         'Successfully restored pending timeline activities from session state.'
       );
+    }
+
+    // When pending state was restored (e.g. after a save-day reload where
+    // beforeunload re-captured just-saved activities), the backend-fetch
+    // block below is skipped — but we still need day_indices_with_data so
+    // the day-switch buttons render correctly.  Do a lightweight fetch
+    // purely for the switch-row metadata.
+    if (restoredPendingState && participantId && studyName) {
+      try {
+        const metaUrl = `${TUD_SETTINGS.API_BASE_URL}/studies/${studyName}/participants/${participantId}/activities?day_label_index=${dayIndex}`;
+        const metaResp = await fetch(metaUrl, {
+          headers: { Accept: 'application/json' },
+        });
+        if (metaResp.ok) {
+          const metaData = await metaResp.json();
+          window.timelineManager.dayIndicesWithData = Array.isArray(
+            metaData.day_indices_with_data
+          )
+            ? metaData.day_indices_with_data
+            : [];
+          // Days complete according to min coverage (submit-gate notion).
+          // Falls back to the "has any data" set when not provided.
+          window.timelineManager.dayIndicesMeetMinCoverage = Array.isArray(
+            metaData.day_indices_meet_min_coverage
+          )
+            ? metaData.day_indices_meet_min_coverage
+            : window.timelineManager.dayIndicesWithData;
+          renderPreviousDaysSwitchRow();
+        }
+      } catch (e) {
+        console.warn(
+          'Could not fetch day_indices_with_data after pending-state restore:',
+          e.message
+        );
+      }
     }
 
     let loadedActivitiesFromBackend = restoredPendingState;
@@ -5857,10 +6510,14 @@ async function init() {
         });
 
         if (copyResponse.ok) {
+          /** @type {import('./api_types.js').TemplateCopyResponse} */
           const copyPayload = await copyResponse.json();
           console.log('Cross-user template copy result:', copyPayload);
           if (copyPayload.copied_days_count > 0) {
-            showTemplateBanner(templateUser);
+            // Cross-user copy: the copied data is saved as regular activities, so
+            // use a dedicated message instead of the same-user "from <day>" one
+            // (which would otherwise render the source participant id as the day).
+            showTemplateBanner(null, 'messages.templateCopiedBanner');
           }
         } else {
           console.warn(
@@ -5904,7 +6561,21 @@ async function init() {
           )
             ? backendData.day_indices_with_data
             : [];
+          // Days complete according to min coverage (submit-gate notion).
+          // Falls back to the "has any data" set when not provided.
+          window.timelineManager.dayIndicesMeetMinCoverage = Array.isArray(
+            backendData.day_indices_meet_min_coverage
+          )
+            ? backendData.day_indices_meet_min_coverage
+            : window.timelineManager.dayIndicesWithData;
           renderPreviousDaysSwitchRow();
+
+          if (typeof window.addCopyDayLink === 'function') {
+            const timelineTitle = document.querySelector('.timeline-title');
+            if (timelineTitle) {
+              window.addCopyDayLink(timelineTitle, dayIndex);
+            }
+          }
 
           const transformedData =
             transformBackendActivitiesResponse(backendData);
@@ -5923,6 +6594,8 @@ async function init() {
             activitiesToLoad = transformedData.activities;
           } else if (
             !loadedActivitiesFromBackend &&
+            TUD_SETTINGS.TEMPLATE_ENABLED !== false &&
+            !wasDaySaved(studyName, participantId, dayIndex) &&
             transformedData.template_activities &&
             transformedData.template_activities.length > 0
           ) {
@@ -5941,7 +6614,20 @@ async function init() {
 
           if (await loadActivitiesIntoTimelineManager(activitiesToLoad)) {
             loadedActivitiesFromBackend = true;
+            if (window.timelineManager) {
+              window.timelineManager._unsavedChanges = !(
+                transformedData &&
+                transformedData.activities &&
+                transformedData.activities.length > 0
+              );
+            }
           }
+
+          // loadActivitiesIntoTimelineManager() calls updateButtonStates(),
+          // which now also re-renders #previousDaysSwitchRow, so the stale
+          // coverage-based disabled state from the render at the top of this
+          // branch gets refreshed with the loaded (saved or templated)
+          // activities.
         } else if (response.status === 404) {
           console.log(
             `No existing data found for participant ${participantId}, study ${studyName}, day index ${dayIndex}. Starting fresh.`
@@ -6036,6 +6722,7 @@ async function init() {
     initKeyboardShortcuts();
     initInstructionBanner();
     initMobileDelete();
+    initMobileSwipeNavigation();
     initDesktopActivityContextMenu();
 
     // Initialize header and footer heights early
@@ -6075,28 +6762,28 @@ async function init() {
     const errorTitle = isStudyUnavailableError
       ? 'Studie nicht verfügbar:'
       : isStudyAuthorizationError
-      ? 'Access denied:'
-      : isMissingParticipantIdError
-      ? 'Participant link required:'
-      : window.i18n?.isReady()
-      ? i18n.t('errors.loadingActivitiesConfigurationTitle')
-      : 'Error loading activities configuration:';
+        ? 'Access denied:'
+        : isMissingParticipantIdError
+          ? 'Participant link required:'
+          : window.i18n?.isReady()
+            ? i18n.t('errors.loadingActivitiesConfigurationTitle')
+            : 'Error loading activities configuration:';
 
     const errorHelp = isStudyUnavailableError
       ? 'Diese Studie ist momentan nicht verfügbar.'
       : isStudyAuthorizationError
-      ? 'You are not authorized to participate in this study.'
-      : isMissingParticipantIdError
-      ? 'Please use your personal invitation link that includes your participant ID.'
-      : window.i18n?.isReady()
-      ? i18n.t('errors.loadingActivitiesConfigurationHelp')
-      : 'The application requires a valid backend connection to load the appropriate activities for your study.';
+        ? 'You are not authorized to participate in this study.'
+        : isMissingParticipantIdError
+          ? 'Please use your personal invitation link that includes your participant ID.'
+          : window.i18n?.isReady()
+            ? i18n.t('errors.loadingActivitiesConfigurationHelp')
+            : 'The application requires a valid backend connection to load the appropriate activities for your study.';
 
     const errorMessage = isStudyUnavailableError
       ? 'Diese Studie ist momentan nicht verfügbar.'
       : isStudyAuthorizationError
-      ? 'You are not authorized to participate in this study.'
-      : error.message;
+        ? 'You are not authorized to participate in this study.'
+        : error.message;
 
     renderFatalInitializationError({
       title: errorTitle,
@@ -6125,7 +6812,9 @@ function renderFatalInitializationError({
   if (activitiesContainer) {
     activitiesContainer.innerHTML =
       '<p style="color: red; padding: 20px; background: #ffebee; border: 2px solid #ef9a9a; border-radius: 8px; margin: 20px;">' +
-      `<strong>${title}</strong><br>${message}${help ? `<br><br>${help}` : ''}</p>`;
+      `<strong>${title}</strong><br>${message}${
+        help ? `<br><br>${help}` : ''
+      }</p>`;
   }
 
   if (hideInteractiveUi) {
@@ -6169,10 +6858,10 @@ init().catch((error) => {
   const message = isStudyUnavailableError
     ? 'Diese Studie ist momentan nicht verfügbar.'
     : isStudyAuthorizationError
-    ? 'You are not authorized to participate in this study.'
-    : isMissingParticipantIdError
-    ? 'A participant link is required for this study.'
-    : `${shortError} ${error.message}`;
+      ? 'You are not authorized to participate in this study.'
+      : isMissingParticipantIdError
+        ? 'A participant link is required for this study.'
+        : `${shortError} ${error.message}`;
   renderFatalInitializationError({
     title: 'Error:',
     message,
@@ -6190,6 +6879,455 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+/**
+ * Copy Days: return all day indices (excluding `excludeIndex`) as potential
+ * copy targets.  Defaults to excluding the current viewing day — the "Copy
+ * this day" button uses this.  Right-click on a day button passes that day's
+ * index so the viewing day becomes a valid target.
+ */
+function getAllTargetDayIndices(excludeIndex) {
+  if (excludeIndex === undefined) {
+    excludeIndex = getCurrentDayIndex();
+  }
+
+  const studyDaysCount =
+    window.timelineManager?.studyDaysCount ||
+    window.studyConfigManager?.getStudyDaysCount() ||
+    0;
+
+  const dayIndicesWithData = Array.isArray(
+    window.timelineManager?.dayIndicesWithData
+  )
+    ? window.timelineManager.dayIndicesWithData
+    : [];
+
+  const currentDayIndex = getCurrentDayIndex();
+
+  const targets = [];
+  for (let i = 0; i < studyDaysCount; i++) {
+    if (i !== excludeIndex) {
+      // For the current viewing day, check in-memory state — the DB may
+      // be stale because template activities or local edits haven't been
+      // saved yet (or local deletions haven't been persisted).
+      const inDb = dayIndicesWithData.includes(i);
+      const isCurrent = i === currentDayIndex;
+      const hasData = isCurrent ? hasFrontendActivities() : inDb;
+
+      targets.push({ index: i, hasData });
+    }
+  }
+  return targets;
+}
+
+/** True when the current viewing day has any activity blocks rendered. */
+function hasFrontendActivities() {
+  return (window.timelineManager?.keys || []).some(function (key) {
+    return (window.timelineManager.activities[key] || []).length > 0;
+  });
+}
+
+// Keep old name as alias for backward compatibility with any remaining callers.
+function getEmptyTargetDayIndices() {
+  return getAllTargetDayIndices()
+    .filter(function (t) { return !t.hasData; })
+    .map(function (t) { return t.index; });
+}
+
+function removeCopyDayContextMenu() {
+  const existingMenu = document.querySelector('.copy-day-context-menu');
+  if (existingMenu) {
+    existingMenu.remove();
+  }
+}
+
+function showCopyTargetPicker(sourceDayIndex, event) {
+  removeCopyDayContextMenu();
+
+  const targets = getAllTargetDayIndices(sourceDayIndex);
+  if (!targets.length) {
+    return;
+  }
+
+  const t =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t.bind(window.i18n)
+      : function (key) {
+          return key;
+        };
+
+  const sourceDayName =
+    window.studyConfigManager?.getDayDisplayLabel(sourceDayIndex) ||
+    t('common.day') + ' ' + (sourceDayIndex + 1);
+
+  const menu = document.createElement('div');
+  menu.className = 'copy-day-context-menu';
+
+  const header = document.createElement('div');
+  header.className = 'copy-day-context-menu-header';
+  header.textContent = t('messages.copyToDay') + ': ' + sourceDayName;
+  menu.appendChild(header);
+
+  for (const target of targets) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'copy-day-context-menu-item';
+    const targetDayName =
+      window.studyConfigManager?.getDayDisplayLabel(target.index) ||
+      t('common.day') + ' ' + (target.index + 1);
+    // Copy Days: show status so users know whether they'll overwrite
+    const status = target.hasData
+      ? ' (' + t('messages.copyDayHasData') + ')'
+      : ' (' + t('messages.copyDayEmpty') + ')';
+    item.textContent = targetDayName + status;
+    item.addEventListener('click', async () => {
+      removeCopyDayContextMenu();
+      await copyDayTo(sourceDayIndex, target.index);
+    });
+    menu.appendChild(item);
+  }
+
+  const isMobile = false;
+
+  if (
+    window.globals &&
+    typeof window.globals.getIsMobile === 'function' &&
+    window.globals.getIsMobile()
+  ) {
+    document.body.appendChild(menu);
+    return;
+  }
+
+  const menuX = Math.min(event.clientX, window.innerWidth - 210);
+  const menuY = Math.min(event.clientY, window.innerHeight - 200);
+  menu.style.position = 'fixed';
+  menu.style.left = menuX + 'px';
+  menu.style.top = menuY + 'px';
+
+  document.body.appendChild(menu);
+
+  const closeHandler = function (e) {
+    if (!menu.contains(e.target)) {
+      removeCopyDayContextMenu();
+      document.removeEventListener('click', closeHandler, true);
+    }
+  };
+  setTimeout(function () {
+    document.addEventListener('click', closeHandler, true);
+  }, 0);
+}
+
+/**
+ * Copy Days: "Copy from..." picker — reverse direction.
+ * Shows all other days as SOURCE options; on selection copies FROM the
+ * selected source INTO the current day.
+ */
+function showCopySourcePicker(targetDayIndex, event) {
+  removeCopyDayContextMenu();
+
+  const targets = getAllTargetDayIndices(targetDayIndex);
+  if (!targets.length) {
+    return;
+  }
+
+  const t =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t.bind(window.i18n)
+      : function (key) { return key; };
+
+  const targetDayName =
+    window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
+    t('common.day') + ' ' + (targetDayIndex + 1);
+
+  const menu = document.createElement('div');
+  menu.className = 'copy-day-context-menu';
+
+  const header = document.createElement('div');
+  header.className = 'copy-day-context-menu-header';
+  header.textContent = t('messages.copyFromDay') + ': ' + targetDayName;
+  menu.appendChild(header);
+
+  for (const source of targets) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'copy-day-context-menu-item';
+    const sourceDayName =
+      window.studyConfigManager?.getDayDisplayLabel(source.index) ||
+      t('common.day') + ' ' + (source.index + 1);
+    const status = source.hasData
+      ? ' (' + t('messages.copyDayHasData') + ')'
+      : ' (' + t('messages.copyDayEmpty') + ')';
+    item.textContent = sourceDayName + status;
+    item.addEventListener('click', async () => {
+      removeCopyDayContextMenu();
+      // Reverse: copy FROM selected source INTO current (target) day
+      await copyDayTo(source.index, targetDayIndex);
+    });
+    menu.appendChild(item);
+  }
+
+  // Position the menu
+  if (
+    window.globals &&
+    typeof window.globals.getIsMobile === 'function' &&
+    window.globals.getIsMobile()
+  ) {
+    document.body.appendChild(menu);
+    return;
+  }
+
+  const menuX = Math.min(event.clientX, window.innerWidth - 210);
+  const menuY = Math.min(event.clientY, window.innerHeight - 200);
+  menu.style.position = 'fixed';
+  menu.style.left = menuX + 'px';
+  menu.style.top = menuY + 'px';
+
+  document.body.appendChild(menu);
+
+  const closeHandler = function (e) {
+    if (!menu.contains(e.target)) {
+      removeCopyDayContextMenu();
+      document.removeEventListener('click', closeHandler, true);
+    }
+  };
+  setTimeout(function () {
+    document.addEventListener('click', closeHandler, true);
+  }, 0);
+}
+
+window.showCopySourcePicker = showCopySourcePicker;
+window.showCopyTargetPicker = showCopyTargetPicker;
+
+async function copyDayTo(sourceDayIndex, targetDayIndex) {
+  const t =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t.bind(window.i18n)
+      : function (key) {
+          return key;
+        };
+
+  const studyName =
+    window.timelineManager?.study?.study_name_short ||
+    new URLSearchParams(window.location.search).get('study_name');
+  const participantId =
+    window.timelineManager?.study?.pid ||
+    new URLSearchParams(window.location.search).get('pid');
+
+  if (!studyName || !participantId) {
+    showCopyToast(
+      t('messages.copyError', { message: 'missing study or participant info' }),
+      true
+    );
+    return;
+  }
+
+  // Copy Days: if target day already has data, ask for confirmation first.
+  // For the current viewing day, check in-memory state (same logic as the
+  // picker) so the confirmation matches what the user sees.
+  const dayIndicesWithData = Array.isArray(
+    window.timelineManager?.dayIndicesWithData
+  )
+    ? window.timelineManager.dayIndicesWithData
+    : [];
+  const currentDayIndex = getCurrentDayIndex();
+  const targetHasData = (targetDayIndex === currentDayIndex)
+    ? hasFrontendActivities()
+    : dayIndicesWithData.includes(targetDayIndex);
+
+  if (targetHasData) {
+    const targetDayName =
+      window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
+      t('common.day') + ' ' + (targetDayIndex + 1);
+    const confirmed = window.confirm(
+      t('messages.copyOverwriteConfirm', { day: targetDayName })
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+
+  const targetDayLabel = window.studyConfigManager?.getDayLabel(targetDayIndex);
+  const sourceDayLabel = window.studyConfigManager?.getDayLabel(sourceDayIndex);
+
+  if (!targetDayLabel || !sourceDayLabel) {
+    showCopyToast(
+      t('messages.copyError', { message: 'could not resolve day labels' }),
+      true
+    );
+    return;
+  }
+
+  // Copying uses the SAVED state of the source day, so persist the current
+  // frontend state to the backend first.  This is the same save path used by
+  // day switching (see saveAndSwitchToDay): frontend+backend validation
+  // applies, and if the current day doesn't meet min_coverage the save fails
+  // and we abort the copy before touching the DB.  We stay on the current
+  // day — copying never advances day_label_index.
+  if (sourceDayIndex === currentDayIndex) {
+    try {
+      const saveResult = await sendData({
+        shouldRedirect: false,
+        isLastDay: false,
+        currentDayIndex,
+      });
+
+      if (!saveResult?.success) {
+        const submitErrorMessage = window.i18n
+          ? window.i18n.t('messages.submitError')
+          : 'Error submitting diary';
+        const errorDetails = saveResult?.error ? `: ${saveResult.error}` : '';
+        showCopyToast(
+          t('messages.copyError', {
+            message: submitErrorMessage + errorDetails,
+          }),
+          true
+        );
+        return;
+      }
+
+      // The save persisted the current frontend state to the DB for the
+      // current day label, so mark it clean and record it as a day with data.
+      if (window.timelineManager) {
+        window.timelineManager._unsavedChanges = false;
+        if (Array.isArray(window.timelineManager.dayIndicesWithData)) {
+          if (
+            !window.timelineManager.dayIndicesWithData.includes(sourceDayIndex)
+          ) {
+            window.timelineManager.dayIndicesWithData.push(sourceDayIndex);
+            window.timelineManager.dayIndicesWithData.sort(function (a, b) {
+              return a - b;
+            });
+          }
+        }
+      }
+    } catch (saveError) {
+      showCopyToast(
+        t('messages.copyError', {
+          message: saveError.message || 'save failed',
+        }),
+        true
+      );
+      return;
+    }
+  }
+
+  try {
+    const url =
+      TUD_SETTINGS.API_BASE_URL +
+      '/studies/' +
+      encodeURIComponent(studyName) +
+      '/participants/' +
+      encodeURIComponent(participantId) +
+      '/day_labels/' +
+      encodeURIComponent(targetDayLabel) +
+      '/copy-from/' +
+      encodeURIComponent(sourceDayLabel);
+
+    const response = await fetch(url, { method: 'POST' });
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(function () {
+        return { detail: 'Unknown error' };
+      });
+      showCopyToast(
+        t('messages.copyError', {
+          message: errorPayload.detail || 'Failed to copy',
+        }),
+        true
+      );
+      return;
+    }
+
+    const data = await response.json();
+
+    const sourceDayName =
+      window.studyConfigManager?.getDayDisplayLabel(sourceDayIndex) ||
+      sourceDayLabel;
+    const targetDayName =
+      window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
+      targetDayLabel;
+    showCopyToast(
+      t('messages.copySuccess', {
+        sourceDay: sourceDayName,
+        targetDay: targetDayName,
+      })
+    );
+
+    if (
+      window.timelineManager &&
+      Array.isArray(window.timelineManager.dayIndicesWithData)
+    ) {
+      if (!window.timelineManager.dayIndicesWithData.includes(targetDayIndex)) {
+        window.timelineManager.dayIndicesWithData.push(targetDayIndex);
+        window.timelineManager.dayIndicesWithData.sort(function (a, b) {
+          return a - b;
+        });
+      }
+    }
+
+    // The copy wrote the source day's activities (which meet min_coverage) to
+    // the target day, so the target day is now complete by min coverage too.
+    // Keep the day status in sync so the green checkmark appears immediately,
+    // without requiring a day switch / page reload.
+    if (
+      window.timelineManager &&
+      Array.isArray(window.timelineManager.dayIndicesMeetMinCoverage)
+    ) {
+      if (
+        !window.timelineManager.dayIndicesMeetMinCoverage.includes(
+          targetDayIndex
+        )
+      ) {
+        window.timelineManager.dayIndicesMeetMinCoverage.push(targetDayIndex);
+        window.timelineManager.dayIndicesMeetMinCoverage.sort(function (a, b) {
+          return a - b;
+        });
+      }
+    }
+
+    if (typeof renderPreviousDaysSwitchRow === 'function') {
+      renderPreviousDaysSwitchRow();
+    }
+
+    if (typeof window.updateSubmitStudyButton === 'function') {
+      window.updateSubmitStudyButton();
+    }
+
+    if (typeof window.addCopyDayLink === 'function') {
+      const timelineTitle = document.querySelector('.timeline-title');
+      const currentDayIndex = getCurrentDayIndex();
+      if (timelineTitle && typeof currentDayIndex === 'number') {
+        window.addCopyDayLink(timelineTitle, currentDayIndex);
+      }
+    }
+
+    // Copy Days: if the copy target is the current viewing day, reload so
+    // the user immediately sees the new data instead of the old state.
+    if (targetDayIndex === currentDayIndex) {
+      setTimeout(function () {
+        window.location.reload();
+      }, 3000);
+    }
+  } catch (error) {
+    showCopyToast(t('messages.copyError', { message: error.message }), true);
+  }
+}
+
+function showCopyToast(message, isError) {
+  if (window.showToast) {
+    window.showToast(message, isError ? 'error' : 'success', 4000);
+  } else {
+    console.log(message);
+  }
+}
+
+window.renderPreviousDaysSwitchRow = renderPreviousDaysSwitchRow;
+
+window.addEventListener('beforeunload', function () {
+  if (typeof window.__TRAC_CAPTURE_PENDING_STATE === 'function') {
+    window.__TRAC_CAPTURE_PENDING_STATE();
+  }
+});
+
 document.addEventListener('visibilitychange', () => {
   if (
     document.visibilityState === 'hidden' &&
@@ -6199,5 +7337,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Export addNextTimeline, goToPreviousTimeline and renderActivities for ui.js
-export { addNextTimeline, goToPreviousTimeline, renderActivities };
+// Export addNextTimeline, goToPreviousTimeline, renderActivities and
+// getCurrentDayIndex for ui.js
+export {
+  addNextTimeline,
+  goToPreviousTimeline,
+  renderActivities,
+  getCurrentDayIndex,
+};

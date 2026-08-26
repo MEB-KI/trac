@@ -5,12 +5,14 @@ import {
   getPostDiaryRedirectPath,
   formatTimeHHMM,
   positionToMinutes,
+  canFinishStudy,
 } from './utils.js';
 import { getIsMobile, updateIsMobile } from './globals.js';
 import {
   addNextTimeline,
   goToPreviousTimeline,
   renderActivities,
+  getCurrentDayIndex,
 } from './script.js';
 import { DEBUG_MODE } from './constants.js';
 
@@ -24,6 +26,15 @@ function showToast(message, type = 'info', duration = 3000) {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = message;
+  // Announce to screen readers: errors as alerts, other types as polite
+  // status updates.  The toast is transient, so use aria-atomic.
+  if (type === 'error') {
+    toast.setAttribute('role', 'alert');
+  } else {
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+  }
+  toast.setAttribute('aria-atomic', 'true');
   document.body.appendChild(toast);
 
   // Trigger show animation
@@ -183,6 +194,154 @@ setInterval(() => {
 // Make the update function globally available for manual calls
 window.updateDisabledButtonOverlays = updateDisabledButtonOverlays;
 
+// ── Modal focus management (Tier 2 accessibility) ─────────────────────────
+// All dialogs carry role="dialog" (see createModal / ensureActivityInfoModal /
+// createChildItemsModal).  A MutationObserver watches those elements for style
+// changes (display none <-> block) to detect open/close; document-level
+// focusin/keydown handlers trap Tab inside the open dialog and close it on
+// Escape, restoring focus to the previously-focused element on close.
+//
+// Everything is centralized here so every existing show/hide call site keeps
+// working unchanged, on both the desktop and the mobile rendering paths.
+
+const MODAL_FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const MODAL_CLOSE_SELECTOR =
+  '.modal-close, .close, #confirmCancel, #confirmSkipCancel, #confirmCleanRowCancel';
+
+// Stack of open dialogs: [{ dialog, trigger }]
+const modalFocusStack = [];
+
+function isDialogVisible(dialog) {
+  return (
+    dialog &&
+    dialog.getAttribute('role') === 'dialog' &&
+    getComputedStyle(dialog).display !== 'none'
+  );
+}
+
+function getVisibleFocusables(dialog) {
+  return Array.from(dialog.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)).filter(
+    (el) => el.getClientRects().length > 0
+  );
+}
+
+// The initial focus target skips pure close/cancel controls so the user lands
+// on the meaningful control (input, OK button, …) instead of the '×'.
+function getInitialFocusTarget(dialog) {
+  const focusables = getVisibleFocusables(dialog);
+  const preferred = focusables.find((el) => !el.matches(MODAL_CLOSE_SELECTOR));
+  if (preferred) return preferred;
+  if (focusables.length > 0) return focusables[0];
+  return null;
+}
+
+function focusDialog(dialog) {
+  const target = getInitialFocusTarget(dialog);
+  if (target) {
+    target.focus();
+    return;
+  }
+  // No focusable content — make the dialog itself the focus target so a screen
+  // reader still announces it together with its aria-labelledby title.
+  dialog.setAttribute('tabindex', '-1');
+  dialog.focus();
+}
+
+function getTopVisibleDialog() {
+  for (let i = modalFocusStack.length - 1; i >= 0; i--) {
+    if (isDialogVisible(modalFocusStack[i].dialog)) {
+      return modalFocusStack[i];
+    }
+  }
+  return null;
+}
+
+function handleModalFocusIn(event) {
+  const top = getTopVisibleDialog();
+  if (!top) return;
+  if (!top.dialog.contains(event.target)) {
+    // Focus escaped the open dialog (e.g. via Tab) — pull it back inside.
+    const focusables = getVisibleFocusables(top.dialog);
+    const target = focusables.length > 0 ? focusables[0] : top.dialog;
+    target.focus();
+  }
+}
+
+function closeTopDialogByEscape() {
+  for (let i = modalFocusStack.length - 1; i >= 0; i--) {
+    const entry = modalFocusStack[i];
+    if (!isDialogVisible(entry.dialog)) {
+      modalFocusStack.splice(i, 1);
+      continue;
+    }
+    // Use the dialog's own cancel/close control so any custom close logic
+    // (e.g. handleCustomActivityModalClose) still runs.
+    const cancelControl = entry.dialog.querySelector(MODAL_CLOSE_SELECTOR);
+    if (cancelControl) {
+      cancelControl.click();
+    } else {
+      entry.dialog.style.display = 'none';
+    }
+    return;
+  }
+}
+
+function handleModalKeyDown(event) {
+  if (event.key === 'Escape') {
+    closeTopDialogByEscape();
+  }
+}
+
+let modalFocusManagementInitialized = false;
+function initModalFocusManagement() {
+  if (modalFocusManagementInitialized) return;
+  modalFocusManagementInitialized = true;
+
+  const observeDialog = (dialog) => {
+    if (dialog.__tracModalObserved) return;
+    dialog.__tracModalObserved = true;
+
+    if (isDialogVisible(dialog)) {
+      modalFocusStack.push({ dialog, trigger: document.activeElement });
+      focusDialog(dialog);
+    }
+
+    const observer = new MutationObserver(() => {
+      const nowVisible = isDialogVisible(dialog);
+      const stackIndex = modalFocusStack.findIndex((e) => e.dialog === dialog);
+      const inStack = stackIndex !== -1;
+      if (nowVisible && !inStack) {
+        modalFocusStack.push({ dialog, trigger: document.activeElement });
+        focusDialog(dialog);
+      } else if (!nowVisible && inStack) {
+        const entry = modalFocusStack.splice(stackIndex, 1)[0];
+        if (entry.trigger && entry.trigger.isConnected) {
+          entry.trigger.focus();
+        }
+      }
+    });
+    observer.observe(dialog, { attributes: true, attributeFilter: ['style'] });
+  };
+
+  const scanDialogs = () => {
+    document.querySelectorAll('[role="dialog"]').forEach(observeDialog);
+  };
+  scanDialogs();
+
+  // Watch for dialogs created lazily after init (childItemsModal,
+  // activityInfoModal) and attach observers to them too.
+  const rootObserver = new MutationObserver(() => {
+    scanDialogs();
+  });
+  rootObserver.observe(document.body, { childList: true, subtree: true });
+
+  document.addEventListener('focusin', handleModalFocusIn);
+  document.addEventListener('keydown', handleModalKeyDown);
+}
+
+window.initModalFocusManagement = initModalFocusManagement;
+
 // Modal management
 function createModal() {
   // Check if modals already exist
@@ -195,15 +354,21 @@ function createModal() {
   const customActivityModal = document.createElement('div');
   customActivityModal.className = 'modal-overlay';
   customActivityModal.id = 'customActivityModal';
+  customActivityModal.setAttribute('role', 'dialog');
+  customActivityModal.setAttribute('aria-modal', 'true');
+  customActivityModal.setAttribute('aria-labelledby', 'customActivityModalTitle');
   customActivityModal.innerHTML = `
         <div class="modal">
             <div class="modal-header">
-                <h3 data-i18n="modals.customActivity.title">Activity Details</h3>
-                <button class="modal-close">&times;</button>
+                <h3 id="customActivityModalTitle" data-i18n="modals.customActivity.title">Activity Details</h3>
+                <button class="modal-close" type="button" data-i18n-aria-label="buttons.close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-content">
                 <div id="customActivityInputContainer">
-                    <input type="text" id="customActivityInput" maxlength="30" data-i18n-placeholder="modals.customActivity.placeholder" placeholder="Enter your activity (max 30 chars)">
+                    <div class="custom-activity-input-wrapper">
+                        <input type="text" id="customActivityInput" maxlength="30" data-i18n-placeholder="modals.customActivity.placeholder" placeholder="Enter your activity (max 30 chars)" data-i18n-aria-label="modals.customActivity.placeholder" aria-label="Enter your activity (max 30 chars)">
+                        <button id="customActivityClearBtn" class="custom-activity-clear-btn" title="Clear saved text" aria-label="Clear saved text" style="display: none;">✕</button>
+                    </div>
                 </div>
                 <div id="customActivityFrequencyContainer" style="display: none;">
                   <label id="customActivityFrequencyLabel" for="customActivityFrequencySelect" data-i18n="modals.customActivity.frequency">Frequency</label>
@@ -240,11 +405,14 @@ function createModal() {
   const activitiesModal = document.createElement('div');
   activitiesModal.className = 'modal-overlay';
   activitiesModal.id = 'activitiesModal';
+  activitiesModal.setAttribute('role', 'dialog');
+  activitiesModal.setAttribute('aria-modal', 'true');
+  activitiesModal.setAttribute('aria-labelledby', 'activitiesModalTitle');
   activitiesModal.innerHTML = `
         <div class="modal">
             <div class="modal-header">
-                <h3 data-i18n="modals.addActivity.title">Add Activity</h3>
-                <button class="modal-close">&times;</button>
+                <h3 id="activitiesModalTitle" data-i18n="modals.addActivity.title">Add Activity</h3>
+                <button class="modal-close" type="button" data-i18n-aria-label="buttons.close" aria-label="Close">&times;</button>
             </div>
             <div id="modalActivitiesContainer"></div>
         </div>
@@ -300,6 +468,9 @@ function createModal() {
   const confirmationModal = document.createElement('div');
   confirmationModal.className = 'modal-overlay';
   confirmationModal.id = 'confirmationModal';
+  confirmationModal.setAttribute('role', 'dialog');
+  confirmationModal.setAttribute('aria-modal', 'true');
+  confirmationModal.setAttribute('aria-labelledby', 'confirmationTitle');
   const numStudyDaysCount = window.studyConfigManager?.getStudyDaysCount() || 1;
   const urlParams = new URLSearchParams(window.location.search);
   const currentDayIndex = parseInt(urlParams.get('day_label_index')) || 0;
@@ -307,60 +478,63 @@ function createModal() {
     window.studyConfigManager?.getDayDisplayLabel(currentDayIndex) ||
     window.studyConfigManager?.getDayLabel(currentDayIndex) ||
     `day_${currentDayIndex + 1}`;
-  const isLastStudyDay = currentDayIndex >= numStudyDaysCount - 1;
 
   const i18n = window.i18n;
   const _t = (key, params) =>
     i18n && i18n.isReady() ? i18n.t(key, params) : key;
 
-  const studyEndInfo = isLastStudyDay ? _t('modals.confirmSubmit.studyEnd') : '';
-  const infoOnTemplateDate = isLastStudyDay
-    ? studyEndInfo
-    : _t('modals.confirmSubmit.infoOnTemplate');
-  const buttonSubmitText = isLastStudyDay
-    ? _t('modals.confirmSubmit.submitDayAndFinish', { dayLabel })
-    : _t('modals.confirmSubmit.submitDay', { dayLabel });
-  const titleText = _t('modals.confirmSubmit.title', {
-    dayLabel,
-    currentDay: currentDayIndex + 1,
-    totalDays: numStudyDaysCount,
-  });
-
   // Show the original "cannot change previous days" message only when
   // previous-day switching buttons are disabled in settings.
-  const showPreviousDaysButtons = Boolean(TUD_SETTINGS.SHOW_PREVIOUS_DAYS_BUTTONS);
+  const showPreviousDaysButtons = Boolean(
+    TUD_SETTINGS.SHOW_PREVIOUS_DAYS_BUTTONS
+  );
   const showCannotChangeMessage = !showPreviousDaysButtons;
-
   const messageText = showCannotChangeMessage
     ? _t('modals.confirmSubmit.message', { dayLabel })
     : '';
 
-  // Use explicit element IDs so i18n language-change updates target the right elements
-  // regardless of whether the message paragraph is present.
+  // Build a skeleton once; the info paragraph and OK-button text are filled
+  // dynamically by updateConfirmationModalContent(buttonMode) right before the
+  // modal is shown, based on the actual current button mode.  The OK click
+  // handler (below) already branches on button mode; only the visible label
+  // and info paragraph were stale when a user manually navigated to the last
+  // study day with previous days incomplete (mode="save-day" but modal said
+  // "Submit Day ... and Finish Study / This submission concludes the study").
   confirmationModal.innerHTML = `
         <div class="modal">
             <div class="modal-content">
-                <h3 id="confirmationTitle">${titleText}</h3>
-                ${showCannotChangeMessage ? `<p id="confirmationMessage">${messageText}</p>` : ''}
-                <p id="confirmationInfo" data-i18n-html="${
-                  isLastStudyDay
-                    ? 'modals.confirmSubmit.studyEnd'
-                    : 'modals.confirmSubmit.infoOnTemplate'
-                }">${infoOnTemplateDate}</p>
+                <h3 id="confirmationTitle">${_t('modals.confirmSubmit.title', {
+                  dayLabel,
+                  currentDay: currentDayIndex + 1,
+                  totalDays: numStudyDaysCount,
+                })}</h3>
+                ${
+                  showCannotChangeMessage
+                    ? `<p id="confirmationMessage">${messageText}</p>`
+                    : ''
+                }
+                <p id="confirmationInfo" style="display:none;"></p>
                 <div class="button-container">
                     <button id="confirmCancel" class="btn btn-secondary" data-i18n="buttons.cancel">Cancel</button>
-                    <button id="confirmOk" class="btn save-btn">${buttonSubmitText}</button>
+                    <button id="confirmOk" class="btn save-btn"></button>
                 </div>
             </div>
         </div>
     `;
 
-  // Update modal text when the user switches language mid-session
-  window.addEventListener('i18n:languageChanged', () => {
-    const h3 = document.getElementById('confirmationTitle');
-    const messageP = document.getElementById('confirmationMessage');
-    const infoP = document.getElementById('confirmationInfo');
+  // Update the modal's visible content for the given button mode.  Modes are
+  // set on #navSubmitBtn / #nextBtn by updateButtonStates():
+  //   - "submit-day"   : non-last study day — save and advance.
+  //   - "finish-study" : last study day AND all previous days complete —
+  //                      save and go to thank-you page.
+  //   - "save-day"      : last study day but previous days incomplete —
+  // Copy Days: only save-day mode exists — save and stay on this day.
+  function updateConfirmationModalContent(buttonMode) {
+    const h3 = confirmationModal.querySelector('#confirmationTitle');
+    const messageP = confirmationModal.querySelector('#confirmationMessage');
+    const infoP = confirmationModal.querySelector('#confirmationInfo');
     const okBtn = confirmationModal.querySelector('#confirmOk');
+
     if (h3) {
       h3.textContent = _t('modals.confirmSubmit.title', {
         dayLabel,
@@ -369,19 +543,32 @@ function createModal() {
       });
     }
     if (messageP) {
-      // Only update if the message paragraph exists (i.e., setting hides it otherwise)
       messageP.textContent = _t('modals.confirmSubmit.message', { dayLabel });
     }
+
+    // Always save-day: no info paragraph, OK says "Save Day"
     if (infoP) {
-      infoP.innerHTML = isLastStudyDay
-        ? _t('modals.confirmSubmit.studyEnd')
-        : _t('modals.confirmSubmit.infoOnTemplate');
+      infoP.innerHTML = '';
+      infoP.removeAttribute('data-i18n-html');
+      infoP.style.display = 'none';
     }
     if (okBtn) {
-      okBtn.textContent = isLastStudyDay
-        ? _t('modals.confirmSubmit.submitDayAndFinish', { dayLabel })
-        : _t('modals.confirmSubmit.submitDay', { dayLabel });
+      okBtn.textContent = _t('modals.confirmSubmit.submitDayNoDay');
     }
+
+    confirmationModal.dataset.currentMode = 'save-day';
+  }
+
+  // Initialize with save-day as the only mode
+  updateConfirmationModalContent('save-day');
+  window.updateConfirmationModalContent = updateConfirmationModalContent;
+
+  // Update modal text when the user switches language mid-session, using the
+  // mode that was active when the modal was last configured.
+  window.addEventListener('i18n:languageChanged', () => {
+    updateConfirmationModalContent(
+      confirmationModal.dataset.currentMode || 'submit-day'
+    );
   });
 
   confirmationModal
@@ -410,20 +597,28 @@ function createModal() {
       const urlParams = new URLSearchParams(window.location.search);
       const currentDayIndex = parseInt(urlParams.get('day_label_index')) || 0;
       const totalDays = window.studyConfigManager?.getStudyDaysCount() || 1;
-      const isLastDay = currentDayIndex >= totalDays - 1;
 
-      // Send data with redirect flag
+      // Copy Days: always save-day mode — save and reload current day.
+      // No auto-advance, no redirect. Submit Study is a separate button.
       const result = await sendData({
-        mode: 'json',
-        shouldRedirect: true,
-        isLastDay: isLastDay,
+        shouldRedirect: false,
+        isLastDay: false,
         currentDayIndex: currentDayIndex,
       });
 
-      if (!result?.success) {
+      if (result?.success) {
+        const daySavedMsg = window.i18n
+          ? window.i18n.t('messages.daySavedStayOnPage')
+          : 'Day saved.';
+        showToast(daySavedMsg, 'success', 3000);
+        // Reload to refresh day button states from backend
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
         const submitErrorMessage = window.i18n
           ? window.i18n.t('messages.submitError')
-          : 'Error submitting diary';
+          : 'Error saving diary';
         const errorDetails = result?.error ? `: ${result.error}` : '';
         showToast(`${submitErrorMessage}${errorDetails}`, 'error', 5000);
         updateButtonStates();
@@ -433,10 +628,13 @@ function createModal() {
   const skipConfirmationModal = document.createElement('div');
   skipConfirmationModal.className = 'modal-overlay';
   skipConfirmationModal.id = 'skipConfirmationModal';
+  skipConfirmationModal.setAttribute('role', 'dialog');
+  skipConfirmationModal.setAttribute('aria-modal', 'true');
+  skipConfirmationModal.setAttribute('aria-labelledby', 'skipConfirmationModalTitle');
   skipConfirmationModal.innerHTML = `
         <div class="modal">
             <div class="modal-content">
-                <h3 data-i18n="modals.confirmSkip.title">Do you really want to skip all time reporting?</h3>
+                <h3 id="skipConfirmationModalTitle" data-i18n="modals.confirmSkip.title">Do you really want to skip all time reporting?</h3>
                 <p data-i18n="modals.confirmSkip.message">You will be taken directly to the thank-you page.</p>
                 <div class="button-container">
                     <button id="confirmSkipCancel" class="btn btn-secondary" data-i18n="buttons.cancel">Cancel</button>
@@ -468,10 +666,13 @@ function createModal() {
   const cleanRowConfirmationModal = document.createElement('div');
   cleanRowConfirmationModal.className = 'modal-overlay';
   cleanRowConfirmationModal.id = 'cleanRowConfirmationModal';
+  cleanRowConfirmationModal.setAttribute('role', 'dialog');
+  cleanRowConfirmationModal.setAttribute('aria-modal', 'true');
+  cleanRowConfirmationModal.setAttribute('aria-labelledby', 'cleanRowConfirmationModalTitle');
   cleanRowConfirmationModal.innerHTML = `
         <div class="modal">
             <div class="modal-content">
-                <h3 data-i18n="modals.confirmCleanRow.title">Clear current timeline row?</h3>
+                <h3 id="cleanRowConfirmationModalTitle" data-i18n="modals.confirmCleanRow.title">Clear current timeline row?</h3>
                 <p data-i18n="modals.confirmCleanRow.message">Are you sure you want to delete all activities in the current timeline row?</p>
                 <div class="button-container">
                     <button id="confirmCleanRowCancel" class="btn btn-secondary" data-i18n="buttons.cancel">Cancel</button>
@@ -519,6 +720,10 @@ function createModal() {
   document.body.appendChild(cleanRowConfirmationModal);
   document.body.appendChild(loadingModal);
   document.body.appendChild(customActivityModal);
+
+  // Tier 2: enable focus management for the dialogs just created (it also
+  // observes lazily-created dialogs such as childItemsModal / activityInfoModal).
+  initModalFocusManagement();
 
   // Apply translations to the newly created modal elements
   if (window.i18n && window.i18n.isReady()) {
@@ -667,6 +872,93 @@ function updateTimelineCoverageIndicators() {
   });
 }
 
+function addCopyDayLink(timelineTitle, dayIndex) {
+  if (!timelineTitle) {
+    return;
+  }
+
+  const existingLink = timelineTitle.querySelector('.copy-day-link');
+  if (existingLink) {
+    existingLink.remove();
+  }
+
+  // Copy Days: the button is always shown when there are other days to copy
+  // to.  The target picker shows whether each day is empty or populated,
+  // and a confirmation dialog handles overwrite.  No min_coverage gate.
+  const hasCopyTarget = getTargetDayCount() > 0;
+  if (!hasCopyTarget) {
+    return;
+  }
+
+  const t =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t.bind(window.i18n)
+      : function (key) {
+          return key;
+        };
+
+  const link = document.createElement('button');
+  link.type = 'button';
+  link.className = 'btn copy-day-link';
+  link.textContent = t('messages.copyDayLink');
+  link.addEventListener('click', function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const pickerEvent = {
+      clientX: event.clientX,
+      clientY: event.clientY + 8,
+    };
+    if (typeof window.showCopyTargetPicker === 'function') {
+      window.showCopyTargetPicker(dayIndex, pickerEvent);
+    }
+  });
+  timelineTitle.appendChild(link);
+
+  // Copy Days: optional "Copy from..." button (pull direction, configurable)
+  if (TUD_SETTINGS.SHOW_COPY_FROM_BUTTON && getTargetDayCount() > 0) {
+    const fromLink = document.createElement('button');
+    fromLink.type = 'button';
+    fromLink.className = 'btn copy-day-link copy-from-link';
+    fromLink.textContent = t('messages.copyFromDay');
+    fromLink.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      const pickerEvent = {
+        clientX: event.clientX,
+        clientY: event.clientY + 8,
+      };
+      if (typeof window.showCopySourcePicker === 'function') {
+        window.showCopySourcePicker(dayIndex, pickerEvent);
+      }
+    });
+    timelineTitle.appendChild(fromLink);
+  }
+}
+
+window.addCopyDayLink = addCopyDayLink;
+
+/**
+ * Copy Days: count other days (excluding current) that can be copy targets.
+ * Overwrite is allowed, so populated days are included.
+ */
+function getTargetDayCount() {
+  const studyDaysCount =
+    window.timelineManager?.studyDaysCount ||
+    window.studyConfigManager?.getStudyDaysCount?.() ||
+    0;
+
+  const currentDayIndex =
+    parseInt(
+      new URLSearchParams(window.location.search).get('day_label_index')
+    ) || 0;
+
+  // All other days are valid targets (overwrite is allowed with confirmation).
+  return Math.max(0, studyDaysCount - 1);
+}
+
+window.getTargetDayCount = getTargetDayCount;
+window.getEmptyTargetDayCount = getTargetDayCount;  // backward compat alias
+
 // Add this function to update the day display
 export function updateCurrentDayDisplay() {
   console.log('Updating current day display...');
@@ -756,7 +1048,54 @@ export function updateCurrentDayDisplay() {
   dayDisplay.title = dayTooltipText;
   timelineTitle.appendChild(dayDisplay);
 
+  addCopyDayLink(timelineTitle, dayIndex);
+
+  // Custom page title from URL param (frontend-only, not sent to backend)
+  const customTitle = urlParams.get('custom_page_title');
+  if (customTitle && customTitle.trim()) {
+    timelineTitle.appendChild(document.createTextNode(' '));
+    const customTitleSpan = document.createElement('span');
+    customTitleSpan.id = 'customPageTitle';
+    customTitleSpan.className = 'timeline-header-emphasis';
+    customTitleSpan.textContent = `\u2014 ${customTitle.trim()}`;
+    timelineTitle.appendChild(customTitleSpan);
+  }
+
   return document.getElementById('currentDayDisplay');
+}
+
+function getIncompleteDaysList() {
+  // "Complete" here means meeting the min_coverage requirement (same notion as
+  // the submit gate).  Fall back to the old "has any data" set for backends
+  // that do not send day_indices_meet_min_coverage yet.
+  const completedDays = Array.isArray(
+    window.timelineManager?.dayIndicesMeetMinCoverage
+  )
+    ? window.timelineManager.dayIndicesMeetMinCoverage
+    : Array.isArray(window.timelineManager?.dayIndicesWithData)
+      ? window.timelineManager.dayIndicesWithData
+      : [];
+  const studyDaysCount =
+    window.timelineManager?.studyDaysCount ||
+    window.studyConfigManager?.getStudyDaysCount() ||
+    0;
+  const currentDayIndex =
+    (window.timelineManager?.currentIndex !== undefined
+      ? window.timelineManager.currentIndex
+      : parseInt(
+          new URLSearchParams(window.location.search).get('day_label_index')
+        )) || 0;
+
+  const incomplete = [];
+  for (let i = 0; i < currentDayIndex; i++) {
+    if (!completedDays.includes(i)) {
+      const dayName =
+        window.studyConfigManager?.getDayDisplayLabel?.(i) ||
+        (window.i18n ? window.i18n.t('common.day') : 'Day') + ' ' + (i + 1);
+      incomplete.push(dayName);
+    }
+  }
+  return incomplete.join(', ');
 }
 
 function updateButtonStates() {
@@ -767,7 +1106,7 @@ function updateButtonStates() {
 
   updateCurrentDayDisplay();
 
-  const undoButton = document.getElementById('undoBtn');
+  const removeLastButton = document.getElementById('removeLastBtn');
   const cleanRowButton = document.getElementById('cleanRowBtn');
   const nextButtonInTopBar = document.getElementById('nextBtn');
   const backButton = document.getElementById('backBtn');
@@ -786,13 +1125,16 @@ function updateButtonStates() {
 
   //console.log('Has activities DOM:', hasActivities);
 
-  if (undoButton) undoButton.disabled = isEmpty;
+  if (removeLastButton) removeLastButton.disabled = isEmpty;
   if (cleanRowButton) cleanRowButton.disabled = !hasActivities;
 
-  // Update Back button state - enable if not on first timeline
+  // Update Back button state - only show when there are multiple timelines
   if (backButton) {
-    backButton.disabled = window.timelineManager.currentIndex <= 0;
-    //console.log('Back button disabled:', backButton.disabled);
+    const hasMultipleTimelines = window.timelineManager.keys.length > 1;
+    backButton.style.display = hasMultipleTimelines ? '' : 'none';
+    if (hasMultipleTimelines) {
+      backButton.disabled = window.timelineManager.currentIndex <= 0;
+    }
   }
 
   // Get current timeline coverage
@@ -824,87 +1166,175 @@ function updateButtonStates() {
   //console.log('Total timelines:', totalTimelines);
   //console.log('Is last timeline:', isLastTimeline);
 
-  const allTimelinesMeetMinCoverage = window.timelineManager.keys.every(
-    (timelineKey) => {
-      const timelineMetadata = window.timelineManager.metadata[timelineKey];
-      const timelineMinCoverage = parseInt(timelineMetadata?.minCoverage) || 0;
-      const timelineCoverage = getCoverageForTimelineKey(timelineKey);
-      return timelineCoverage >= timelineMinCoverage;
-    }
-  );
+  // Copy Days feature: Save is always available regardless of min_coverage.
+  // The green/gray day buttons show completion status; the Submit Study
+  // button enforces the final gate.
+  const canProceed = true;
 
-  const canProceed = isLastTimeline
-    ? allTimelinesMeetMinCoverage
-    : meetsMinCoverage;
+  const currentDayIndex =
+    parseInt(
+      new URLSearchParams(window.location.search).get('day_label_index')
+    ) || 0;
+  const totalStudyDays = window.studyConfigManager?.getStudyDaysCount() || 1;
+  const isLastStudyDay = currentDayIndex >= totalStudyDays - 1;
 
+  // Copy Days: all timelines are always visible.  The save button always
+  // says "Save Day" and always triggers the save flow.
   updateTimelineCoverageIndicators();
 
-  // Get text values for buttons
-  const nextTextTopBarButton = window.i18n
-    ? window.i18n.t('buttons.next')
-    : 'Next Timeline';
-  const nextTextLowerSubmitButton = window.i18n
-    ? window.i18n.t('buttons.next')
-    : 'Next Timeline';
-  const submitText = window.i18n
-    ? window.i18n.t('buttons.submit')
-    : 'Submit Day';
-
-  //console.log('Button texts - Next:', nextTextTopBarButton, 'Submit:', submitText);
+  const saveDayText = window.i18n
+    ? window.i18n.t('buttons.saveDay')
+    : 'Save Day';
 
   if (nextButtonInTopBar) {
-    //console.log('Next button before update - disabled:', nextButtonInTopBar.disabled, 'innerHTML:', nextButtonInTopBar.innerHTML);
-
     nextButtonInTopBar.disabled = !canProceed;
-
-    if (isLastTimeline) {
-      // On last timeline, show Submit
-      nextButtonInTopBar.innerHTML = `<i class="fas fa-check"></i> ${submitText}`;
-      //console.log('Setting Next button to SUBMIT mode');
-    } else {
-      // For other timelines, show Next
-      nextButtonInTopBar.innerHTML = `${nextTextTopBarButton} <i class="fas fa-arrow-right"></i>`;
-      //console.log('Setting Next button to NEXT mode');
-    }
-
-    //console.log('Next button after update - disabled:', nextButtonInTopBar.disabled, 'innerHTML:', nextButtonInTopBar.innerHTML);
+    nextButtonInTopBar.innerHTML = `<i class="fas fa-save"></i> ${saveDayText}`;
+    nextButtonInTopBar.setAttribute('data-mode', 'save-day');
+    nextButtonInTopBar.title = '';
   }
 
-  // Update navSubmitBtn to mirror nextButton exactly
+  // Update navSubmitBtn to mirror nextButton — always "Save Day"
   if (lowerNavSubmitBtn) {
-    //console.log('Nav button before update - disabled:', lowerNavSubmitBtn.disabled);
-
     lowerNavSubmitBtn.disabled = !canProceed;
 
-    // Find the span element inside navSubmitBtn
     const navSubmitIcon = lowerNavSubmitBtn.querySelector('i');
     const navSubmitSpan = lowerNavSubmitBtn.querySelector('span');
 
-    if (isLastTimeline) {
-      // On last timeline, show Submit with green color
-      if (navSubmitSpan) {
-        navSubmitSpan.textContent = submitText;
-      }
-      if (navSubmitIcon) {
-        navSubmitIcon.className = 'fas fa-check'; // Check icon for submit
-      }
-      lowerNavSubmitBtn.classList.add('submit-mode');
-      //console.log('Setting lower Nav button to SUBMIT mode');
-    } else {
-      // For other timelines, show Next with blue color
-      if (navSubmitSpan) {
-        navSubmitSpan.textContent = nextTextLowerSubmitButton;
-      }
-      if (navSubmitIcon) {
-        navSubmitIcon.className = 'fas fa-arrow-right'; // Arrow icon for next
-      }
-      lowerNavSubmitBtn.classList.remove('submit-mode');
-      //console.log('Setting lower Nav button to NEXT mode');
+    if (navSubmitSpan) {
+      navSubmitSpan.textContent = saveDayText;
     }
+    if (navSubmitIcon) {
+      navSubmitIcon.className = 'fas fa-save';
+    }
+    lowerNavSubmitBtn.classList.add('submit-mode');
+    lowerNavSubmitBtn.setAttribute('data-mode', 'save-day');
+    lowerNavSubmitBtn.title = '';
+  }
 
-    //console.log('Nav button after update - disabled:', lowerNavSubmitBtn.disabled);
+  // The day-switch buttons in #previousDaysSwitchRow are gated on the same
+  // min_coverage check as the Next/Submit buttons above.  Every activity
+  // mutation (create, delete, move, resize, arrow-key time edit,
+  // remove-last, clean-row, load) routes through this function, so
+  // re-rendering the row here keeps both button groups in sync without
+  // touching each individual call site.
+  if (typeof window.renderPreviousDaysSwitchRow === 'function') {
+    window.renderPreviousDaysSwitchRow();
+  }
+
+  // The "Copy this day" button in the timeline title is gated on the same
+  // min_coverage check (the copy operation saves the current day first, so
+  // the state must be saveable).  Refresh it from the same single chokepoint.
+  if (typeof window.addCopyDayLink === 'function') {
+    const timelineTitle = document.querySelector('.timeline-title');
+    if (timelineTitle) {
+      window.addCopyDayLink(timelineTitle, currentDayIndex);
+    }
+  }
+
+  // Copy Days: update the Submit Study button state
+  updateSubmitStudyButton();
+}
+
+/**
+ * Whether the currently loaded day meets min_coverage for ALL of its
+ * timelines, computed from the live client state (not the database).
+ *
+ * Mirrors the backend notion in `_get_days_meeting_min_coverage()`:
+ * - If at least one timeline imposes a `min_coverage > 0`, every such
+ *   timeline must be covered by the current client activities.
+ * - If no timeline imposes a requirement, the day counts as complete once it
+ *   has any activity (the backend falls back to "has any data").
+ *
+ * Used by the Submit Study gate so unsaved edits (e.g. deleting activities so
+ * min_coverage is no longer met) gray out the button immediately, without
+ * waiting for a save + backend round-trip.
+ */
+function getCurrentDayMeetsMinCoverage() {
+  const keys = window.timelineManager?.keys;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return false; // No timelines loaded yet -> don't count the day as complete.
+  }
+
+  const requiredTimelines = keys.filter((key) => {
+    const minCoverage =
+      parseInt(window.timelineManager.metadata?.[key]?.minCoverage) || 0;
+    return minCoverage > 0;
+  });
+
+  if (requiredTimelines.length === 0) {
+    // No min_coverage requirements: a day counts as complete once it has any
+    // data, matching the backend's "_get_completed_day_indices" fallback.
+    return keys.some(
+      (key) => (window.timelineManager.activities?.[key] || []).length > 0
+    );
+  }
+
+  return requiredTimelines.every((key) => {
+    const minCoverage =
+      parseInt(window.timelineManager.metadata[key].minCoverage) || 0;
+    return getCoverageForTimelineKey(key) >= minCoverage;
+  });
+}
+
+/**
+ * Copy Days: Enable the Submit Study button only when ALL days meet
+ * min_coverage.  Shows a tooltip listing incomplete days.
+ *
+ * Hybrid gate:
+ * - Days other than the currently loaded one are evaluated against the
+ *   DB-derived set (`dayIndicesMeetMinCoverage`).  Those days cannot be
+ *   "dirty" because switching days always saves first.
+ * - The current day is evaluated against the live client state instead, so
+ *   unsaved edits (e.g. deleting activities so min_coverage is no longer met)
+ *   gray out the button immediately.
+ */
+function updateSubmitStudyButton() {
+  const btn = document.getElementById('submitStudyBtn');
+  if (!btn) return;
+
+  const dayIndicesMeetMinCoverage = Array.isArray(
+    window.timelineManager?.dayIndicesMeetMinCoverage
+  )
+    ? window.timelineManager.dayIndicesMeetMinCoverage
+    : [];
+
+  const totalDays =
+    window.studyConfigManager?.getStudyDaysCount() ||
+    window.timelineManager?.studyDaysCount ||
+    0;
+
+  const currentDayIndex = getCurrentDayIndex();
+
+  const incomplete = [];
+  for (let i = 0; i < totalDays; i++) {
+    if (i === currentDayIndex) {
+      continue; // Current day is checked against live client state below.
+    }
+    if (!dayIndicesMeetMinCoverage.includes(i)) {
+      incomplete.push(i + 1);
+    }
+  }
+  if (!getCurrentDayMeetsMinCoverage()) {
+    incomplete.push(currentDayIndex + 1);
+  }
+
+  const allComplete = incomplete.length === 0;
+
+  if (allComplete) {
+    btn.disabled = false;
+    btn.classList.add('submit-ready');
+    btn.title = '';
+  } else {
+    btn.disabled = true;
+    btn.classList.remove('submit-ready');
+    const t = window.i18n && window.i18n.isReady()
+      ? window.i18n.t.bind(window.i18n)
+      : function(k) { return k; };
+    btn.title = t('messages.submitStudyIncomplete', { days: incomplete.join(', ') });
   }
 }
+
+window.updateSubmitStudyButton = updateSubmitStudyButton;
 
 function redirectToThankYouPage() {
   const redirectUrl = getPostDiaryRedirectPath('skipped');
@@ -966,33 +1396,64 @@ const NEXT_BUTTON_COOLDOWN = 500; // 1 second cooldown
 let backButtonLastClick = 0;
 const BACK_BUTTON_COOLDOWN = 500; // 1 second cooldown (shorter than Next)
 
-// Debounce variables for Undo button
-let undoButtonLastClick = 0;
-const UNDO_BUTTON_COOLDOWN = 300; // 300ms cooldown
+// Debounce variables for Remove Last button
+let removeLastButtonLastClick = 0;
+const REMOVE_LAST_BUTTON_COOLDOWN = 300; // 300ms cooldown
 
-// Shared function to handle Next button logic with debounce
-const handleNextButtonAction = () => {
+// Shared function to handle save button logic with debounce.
+// Copy Days: saving is a routine operation — no confirmation modal needed.
+const handleNextButtonAction = async () => {
   const currentTime = Date.now();
   if (currentTime - nextButtonLastClick < NEXT_BUTTON_COOLDOWN) {
-    console.log('Next button on cooldown');
+    console.log('Save button on cooldown');
     return;
   }
   nextButtonLastClick = currentTime;
 
-  const isLastTimeline =
-    window.timelineManager.currentIndex ===
-    window.timelineManager.keys.length - 1;
+  const nextButton = document.getElementById('nextBtn');
+  const navSubmitButton = document.getElementById('navSubmitBtn');
 
-  if (isLastTimeline) {
-    // On last timeline, show confirmation modal
-    document.getElementById('confirmationModal').style.display = 'block';
+  if (nextButton) nextButton.disabled = true;
+  if (navSubmitButton) navSubmitButton.disabled = true;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentDayIndex = parseInt(urlParams.get('day_label_index')) || 0;
+
+  const result = await sendData({
+    shouldRedirect: false,
+    isLastDay: false,
+    currentDayIndex,
+  });
+
+  if (result?.success) {
+    // Copy Days: mark this day as saved so templates aren't re-loaded
+    // if the user intentionally saved an empty day.
+    const studyName = window.timelineManager?.study?.study_name_short ||
+      new URLSearchParams(window.location.search).get('study_name');
+    const pid = window.timelineManager?.study?.pid ||
+      new URLSearchParams(window.location.search).get('pid');
+    if (studyName && pid && typeof window.markDaySaved === 'function') {
+      window.markDaySaved(studyName, pid, currentDayIndex);
+    }
+
+    const daySavedMsg = window.i18n
+      ? window.i18n.t('messages.daySavedStayOnPage')
+      : 'Day saved.';
+    if (typeof showToast === 'function') {
+      showToast(daySavedMsg, 'success', 3000);
+    }
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
   } else {
-    // For other timelines, proceed to next timeline
-    addNextTimeline();
-    window.selectedActivity = null;
-    document.querySelectorAll('.activity-button.selected').forEach((btn) => {
-      btn.classList.remove('selected');
-    });
+    const errMsg = window.i18n
+      ? window.i18n.t('messages.submitError')
+      : 'Error saving diary';
+    const details = result?.error ? `: ${result.error}` : '';
+    if (typeof showToast === 'function') {
+      showToast(errMsg + details, 'error', 5000);
+    }
+    updateButtonStates();
   }
 };
 
@@ -1010,21 +1471,21 @@ const handleBackButtonAction = () => {
   }
 };
 
-// Shared function to handle Undo button logic with debounce
-const handleUndoButtonAction = () => {
+// Shared function to handle Remove Last button logic with debounce
+const handleRemoveLastButtonAction = () => {
   const currentTime = Date.now();
-  if (currentTime - undoButtonLastClick < UNDO_BUTTON_COOLDOWN) {
-    console.log('Undo button on cooldown');
+  if (currentTime - removeLastButtonLastClick < REMOVE_LAST_BUTTON_COOLDOWN) {
+    console.log('Remove Last button on cooldown');
     return;
   }
-  undoButtonLastClick = currentTime;
+  removeLastButtonLastClick = currentTime;
 
   const currentKey = getCurrentTimelineKey();
   const currentData = getCurrentTimelineData();
   if (currentData.length > 0) {
     if (DEBUG_MODE) {
       console.log(
-        'Before undo - timelineData:',
+        'Before remove last - timelineData:',
         window.timelineManager.activities
       );
     }
@@ -1096,28 +1557,10 @@ function initButtons() {
   const cleanRowBtn = document.getElementById('cleanRowBtn');
   const navSubmitBtn = document.getElementById('navSubmitBtn');
 
-  // Initialize the navigation submit button with proper debounce
+  // Initialize the navigation submit button — Copy Days: always call save action
   if (navSubmitBtn) {
-    // Allow pointer events on disabled button to show toast
-    navSubmitBtn.style.pointerEvents = 'auto';
-
     navSubmitBtn.addEventListener('click', () => {
-      const nextBtn = document.getElementById('nextBtn');
-
-      // Check if the Next button is disabled
-      if (nextBtn && nextBtn.disabled) {
-        // Show toast message when trying to click disabled nav button
-        const message = window.i18n
-          ? window.i18n.t('messages.timelineMissing')
-          : 'There is information missing from this timeline. Would you like to add anything?';
-        showToast(message, 'warning', 4000);
-        return;
-      }
-
-      if (nextBtn && !nextBtn.disabled) {
-        // Use the shared debounced function instead of programmatic click
-        handleNextButtonAction();
-      }
+      handleNextButtonAction();
     });
   }
 
@@ -1183,10 +1626,10 @@ function initButtons() {
     confirmCleanRowOk.addEventListener('click', performCleanRow);
   }
 
-  // Add click handler for Undo button using debounced function
+  // Add click handler for Remove Last button using debounced function
   document
-    .getElementById('undoBtn')
-    .addEventListener('click', handleUndoButtonAction);
+    .getElementById('removeLastBtn')
+    .addEventListener('click', handleRemoveLastButtonAction);
 
   // Add click handler for Next button
   const nextBtn = document.getElementById('nextBtn');
@@ -1212,14 +1655,101 @@ function initButtons() {
   });
 
   // Add click handler for Back button using shared debounced function
-  document
-    .getElementById('backBtn')
-    .addEventListener('click', handleBackButtonAction);
-
-  // Disable back button initially
   const backButton = document.getElementById('backBtn');
   if (backButton) {
-    backButton.disabled = true;
+    backButton.addEventListener('click', handleBackButtonAction);
+  }
+
+  // Copy Days: Submit Study button — save the current day first, then POST to
+  // the submit endpoint and redirect to thank-you.  Saving first guarantees
+  // that the state the participant sees is what gets submitted (the backend
+  // validates all days meet min_coverage against the DB on submit), so unsaved
+  // edits are never silently discarded.
+  const submitStudyBtn = document.getElementById('submitStudyBtn');
+  if (submitStudyBtn) {
+    submitStudyBtn.addEventListener('click', async function () {
+      if (submitStudyBtn.disabled) return;
+
+      submitStudyBtn.disabled = true;
+
+      const studyName =
+        window.timelineManager?.study?.study_name_short ||
+        window.studyConfigManager?.getCurrentStudy?.()?.name_short ||
+        new URLSearchParams(window.location.search).get('study_name');
+      const participantId =
+        window.timelineManager?.study?.pid ||
+        new URLSearchParams(window.location.search).get('pid');
+
+      if (!studyName || !participantId) {
+        if (window.showToast) {
+          window.showToast('Missing study or participant info', 'error', 4000);
+        }
+        submitStudyBtn.disabled = false;
+        return;
+      }
+
+      const reenableAfterFailure = () => {
+        submitStudyBtn.disabled = false;
+        updateButtonStates();
+      };
+
+      try {
+        // Persist the current day before submitting so the backend validates
+        // the exact visible state.  Submit is a rare explicit action, so the
+        // extra save round-trip is acceptable.
+        const currentDayIndex = getCurrentDayIndex();
+        const saveResult = await sendData({
+          shouldRedirect: false,
+          isLastDay: false,
+          currentDayIndex,
+        });
+
+        if (!saveResult?.success) {
+          const submitErrorMessage = window.i18n
+            ? window.i18n.t('messages.submitError')
+            : 'Error saving diary';
+          const errorDetails = saveResult?.error ? `: ${saveResult.error}` : '';
+          if (window.showToast) {
+            window.showToast(submitErrorMessage + errorDetails, 'error', 5000);
+          }
+          reenableAfterFailure();
+          return;
+        }
+
+        const apiUrl = TUD_SETTINGS.API_BASE_URL;
+        const response = await fetch(
+          apiUrl + '/studies/' + encodeURIComponent(studyName) +
+          '/participants/' + encodeURIComponent(participantId) +
+          '/submit',
+          { method: 'POST' }
+        );
+
+        if (!response.ok) {
+          const err = await response.json().catch(function () { return { detail: 'Unknown error' }; });
+          if (window.showToast) {
+            window.showToast(
+              (err.detail && err.detail.message) || err.detail || 'Failed to submit study',
+              'error',
+              5000
+            );
+          }
+          reenableAfterFailure();
+          return;
+        }
+
+        // Success — redirect to thank-you page
+        const redirectUrl = getPostDiaryRedirectPath('completed');
+        const currentParams = new URLSearchParams(window.location.search);
+        currentParams.set('completion_status', 'completed');
+        const sep = redirectUrl.includes('?') ? '&' : '?';
+        window.location.href = redirectUrl + (currentParams.toString() ? sep + currentParams.toString() : '');
+      } catch (err) {
+        if (window.showToast) {
+          window.showToast('Network error submitting study', 'error', 5000);
+        }
+        reenableAfterFailure();
+      }
+    });
   }
 }
 
@@ -1341,32 +1871,7 @@ function scrollToActiveTimeline() {
   if (!activeTimeline) return;
 
   if (getIsMobile()) {
-    // Mobile: horizontal scroll
-    const timelinesWrapper = document.querySelector('.timelines-wrapper');
-    if (timelinesWrapper) {
-      // Check if wrapper has scrollable overflow
-      const hasScrollableOverflow =
-        timelinesWrapper.scrollWidth > timelinesWrapper.clientWidth;
-
-      if (hasScrollableOverflow) {
-        // Calculate if timeline is partially or fully hidden
-        const timelineRect = activeTimeline.getBoundingClientRect();
-        const wrapperRect = timelinesWrapper.getBoundingClientRect();
-
-        // Check if timeline is not fully visible
-        const isPartiallyHidden =
-          timelineRect.left < wrapperRect.left ||
-          timelineRect.right > wrapperRect.right;
-
-        if (isPartiallyHidden) {
-          // Scroll to make timeline fully visible
-          timelinesWrapper.scrollTo({
-            left: activeTimeline.offsetLeft,
-            behavior: 'smooth',
-          });
-        }
-      }
-    }
+    return;
   } else {
     // Desktop: vertical scroll to center
     const windowHeight = window.innerHeight;
