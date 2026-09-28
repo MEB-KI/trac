@@ -9,7 +9,7 @@
 
 TRAC is a web-based research software for time-use research: users can report what they did during one or more days by selecting activities and placing them on one or more timelines per day. E.g., depending on the study, there may be one timeline for 'Primary Activity', and another one for 'Secondary Activity', allowing users to report things like listening to music while riding on the subway.
 
-A very early version of the frontend was based on [o-timeusediary](https://github.com/andreifoldes/o-timeusediary) by Andrei Tamas Foldes et al. but heavily adapted, and the backend was written from scratch.
+A very early version of the frontend was based on [o-timeusediary](https://github.com/andreifoldes/o-timeusediary) by Andrei Tamas Foldes *et al.* but heavily adapted, and the backend was written from scratch.
 
 When using the software in this repo for academical research, please cite it using this [DOI](https://doi.org/10.5281/zenodo.19594929). We highly recommend you also cite [Andrei Tamas Foldes' paper](https://doi.org/10.32797/jtur-2020-1) `Time use diary design for our times - an overview, presenting a Click-and-Drag Diary Instrument (CaDDI) for online application`.
 
@@ -18,14 +18,14 @@ When using the software in this repo for academical research, please cite it usi
 
 TRAC consists of three components that must be set up together:
 
-1. **PostgreSQL database** — stores participant data and study definitions
-2. **Python/FastAPI backend** — serves the REST API and the admin interface
+1. **Database server** — stores study definitions including available activities and results (activities reported by participants)
+2. **Python/FastAPI backend** — serves the REST API of the app and the admin interface
 3. **Frontend** — a static JavaScript/HTML/CSS app served by any web server
 
 
 ### Prerequisites
 
-- A **PostgreSQL** server (any recent version)
+- A **PostgreSQL** server (any recent version) is recommended. We also support (and [test against](.github/workflows/backend_integration_tests_dbms_matrix_manual.yml)) MariaDB and MSSQL.
 - **Python 3.10+** and [`uv`](https://github.com/astral-sh/uv) for the backend
 - A **web server** (e.g., nginx, Apache, Caddy) to serve the frontend static files and optionally act as a reverse proxy in front of the backend
 - For production: a domain name and TLS/HTTPS (strongly recommended — see [Security](#security) below)
