@@ -179,7 +179,7 @@ The E2E test command uses the `e2e` service in `docker-compose.dev.yml`, which i
 ### How to make a Release
 
 * record changes in `CHANGES` file
-* bump version of backend in `backend/src/o-timeusediary_backend/__init__.py`
+* bump version of backend in `backend/src/o_timeusediary_backend/__init__.py`
 * bump version of frontend in `frontend/src/js/constants.js`
 * create commit with the mentioned changes, with a commit message like 'Bump version to and log changes for v0.x.y'
 * manually run the GitHub Actions workflow `TUD Backend Integration Tests (DBMS Matrix, Manual)` and confirm postgres, mariadb, and mssql jobs pass
