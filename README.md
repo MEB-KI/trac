@@ -136,9 +136,21 @@ const TUD_SETTINGS = {
     DEFAULT_STUDY_NAME: 'default',
 
     // Whether to show navigation buttons for previous days
-    SHOW_PREVIOUS_DAYS_BUTTONS: true
+    SHOW_PREVIOUS_DAYS_BUTTONS: true,
+
+    // Show a red "maintenance soon, please save your work" notice on every page.
+    // Intended for short maintenance windows (deploying files, restarting the
+    // backend): set it to true a few minutes before the maintenance starts so
+    // participants have time to save their current day.
+    IS_MAINTENANCE_MODE: false,
+
+    // Optional custom notice text. null uses the localised default from
+    // locales/*.json ('maintenance.banner'), which is preferred.
+    MAINTENANCE_MESSAGE: null
 };
 ```
+
+The maintenance notice is rendered by `frontend/src/js/maintenance.js`, which every page includes. It is purely informational: it never blocks the diary, and it takes effect on the next page load (day switches reload the page, so active participants usually see it quickly). New pages must include `../js/maintenance.js` as a module next to the settings include.
 
 No build step is required. Once this file is configured, the entire `frontend/src/` directory can be deployed as-is to any static file server.
 
