@@ -152,6 +152,8 @@ const TUD_SETTINGS = {
 
 The maintenance notice is rendered by `frontend/src/js/maintenance.js`, which every page includes. It is purely informational: it never blocks the diary, and it takes effect on the next page load (day switches reload the page, so active participants usually see it quickly). New pages must include `../js/maintenance.js` as a module next to the settings include.
 
+Note: this file is not the only copy. `run_dev_nginx_both.bash`, `docker-compose.dev.yml`, the CI workflows and `dev_tools/local_minimal/README.md` each overwrite `frontend/src/settings/tud_settings.js` with a copy from `dev_tools/*/frontend_settings/`. Any setting added here has to be added to those copies as well, otherwise it is silently dropped wherever such a copy is used.
+
 No build step is required. Once this file is configured, the entire `frontend/src/` directory can be deployed as-is to any static file server.
 
 
