@@ -166,6 +166,8 @@ def test_pre_alembic_database_can_be_adopted(scratch_database):
             "ALTER TABLE studies ALTER COLUMN description TYPE text USING description::text"
         )
     else:
+        # MariaDB stores JSON as LONGTEXT plus a json_valid() check; modifying
+        # the column to TEXT replaces both.
         scratch_database.execute("ALTER TABLE studies MODIFY COLUMN description TEXT")
 
     scratch_database.seed(
