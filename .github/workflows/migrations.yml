@@ -54,6 +54,12 @@ jobs:
         working-directory: backend
         run: uv sync --frozen
 
+      # The tests run `tud studies import` on the migrated database, and the
+      # backend settings (external task secrets, admin users) come from this file
+      # in CI, exactly as in the other workflows.
+      - name: Prepare backend settings
+        run: cp dev_tools/ci/backend_settings/.env.ci backend/.env
+
       - name: Run the schema migration tests
         env:
           # The app itself is imported by the tests and needs TUD_DATABASE_URL;
@@ -94,6 +100,9 @@ jobs:
           uv sync --frozen
           uv pip install 'pymysql>=1.1.0'
 
+      - name: Prepare backend settings
+        run: cp dev_tools/ci/backend_settings/.env.ci backend/.env
+
       - name: Run the schema migration tests on MariaDB
         env:
           # Root, because the tests create and drop their own scratch databases.
@@ -130,6 +139,9 @@ jobs:
         run: |
           uv sync --frozen
           uv pip install 'pymssql>=2.3.0'
+
+      - name: Prepare backend settings
+        run: cp dev_tools/ci/backend_settings/.env.ci backend/.env
 
       - name: Run the schema migration tests on MSSQL
         env:
