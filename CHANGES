@@ -4,6 +4,33 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- NEW: the database schema is documented as forward-only, and that policy now has
+  tests. `backend/tests/migrations/` (run with the new `./test_backend_migrations.sh`,
+  which starts a throwaway database) executes the real migrations, which no other
+  suite did - the integration tests build their schema with
+  `SQLModel.metadata.create_all()` and so never run them:
+  * `upgrade head` on an empty database, and upgrading twice,
+  * upgrading a database that already holds data from *every* revision to head and
+    then running `tud studies import` against it (the deployment that actually
+    happens, and the only place 0004's data conversion runs),
+  * adopting a database created by `create_all()` before Alembic existed via
+    `stamp` + `upgrade`,
+  * `alembic check`: a change in `models.py` without a migration now fails CI.
+  There is deliberately no downgrade test: reverting a migration that dropped a
+  column cannot restore the data, and 0004 cannot reverse its type change at all.
+- NEW: `.github/workflows/migrations.yml` runs those tests on every push and pull
+  request (PostgreSQL), and on MariaDB/MSSQL on demand
+  (`gh workflow run migrations.yml -f run_dbms_matrix=true`) - their migration
+  branches (0004's type conversion, 0010's constraint/index handling) had never
+  been executed on those DBMSes.
+- DEV: `README.md` ("Database schema policy"), `docs/agents/database.md` and the
+  database skill describe the forward-only policy: migrations stay additive for the
+  deployed code (nullable/server defaults, data moves in its own step, columns are
+  dropped a release after they stop being used), undoing a release means redeploying
+  the previous release or restoring a backup, and a pre-Alembic database is adopted
+  once with `alembic stamp`.
+- DEV: `backend/alembic.ini` declares `path_separator = os` (Alembic >= 1.11), which
+  removes the deprecation warning about splitting `prepend_sys_path`.
 - FIX (CI, surfaced by the first run with the new guards): the WebKit leg
 failed because the activity info dialog carried `role="dialog"` on its inner
 wrapper while only the overlay around it is shown and hidden. `js/ui.js`

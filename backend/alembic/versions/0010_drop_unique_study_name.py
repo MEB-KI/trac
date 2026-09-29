@@ -57,6 +57,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Reversing this would forbid the duplicate labels that this migration exists
+    # to allow, so it fails as soon as two studies share a name (and the database
+    # cannot be moved below this revision afterwards either).
+    #
+    # Schema changes are forward-only, see README "Database schema policy": this
+    # body is not exercised by CI and not a supported rollback path.
     dialect_name = _dialect_name()
     if dialect_name not in CONSTRAINT_DIALECTS | INDEX_DIALECTS:
         raise NotImplementedError(
