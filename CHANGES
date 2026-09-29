@@ -4,6 +4,16 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- DEV: new static-asset guards: `frontend/tests/unit/static_assets.test.js`
+checks that every asset referenced by HTML/CSS exists, and the new E2E spec
+`frontend/tests/e2e/no_broken_static_requests.spec.js` visits all participant
+pages and fails on any static request that does not succeed (missing GIF,
+locale, settings file, font) - the class of bug that only the deployment used to
+notice.
+- DEV: `frontend/tests/unit/locale_values.test.js` guards translation *values*:
+`{{placeholders}}` and the HTML tags of every key must match the reference
+locale, so a translator cannot drop `{{days}}` or break `data-i18n-html` markup
+without the suite complaining.
 - FIX: the admin "study not found" page reflected the study name from the URL
 path unescaped (`/admin/study/<img src=x onerror=...>` executed script in the
 administrator's authenticated browser). Values are escaped now; new guards:
