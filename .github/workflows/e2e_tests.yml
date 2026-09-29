@@ -11,6 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+        # The deployment runs with European participants, but CI runs in UTC by
+        # default - so a second leg repeats the flow in a real timezone
+        # (DST-aware date handling, day boundaries).
+        tz: [UTC, Europe/Berlin]
+        exclude:
+          - browser: firefox
+            tz: Europe/Berlin
+          - browser: webkit
+            tz: Europe/Berlin
 
     services:
       postgres:
@@ -68,6 +77,7 @@ jobs:
       - name: Run backend and Playwright tests
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000/report/
+          TZ: ${{ matrix.tz }}
         run: |
           set -euxo pipefail
 
@@ -96,7 +106,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.browser }}
+          name: playwright-report-${{ matrix.browser }}-${{ matrix.tz }}
           path: frontend/playwright-report/
           if-no-files-found: ignore
 
@@ -104,7 +114,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: backend-log-${{ matrix.browser }}
+          name: backend-log-${{ matrix.browser }}-${{ matrix.tz }}
           path: /tmp/backend.log
           if-no-files-found: ignore
 
