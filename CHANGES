@@ -4,6 +4,14 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- FIX (i18n text): the thank-you page's built-in message named the app, so it
+read as "...Ihre Teilnahme an unserer Studie TRAC" - as if the participant had
+signed up for TRAC instead of for the study. This is a leftover from when the app
+was called "TimeUse" and the sentence was built around the app name; the app name
+is now gone from `thankYou.defaultMessage` in every locale (en, de, es, fi, fr,
+pl, sv) and from the static fallback in `frontend/src/pages/thank-you.html` (the
+`.app-name` rule went with it). Study-specific end texts come from the study
+config and are unaffected - they are simply shown instead of the default.
 - FIX (accessibility, found by the new axe check): the diary's "Skip time
 reporting" button rendered white text on its light grey background (1.23:1 - the
 label was effectively invisible) because a later `.btn { color: white }` rule
