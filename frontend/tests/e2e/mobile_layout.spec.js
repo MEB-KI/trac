@@ -1,0 +1,122 @@
+const { test, expect } = require('@playwright/test');
+const {
+  PARTICIPANT_PAGES,
+  MOBILE_VIEWPORT,
+} = require('./participant_pages.js');
+const { enterStudyIfNeeded } = require('./e2e_helpers.js');
+
+// Phone layout checks. Every other spec runs at a desktop window size (or sets a
+// narrow viewport only to reach the mobile *controls*), so a page that pushes
+// content off to the right or renders a 13px-high control passes unnoticed - yet
+// most participants answer the diary on a phone.
+//
+// Covered here:
+//  - no sideways scrolling: `width: 100%` plus padding inside pages that do not
+//    load the shared stylesheet used to run 20-80px past a 390px viewport
+//  - primary diary controls are at least 24x24 CSS px (WCAG 2.2 SC 2.5.8)
+//  - the diary reacts to real touch events, not only to mouse events
+//
+// Known, deliberately not asserted here: inline links in the footer/legal rows
+// and the two language <select>s are only 16-19px high. They are reachable and
+// axe's target-size rule accepts them, but they are small for a thumb.
+test.use({ viewport: MOBILE_VIEWPORT, hasTouch: true });
+
+for (const target of PARTICIPANT_PAGES) {
+  test(`no sideways scrolling on a phone: ${target.name}`, async ({ page }) => {
+    await page.goto(target.url, { waitUntil: 'load' });
+    await page.locator(target.ready).first().waitFor({ state: 'attached' });
+    await page.waitForTimeout(300);
+
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.scrollingElement.scrollWidth,
+      clientWidth: document.scrollingElement.clientWidth,
+    }));
+
+    expect(
+      scrollWidth,
+      `${target.name} is ${scrollWidth - clientWidth}px wider than the ${clientWidth}px viewport ` +
+        '(content is cut off / the page scrolls sideways on a phone)'
+    ).toBeLessThanOrEqual(clientWidth + 1);
+  });
+}
+
+test('the main diary controls are big enough to tap', async ({ page }) => {
+  await page.goto('index.html?pid=mobile_targets&study_name=default&lang=en', {
+    waitUntil: 'load',
+  });
+  await enterStudyIfNeeded(page);
+  await page.locator('#navSubmitBtn').waitFor({ state: 'visible' });
+
+  const measured = await page.evaluate(() =>
+    [
+      ['floating add button', '.floating-add-button'],
+      ['save day button', '#navSubmitBtn'],
+      ['skip reporting button', '#skipReportingBtn'],
+    ].map(([label, selector]) => {
+      const element = document.querySelector(selector);
+      const rect = element.getBoundingClientRect();
+      return {
+        label,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    })
+  );
+
+  for (const control of measured) {
+    expect(
+      Math.min(control.width, control.height),
+      `${control.label} is ${control.width}x${control.height}px - WCAG 2.2 SC 2.5.8 requires at least 24x24`
+    ).toBeGreaterThanOrEqual(24);
+  }
+});
+
+test('an activity can be placed with touch alone', async ({ page }) => {
+  await page.goto('index.html?pid=mobile_touch&study_name=default&lang=en', {
+    waitUntil: 'load',
+  });
+  await enterStudyIfNeeded(page);
+
+  // Tap the floating add button: this is the mobile-only entry point.
+  await page.locator('.floating-add-button').tap();
+  await expect(page.locator('#activitiesModal')).toBeVisible();
+
+  const activityButton = page
+    .locator(
+      '#modalActivitiesContainer .activity-button:not(.has-child-items):not(.custom-input)'
+    )
+    .first();
+  await activityButton.waitFor({ state: 'visible', timeout: 30000 });
+  await activityButton.tap();
+
+  // Selecting a plain activity closes the picker after a short delay; an activity
+  // with a frequency / child-items dialog leaves both open. Get back to a bare
+  // diary either way (Escape closes the top-most dialog, see js/ui.js) - the
+  // touch interactions under test are the tap that opened the picker, the tap
+  // that picked the activity and the tap that places it.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (!(await page.locator('#activitiesModal').isVisible())) {
+      break;
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+  }
+  await expect(page.locator('#activitiesModal')).toBeHidden();
+
+  // Tapping the timeline has to place the activity - a mouse-only placement path
+  // would leave the phone user with a selected activity and no way to place it.
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
+  await timeline.scrollIntoViewIfNeeded();
+  const box = await timeline.boundingBox();
+  expect(box, 'active timeline must be visible').toBeTruthy();
+  // The mobile timeline is a tall vertical column (hours), so its midpoint is
+  // usually below the fold - tap inside the visible part.
+  const tapY = Math.min(box.y + box.height / 2, page.viewportSize().height - 60);
+  await page.touchscreen.tap(box.x + box.width * 0.25, tapY);
+
+  await expect(
+    page.locator('.timeline-container[data-active="true"] .activity-block').first()
+  ).toBeVisible({ timeout: 10000 });
+});

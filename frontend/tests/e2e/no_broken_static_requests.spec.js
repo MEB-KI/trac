@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { PARTICIPANT_PAGES } = require('./participant_pages.js');
 
 // Fails when a page cannot load a static file it asks for.
 //
@@ -36,17 +37,7 @@ function trackBrokenStaticRequests(page) {
   return broken;
 }
 
-const PAGES = [
-  // Participant pages, in the order a participant meets them.
-  { name: 'instructions (en)', url: 'pages/instructions.html?study_name=default&lang=en' },
-  { name: 'instructions (de)', url: 'pages/instructions.html?study_name=default&lang=de' },
-  { name: 'consent (de)', url: 'pages/consent.html?study_name=adult_pilot_de&lang=de' },
-  { name: 'diary (en)', url: 'index.html?study_name=default&lang=en&instructions=completed' },
-  { name: 'diary (de)', url: 'index.html?study_name=adult_pilot_de&lang=de&instructions=completed' },
-  { name: 'open studies', url: 'pages/open_studies.html' },
-  { name: 'timeout (de)', url: 'pages/timeout.html?lang=de' },
-  { name: 'thank you (en)', url: 'pages/thank-you.html?study_name=default&lang=en' },
-];
+const PAGES = PARTICIPANT_PAGES;
 
 for (const target of PAGES) {
   test(`no broken static requests on ${target.name}`, async ({ page }) => {

@@ -4,6 +4,37 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- FIX (accessibility, found by the new axe check): the diary's "Skip time
+reporting" button rendered white text on its light grey background (1.23:1 - the
+label was effectively invisible) because a later `.btn { color: white }` rule
+overrode `.skip-btn`; the legal-footer links were #ccc on the page background
+(1.53:1) and so were unreadable on the German pages; the timeline helper texts
+and the inactive-timeline title were grey on grey (3.28:1 / 2.68:1); the idle
+timer readout was just under the limit (4.09:1); the timeline containers carried
+an `aria-label` without a role (assistive tech drops it); and the viewport meta
+blocked pinch-zoom (`user-scalable=no`).
+- FIX (phone layout): pages that do not load the shared stylesheet combined
+`width: 100%` with `box-sizing: content-box`, so on a 390px viewport the open
+studies page ran 77px wide, tasks 26px, timeout 22px and the German instructions
+page 58px - `overflow-x: hidden` then cut the content off instead of showing it.
+The diary timeline ran 4px wide (nested `width: 100%` + padding), and the German
+legal-footer row could not wrap at all (inline links with no break opportunity),
+so "Impressum - Datenschutz - Studieninformation" was clipped; the footer links
+are also 24px tall now instead of 16px (WCAG 2.2 SC 2.5.8).
+- DEV: new accessibility guard `frontend/tests/e2e/accessibility.spec.js` runs
+axe-core (WCAG 2.0/2.1/2.2 A + AA) over every participant page plus the activity
+picker and activity info dialogs, and fails on any violation; `@axe-core/playwright`
+is a dev dependency. Verified to fail when the zoom-blocking meta is restored.
+- DEV: new `frontend/tests/e2e/keyboard_accessibility.spec.js` covers the dialog
+focus management in `js/ui.js` (focus moves into the opened dialog, Tab and
+Shift+Tab cannot leave it, Escape closes it and returns focus) and the timeline
+containers (named `role="group"`, focusable); `frontend/tests/e2e/mobile_layout.spec.js`
+checks that no participant page scrolls sideways on a phone, that the main diary
+controls are at least 24x24 and that an activity can be placed with touch events
+alone. All three were verified to fail when the fixed behaviour is reverted.
+- DEV: `frontend/tests/e2e/participant_pages.js` now holds the list of
+participant pages, so the static-asset, accessibility and mobile guards sweep the
+same set (this added the tasks page to the static-request check).
 - FIX: the diary's overlap validation (used by the drag/resize/undo handlers, which
 revert an invalid change) compared `new Date("07:30")` - an Invalid Date in every
 engine - so it could never fire and invalid drags were kept. It now compares the
