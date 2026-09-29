@@ -2,6 +2,37 @@ TRAC MPIAE Changes
 ===================
 
 
+Version 0.20.1 -- i18n hardening
+--------------------------------
+- FIX: half-translated pages (e.g. German "Tagebuch absenden" heading above an
+English body on the instructions page) were caused by a stale browser-cached
+locale file: i18n.t() keeps the built-in English markup text for keys it cannot
+resolve, so an old de.json mixes languages once a page uses new keys.
+- FIX: js/i18n.js now revalidates the locale file (fetch cache: 'no-cache') and,
+if keys were still missing, re-fetches it once with a cache-buster and applies
+the fresh copy before reporting the remaining keys as a real translation gap.
+- NEW: I18n.tOptional()/has() for optional keys (deployment-overridable labels
+like footer.imprint) so expected misses no longer log warnings or trigger a
+locale re-fetch; footer.js uses them.
+- NEW: pages/timeout.html initialised no i18n at all (title/heading/message were
+English for everyone) and the inactivity redirect passed no language; both are
+fixed (timeout.title/heading/message, language appended to the redirect URL).
+- FIX: missing i18n wiring on other pages: consent language label + select
+aria-label, consent tooltips/review prompt/load error, consent page title per
+study, thank-you default outro text, "Access study '<name>'" and the error text
+on the open-studies page, tasks page title, the Submit Study tooltip and the
+document title on the diary page.
+- FIX: the instructions page "Loading..." GIF placeholder was hardcoded in
+instructions.css; it is a real translated element now (common.loading). The GIF
+alt texts are translated too (new data-i18n-alt support in i18n.js).
+- FIX: messages.copyFromDay was referenced by script.js/ui.js but missing from
+all 7 locale files, so the "Copy from..." button showed the raw key.
+- DEV: new frontend/tests/unit/page_i18n_keys.test.js asserts that every key
+requested by markup/scripts exists in every locale and that no stylesheet
+contains hardcoded user-visible text; new i18n_missing_keys.test.js covers the
+revalidation/repair/optional-lookup behaviour.
+
+
 Version 0.20.0 -- New user type Scientist
 ------------------------------------------
 - NEW: scoped admin accounts ("scientists") via TUD_API_SCIENTISTS. A scientist fully manages the studies she owns or was granted; super admins (TUD_API_ADMIN_USERNAME) keep unrestricted access.
