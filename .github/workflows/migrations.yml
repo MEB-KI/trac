@@ -1,0 +1,134 @@
+name: Database Migrations (forward-only)
+
+# The schema policy is forward-only (see README, "Database schema policy"), so
+# this workflow tests the forward path: a fresh database, a database that already
+# holds data and is migrated from every revision to head, and a database that was
+# created before Alembic existed and is adopted with `stamp`.
+#
+# It is the only place where the migration scripts actually run - the integration
+# tests build their schema with SQLModel.metadata.create_all(), so they cannot see
+# a migration that fails (or that silently drops data) on a database that already
+# contains a study's worth of answers.
+#
+# PostgreSQL runs on every push/pull request. MariaDB and MSSQL need an extra
+# driver (only the Docker dev stacks install pymysql/pymssql) and a heavier
+# container, so they run on demand:
+#
+#   gh workflow run migrations.yml -f run_dbms_matrix=true
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_dbms_matrix:
+        description: "Also run the migration tests on MariaDB and MSSQL"
+        type: boolean
+        default: false
+
+jobs:
+  migrations-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: timeusediary_db
+          POSTGRES_USER: timeusediary_user
+          POSTGRES_PASSWORD: timeusediary_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Run the schema migration tests
+        env:
+          # The tests create their own scratch databases next to this one (the
+          # role has to be allowed to CREATE DATABASE) and never write to it.
+          TUD_MIGRATION_TEST_DATABASE_URL: postgresql://timeusediary_user:timeusediary_password@localhost:5432/timeusediary_db
+        run: ./test_backend_migrations.sh
+
+  migrations-mariadb:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_dbms_matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:13.0
+        env:
+          MARIADB_ROOT_PASSWORD: Migration_Test_pw1
+          MARIADB_DATABASE: timeusediary_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -u root -pMigration_Test_pw1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Install backend dependencies and the MariaDB driver
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv pip install 'pymysql>=1.1.0'
+
+      - name: Run the schema migration tests on MariaDB
+        env:
+          # Root, because the tests create and drop their own scratch databases.
+          TUD_MIGRATION_TEST_DATABASE_URL: mysql+pymysql://root:Migration_Test_pw1@127.0.0.1:3306/timeusediary_db
+        run: ./test_backend_migrations.sh
+
+  migrations-mssql:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_dbms_matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2025-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Migration_Test_pw1
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Migration_Test_pw1 -C -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Install backend dependencies and the MSSQL driver
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv pip install 'pymssql>=2.3.0'
+
+      - name: Run the schema migration tests on MSSQL
+        env:
+          # sa, because the tests create and drop their own scratch databases.
+          TUD_MIGRATION_TEST_DATABASE_URL: mssql+pymssql://sa:Migration_Test_pw1@127.0.0.1:1433/timeusediary_db
+        run: ./test_backend_migrations.sh

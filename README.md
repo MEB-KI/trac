@@ -96,6 +96,36 @@ cd backend/
 uv run tud db current
 ```
 
+**Database schema policy: forward-only.** The `downgrade()` functions in
+`backend/alembic/versions/` exist because Alembic asks for them, not because
+rolling a database back is a supported operation: most of them drop columns,
+which cannot bring the data back, and migration 0004 cannot convert its JSON
+column back to text at all. To undo a release:
+
+1. **Redeploy the previous release.** That works because migrations are expected
+   to stay additive for the code that is currently deployed: add a column as
+   nullable or with a server default, migrate its data in a separate step, and
+   never drop or rename a column in the same release that stops using it - the
+   contract step (dropping the old column) comes a release later.
+2. **Restore a backup** (take a `pg_dump` before a release that does anything
+   destructive) and start the restored database at the revision it was taken at.
+
+A database that was created before Alembic existed is adopted once, by hand:
+`uv run alembic stamp <revision whose schema matches>` followed by the normal
+`uv run tud db upgrade`.
+
+What is verified automatically (`./test_backend_migrations.sh`, and the
+"Database Migrations (forward-only)" workflow on every push):
+
+- `tud db upgrade` on an empty database, and upgrading twice,
+- upgrading a database that already holds data **from every revision** to head,
+  and then running `tud studies import` against the result,
+- adopting a database that was created by `create_all()` before Alembic existed
+  (this is what executes migration 0004's conversion of existing values),
+- that `models.py` and `alembic/versions/` agree - a model change without a
+  migration fails that check, which the integration tests cannot see because they
+  build their schema from the models.
+
 
 ### 3. Study Configuration
 

@@ -84,6 +84,7 @@ Now that you have all local test dependencies, you can run tests directly from y
 
 - Unit tests do not require services to be running: `./test_backend_unit.sh`
 - Integration tests require the backend and database to be running: `./test_backend_integration.sh`
+- Migration tests run the real Alembic migrations on a throwaway database (drops it again) or on `TUD_MIGRATION_TEST_DATABASE_URL`: `./test_backend_migrations.sh`
 - E2E tests require frontend and backend to be running: `./test_e2e.sh`
 
 If you want to run E2E tests, install Node.js and Playwright once:

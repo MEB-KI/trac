@@ -153,6 +153,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Converting JSON back to VARCHAR would lose the structured i18n map.
-    # This downgrade is intentionally not supported — restore from a backup
-    # if you need to roll back.
+    # This downgrade is intentionally not supported - restore from a backup
+    # if you need to roll back.  Schema changes are forward-only, see README
+    # "Database schema policy".
     pass
