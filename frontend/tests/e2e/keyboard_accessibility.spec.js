@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { MOBILE_VIEWPORT } = require('./participant_pages.js');
-const { enterStudyIfNeeded } = require('./e2e_helpers.js');
+const { enterStudyIfNeeded, findTimelinePoint } = require('./e2e_helpers.js');
 
 // Keyboard-only behaviour, which no other spec exercises: every existing test
 // clicks. `js/ui.js` traps Tab inside the open dialog and closes it on Escape,
@@ -94,10 +94,8 @@ test('the activity info dialog closes on Escape and does not keep focus', async 
     .first();
   await timeline.waitFor({ state: 'visible', timeout: 10000 });
   await timeline.scrollIntoViewIfNeeded();
-  const box = await timeline.boundingBox();
-  expect(box, 'active timeline must be visible').toBeTruthy();
-  const clickY = Math.min(box.y + box.height / 2, page.viewportSize().height - 60);
-  await page.mouse.click(box.x + box.width * 0.3, clickY);
+  const clickPoint = await findTimelinePoint(page);
+  await page.mouse.click(clickPoint.x, clickPoint.y);
 
   const block = page
     .locator('.timeline-container[data-active="true"] .activity-block')

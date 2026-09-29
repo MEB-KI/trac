@@ -3,7 +3,7 @@ const {
   PARTICIPANT_PAGES,
   MOBILE_VIEWPORT,
 } = require('./participant_pages.js');
-const { enterStudyIfNeeded } = require('./e2e_helpers.js');
+const { enterStudyIfNeeded, findTimelinePoint } = require('./e2e_helpers.js');
 
 // Phone layout checks. Every other spec runs at a desktop window size (or sets a
 // narrow viewport only to reach the mobile *controls*), so a page that pushes
@@ -109,12 +109,11 @@ test('an activity can be placed with touch alone', async ({ page }) => {
     .locator('.timeline-container[data-active="true"] .timeline')
     .first();
   await timeline.scrollIntoViewIfNeeded();
-  const box = await timeline.boundingBox();
-  expect(box, 'active timeline must be visible').toBeTruthy();
-  // The mobile timeline is a tall vertical column (hours), so its midpoint is
-  // usually below the fold - tap inside the visible part.
-  const tapY = Math.min(box.y + box.height / 2, page.viewportSize().height - 60);
-  await page.touchscreen.tap(box.x + box.width * 0.25, tapY);
+  // The mobile timeline is a tall column inside a clipped pane and the footer is
+  // painted over the part that overflows the fold, so ask for a point the
+  // timeline actually receives instead of assuming the viewport bottom is one.
+  const tapPoint = await findTimelinePoint(page);
+  await page.touchscreen.tap(tapPoint.x, tapPoint.y);
 
   await expect(
     page.locator('.timeline-container[data-active="true"] .activity-block').first()

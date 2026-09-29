@@ -81,6 +81,10 @@ jobs:
         run: |
           set -euxo pipefail
 
+          # Artifact names may not contain a forward slash, and one leg runs with
+          # TZ=Europe/Berlin - expose a slash-free label for the uploads below.
+          echo "TZ_LABEL=${TZ//\//-}" >> "$GITHUB_ENV"
+
           cp dev_tools/ci/backend_settings/.env.ci backend/.env
           cd backend
           uv run tud db upgrade
@@ -106,7 +110,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.browser }}-${{ matrix.tz }}
+          name: playwright-report-${{ matrix.browser }}-${{ env.TZ_LABEL }}
           path: frontend/playwright-report/
           if-no-files-found: ignore
 
@@ -114,7 +118,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: backend-log-${{ matrix.browser }}-${{ matrix.tz }}
+          name: backend-log-${{ matrix.browser }}-${{ env.TZ_LABEL }}
           path: /tmp/backend.log
           if-no-files-found: ignore
 

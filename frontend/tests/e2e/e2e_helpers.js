@@ -170,6 +170,59 @@ async function enterStudyIfNeeded(page) {
   });
 }
 
+// ── Pointer helpers ────────────────────────────────────────────────────────
+
+const ACTIVE_TIMELINE = '.timeline-container[data-active="true"] .timeline';
+
+/**
+ * Find a viewport point inside the active day's timeline that the timeline
+ * itself receives.
+ *
+ * "Middle of the element, clamped to the viewport" is not good enough: on a
+ * phone the timeline is a very tall column inside a clipped pane, so its box
+ * reaches far below the fold and the page footer is painted on top of the part
+ * that overflows. A tap there lands on a legal link and the browser never
+ * routes it to the timeline (seen on WebKit, where the footer covered the
+ * clamped point). Walk candidate points instead and return the first one whose
+ * top-most element belongs to the timeline.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} [selector] - timeline selector, defaults to the active day
+ * @returns {Promise<{x: number, y: number}>} viewport coordinates
+ */
+async function findTimelinePoint(page, selector = ACTIVE_TIMELINE) {
+  const point = await page.evaluate((sel) => {
+    const timeline = document.querySelector(sel);
+    if (!timeline) return null;
+
+    const rect = timeline.getBoundingClientRect();
+    const top = Math.max(rect.top, 0);
+    const bottom = Math.min(rect.bottom, window.innerHeight);
+    if (bottom - top < 30) return null;
+
+    const middle = (top + bottom) / 2;
+    for (const offset of [0, 40, -40, 80, -80, 120, -120, 160, -160, 200, -200]) {
+      const y = middle + offset;
+      if (y < top + 5 || y > bottom - 5) continue;
+      for (const fraction of [0.25, 0.5, 0.35, 0.65, 0.75]) {
+        const x = rect.left + rect.width * fraction;
+        const hit = document.elementFromPoint(x, y);
+        if (hit && timeline.contains(hit)) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  }, selector);
+
+  if (!point) {
+    throw new Error(
+      `no tap-able point found inside ${selector}: the timeline is off screen or covered`
+    );
+  }
+  return point;
+}
+
 // ── Copy Days helpers ──────────────────────────────────────────────────────
 
 function isThankYouUrl(url) {
@@ -421,6 +474,8 @@ async function getDayButtonCount(page) {
 module.exports = {
   enterConsentAndInstructionsIfNeeded,
   enterStudyIfNeeded,
+  // Pointer helpers
+  findTimelinePoint,
   // Copy Days helpers
   placeActivity,
   saveCurrentDay,
