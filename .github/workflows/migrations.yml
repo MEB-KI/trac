@@ -147,6 +147,10 @@ jobs:
       - name: Run the schema migration tests on MSSQL
         env:
           # sa, because the tests create and drop their own scratch databases.
-          TUD_DATABASE_URL: mssql+pymssql://sa:Migration_Test_pw1!@127.0.0.1:1433/timeusediary_db
-          TUD_MIGRATION_TEST_DATABASE_URL: mssql+pymssql://sa:Migration_Test_pw1!@127.0.0.1:1433/timeusediary_db
+          # The service container has no timeusediary_db (the compose stack
+          # creates it with a separate init step), and this URL is only the
+          # server the tests connect to - they never write to the database it
+          # names, so `master` is fine.
+          TUD_DATABASE_URL: mssql+pymssql://sa:Migration_Test_pw1!@127.0.0.1:1433/master
+          TUD_MIGRATION_TEST_DATABASE_URL: mssql+pymssql://sa:Migration_Test_pw1!@127.0.0.1:1433/master
         run: ./test_backend_migrations.sh
