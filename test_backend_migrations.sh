@@ -73,5 +73,13 @@ else
     export TUD_MIGRATION_TEST_DATABASE_URL
 fi
 
+# The application itself reads TUD_DATABASE_URL (it decides where its engine
+# points), and importing it fails without one; the tests still migrate the
+# scratch databases only.
+if [ -z "$TUD_DATABASE_URL" ]; then
+    TUD_DATABASE_URL="$TUD_MIGRATION_TEST_DATABASE_URL"
+    export TUD_DATABASE_URL
+fi
+
 echo "Running backend schema migration tests"
 cd backend && uv run pytest tests/migrations -v --require-database "$@"

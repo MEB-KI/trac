@@ -23,7 +23,6 @@ import pytest
 from alembic.config import Config as AlembicConfig
 from sqlalchemy import MetaData, create_engine, insert, inspect, text
 
-from o_timeusediary_backend import database
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,6 +45,10 @@ def all_revisions() -> list[str]:
     (which is what `pytest.mark.parametrize` needs).
     """
     from alembic.script import ScriptDirectory
+
+    # Imported here (not at module level): importing the app constructs its
+    # engine, which needs TUD_DATABASE_URL, and listing revisions does not.
+    from o_timeusediary_backend import database
 
     ini_path = database._resolve_alembic_ini_path()
     config = AlembicConfig(str(ini_path))
@@ -131,6 +134,8 @@ class ScratchDatabase:
     # ── Alembic ────────────────────────────────────────────────────────────
     def alembic_config(self) -> AlembicConfig:
         """The app's Alembic setup, pointed at this scratch database."""
+        from o_timeusediary_backend import database
+
         config = database._alembic_config()
         config.set_main_option("sqlalchemy.url", self.url)
         return config
