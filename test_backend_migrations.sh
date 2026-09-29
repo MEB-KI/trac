@@ -81,5 +81,31 @@ if [ -z "$TUD_DATABASE_URL" ]; then
     export TUD_DATABASE_URL
 fi
 
+# A service container may still be starting when the job reaches this step
+# (GitHub does not wait for service health checks, and MSSQL takes a while), so
+# wait for the server to accept connections before running the tests.
+WAIT_SECONDS="${TUD_MIGRATION_TEST_WAIT_SECONDS:-120}"
+echo "Waiting for the database server to accept connections (up to ${WAIT_SECONDS}s)..."
+attempt=0
+while [ "$attempt" -lt "$WAIT_SECONDS" ]; do
+    if (cd backend && uv run python -c "
+import os
+import sqlalchemy as sa
+
+engine = sa.create_engine(os.environ['TUD_MIGRATION_TEST_DATABASE_URL'])
+engine.connect().close()
+" >/dev/null 2>&1); then
+        echo "Database server is up."
+        break
+    fi
+    attempt=$((attempt + 5))
+    if [ "$attempt" -ge "$WAIT_SECONDS" ]; then
+        echo "Error: the database server did not accept connections within ${WAIT_SECONDS}s."
+        echo "Set TUD_MIGRATION_TEST_WAIT_SECONDS to wait longer."
+        exit 1
+    fi
+    sleep 5
+done
+
 echo "Running backend schema migration tests"
 cd backend && uv run pytest tests/migrations -v --require-database "$@"
