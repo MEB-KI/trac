@@ -68,6 +68,7 @@ from .database import (
 )
 from pathlib import Path
 import hashlib
+import html
 import hmac as hmac_lib
 from .api_deps.activities import get_study_activity_codes
 from .api_deps.available_activities import (
@@ -2143,9 +2144,18 @@ async def admin_study_detail(
     study = session.exec(select(Study).where(Study.name_short == name_short)).first()
 
     if not study:
+        # Never interpolate request-controlled values into HTML without
+        # escaping: the admin opens such links while being authenticated, so
+        # /admin/study/<img src=x onerror=...> would otherwise execute script in
+        # the administrator's browser session.
+        safe_name = html.escape(name_short)
+        safe_root_path = html.escape(str(request.scope.get("root_path", "")))
         return HTMLResponse(
-            content=f"<html><body><h1>Study '{name_short}' not found</h1>"
-            f"<a href='{request.scope.get('root_path', '')}/admin'>Back to overview</a></body></html>",
+            content=(
+                f"<html><body><h1>Study '{safe_name}' not found</h1>"
+                f"<a href='{safe_root_path}/admin'>Back to overview</a>"
+                "</body></html>"
+            ),
             status_code=404,
         )
 

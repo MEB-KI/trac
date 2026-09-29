@@ -4,6 +4,12 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- FIX: the admin "study not found" page reflected the study name from the URL
+path unescaped (`/admin/study/<img src=x onerror=...>` executed script in the
+administrator's authenticated browser). Values are escaped now; new guards:
+`tests/unit/test_html_escaping_guards.py` (no f-string HTML in HTMLResponse, no
+`|safe` in admin templates) and `tests/integration/test_admin_html_escaping.py`
+(reflected URL value + stored study name are rendered escaped).
 - FIX: half-translated pages (e.g. German "Tagebuch absenden" heading above an
 English body on the instructions page) were caused by a stale browser-cached
 locale file: i18n.t() keeps the built-in English markup text for keys it cannot
