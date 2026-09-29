@@ -4,6 +4,30 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- FIX (CI, surfaced by the first run with the new guards): the WebKit leg
+failed because the activity info dialog carried `role="dialog"` on its inner
+wrapper while only the overlay around it is shown and hidden. `js/ui.js`
+detects open/close by watching the style of the `[role="dialog"]` element, so
+that dialog counted as permanently open: focus was never given back, and WebKit
+keeps focus on a control that just became invisible (Chromium moves it out by
+itself, which is why only WebKit complained). The role/aria attributes now sit
+on the overlay like every other dialog, the visibility check additionally
+requires a layout box, and focus is blurred when the element that opened the
+dialog cannot take it (the body is not focusable).
+- FIX (CI): `frontend/tests/e2e/mobile_layout.spec.js` failed on WebKit because
+the phone timeline is a tall column inside a clipped pane and the legal footer
+is painted over the part that overflows it - tapping "the middle of the
+timeline, clamped to the viewport" landed on a footer link, which no browser
+routes to the timeline. Both specs now ask the new `findTimelinePoint()` helper
+in `e2e_helpers.js` for a point the timeline actually receives.
+- DEV: the e2e workflow no longer marks the `Europe/Berlin` leg as failed after
+a green test run - the artifact name contained the matrix timezone and artifact
+names may not contain a forward slash, so the upload step (not the tests) failed;
+the test step now exports a slash-free `TZ_LABEL` and the uploads use it.
+- DEV: `no_broken_static_requests.spec.js` ignores requests the browser itself
+cancelled (Firefox and WebKit abort font downloads they stop needing; a missing
+file answers 404, which the response handler still catches) and waits for
+`document.fonts.ready` before asserting, so the guard is not timing-dependent.
 - FIX (i18n text): the thank-you page's built-in message named the app, so it
 read as "...Ihre Teilnahme an unserer Studie TRAC" - as if the participant had
 signed up for TRAC instead of for the study. This is a leftover from when the app

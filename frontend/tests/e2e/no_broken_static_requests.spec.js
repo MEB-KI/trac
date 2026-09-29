@@ -11,6 +11,12 @@ const { PARTICIPANT_PAGES } = require('./participant_pages.js');
 // which several specs provoke on purpose - are not flagged here.
 const STATIC_REQUEST = /\.(gif|png|jpe?g|svg|ico|webp|css|js|json|woff2?|ttf)$/i;
 
+// A request the *browser* cancelled is not a broken asset: Firefox and WebKit
+// cancel font downloads they stop needing (Chromium: net::ERR_ABORTED,
+// Firefox: NS_BINDING_ABORTED, WebKit: "Load request cancelled"), and a truly
+// missing file answers with 404/403 - which the response handler catches.
+const CANCELLED = /abort|cancel/i;
+
 /**
  * Record static requests that did not return a success response.
  * @param {import('@playwright/test').Page} page
@@ -30,8 +36,9 @@ function trackBrokenStaticRequests(page) {
   page.on('requestfailed', (request) => {
     const path = new URL(request.url()).pathname;
     if (!STATIC_REQUEST.test(path)) return;
-    const failure = request.failure();
-    broken.push(`FAILED ${path} (${failure ? failure.errorText : 'unknown'})`);
+    const errorText = request.failure() ? request.failure().errorText : 'unknown';
+    if (CANCELLED.test(errorText)) return;
+    broken.push(`FAILED ${path} (${errorText})`);
   });
 
   return broken;
@@ -47,8 +54,11 @@ for (const target of PAGES) {
 
     // Give late (lazy-loaded) requests a moment to settle: the instructions
     // page loads its GIFs when they scroll into view, and the pages fetch their
-    // locale file after the study config.
+    // locale file after the study config. Waiting for the fonts too keeps the
+    // result stable - WebKit/Firefox otherwise cancel font downloads that are
+    // still queued when the assertions run.
     await page.waitForLoadState('networkidle');
+    await page.evaluate(() => document.fonts.ready);
 
     expect(broken, `failed static requests: ${broken.join(', ')}`).toEqual([]);
   });
