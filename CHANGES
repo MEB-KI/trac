@@ -4,6 +4,17 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- FIX: the diary's overlap validation (used by the drag/resize/undo handlers, which
+revert an invalid change) compared `new Date("07:30")` - an Invalid Date in every
+engine - so it could never fire and invalid drags were kept. It now compares the
+absolute minutes-of-day via `getActivityTimeRangeMinutes()`; `Timeline.validate()`
+in `frontend/src/js/timeline.js` is covered by
+`frontend/tests/unit/timeline_validation.test.js`.
+- DEV: removed the unused `formatTimeDDMMYYYYHHMM()` helper, which derived real
+calendar dates from the browser's local "today" (activities carry minutes-of-day,
+not dates).
+- DEV: the E2E workflow runs a second chromium leg with `TZ=Europe/Berlin` so
+timezone/DST assumptions surface in CI instead of on a participant's phone.
 - FIX: the diary's unsaved work is now kept via `frontend/src/js/draft_storage.js`,
 which never throws when storage is unavailable or full (Safari private mode,
 "block all cookies", quota exceeded - one `localStorage.setItem` on the
