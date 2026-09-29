@@ -18,6 +18,14 @@ Version 0.20.1 -- i18n hardening
   * `alembic check`: a change in `models.py` without a migration now fails CI.
   There is deliberately no downgrade test: reverting a migration that dropped a
   column cannot restore the data, and 0004 cannot reverse its type change at all.
+- FIX: adopting a database that was created before Alembic existed failed on
+  MariaDB. Migration 0004 changed `studies.description` to JSON before rewriting
+  its values, but MariaDB validates the rows that are already in the table when
+  the column becomes JSON, so a legacy plain-text description aborted the whole
+  upgrade (`CONSTRAINT studies.description failed`). The values are now made
+  JSON-safe first - `JSON_VALID()` keeps objects and arrays, `JSON_QUOTE()` turns
+  plain text into a JSON string - and the column type is changed afterwards.
+  Found by the new migration tests, which now also run on MariaDB.
 - NEW: `.github/workflows/migrations.yml` runs those tests on every push and pull
   request (PostgreSQL), and on MariaDB/MSSQL on demand
   (`gh workflow run migrations.yml -f run_dbms_matrix=true`) - their migration

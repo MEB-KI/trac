@@ -75,7 +75,12 @@ def url_with_database(url: str, name: str) -> str:
 
 
 def quote_identifier(identifier: str, dialect: str) -> str:
-    return f"[{identifier}]" if dialect == "mssql" else f'"{identifier}"'
+    """Quote an identifier the way the dialect expects (MariaDB has no ANSI quotes by default)."""
+    if dialect == "mssql":
+        return f"[{identifier}]"
+    if dialect in {"mysql", "mariadb"}:
+        return f"`{identifier}`"
+    return f'"{identifier}"'
 
 
 def _sample_value(column: Any) -> Any:

@@ -96,31 +96,21 @@ def upgrade() -> None:
 
     elif dialect_name == "mysql":
         # MariaDB/MySQL: change column type to JSON.
-        # First convert existing data: if a value is a JSON-looking string,
-        # parse it and store back as JSON; otherwise wrap as JSON string.
-        # We use a staging approach to avoid data loss.
-        rows = conn.execute(
-            text("SELECT id, description FROM studies WHERE description IS NOT NULL")
-        ).fetchall()
+        # The values have to be valid JSON *before* the type change: MODIFY ...
+        # JSON adds the column's json_valid() check and validates the rows that
+        # are already there, so a plain-text description from a pre-Alembic
+        # database would make the ALTER fail ("CONSTRAINT studies.description
+        # failed").  JSON_VALID() keeps values that are already objects/arrays
+        # as they are, JSON_QUOTE() turns plain text into a JSON string.
+        op.execute(
+            text(
+                "UPDATE studies SET description = ("
+                "  CASE WHEN JSON_VALID(description) THEN description "
+                "       ELSE JSON_QUOTE(description) END"
+                ") WHERE description IS NOT NULL"
+            )
+        )
         op.execute(text("ALTER TABLE studies MODIFY COLUMN description JSON NULL"))
-        for study_id, desc in rows:
-            if desc is None:
-                continue
-            desc_stripped = desc.strip() if isinstance(desc, str) else desc
-            if isinstance(desc_stripped, str) and desc_stripped.startswith(("{", "[")):
-                # Already looks like JSON — store as-is (MariaDB will parse it)
-                conn.execute(
-                    text("UPDATE studies SET description = :d WHERE id = :id"),
-                    {"d": desc_stripped, "id": study_id},
-                )
-            else:
-                # Plain text — wrap as JSON string value
-                import json
-
-                conn.execute(
-                    text("UPDATE studies SET description = :d WHERE id = :id"),
-                    {"d": json.dumps(desc), "id": study_id},
-                )
 
     elif dialect_name == "mssql":
         # MS SQL: change from NVARCHAR to NVARCHAR(MAX) and store as JSON text.
