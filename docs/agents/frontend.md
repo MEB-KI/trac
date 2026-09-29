@@ -10,6 +10,11 @@
 - Backend API is typically mounted under `/api` (or deployment-specific prefixes).
 - Participant context is URL-driven (`pid`, optional `lang`), not login-driven.
 
+## Unsaved diary work (draft state)
+- `frontend/src/js/draft_storage.js` owns the browser-side copy of the diary that is being edited: `sessionStorage` (`trac.pendingTimelineState.v1`) plus `localStorage` (`trac.timelineDraftState.v1`, survives closing the browser, restored only while younger than 24h). `script.js` captures it on every change (debounced), on `beforeunload` and on `visibilitychange`, and restores it after a reload.
+- Nothing in that module may throw: `safeGetItem`/`safeSetItem`/`safeRemoveItem` swallow unavailable/quota-exceeded storage (Safari private mode, blocked cookies). Drafts are validated on read (`normalizeTimelineState`) and unusable payloads are deleted instead of restored.
+- A draft is only restored when `matchesTimelineContext()` agrees on `pid`, `study_name` and `day_label_index` - participants share browsers (family tablet, lab PC). Covered by `frontend/tests/unit/draft_storage.test.js` and E2E `draft_restore.spec.js`; the context rule itself is unit-tested because the browser flow for switching participant goes through consent/instructions, which drop the pending state first.
+
 ## Localization
 - Locale resources are in `frontend/src/locales/`.
 - Language fallback order: URL `lang` -> browser language -> study default.

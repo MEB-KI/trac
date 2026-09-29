@@ -4,6 +4,18 @@ TRAC MPIAE Changes
 
 Version 0.20.1 -- i18n hardening
 --------------------------------
+- FIX: the diary's unsaved work is now kept via `frontend/src/js/draft_storage.js`,
+which never throws when storage is unavailable or full (Safari private mode,
+"block all cookies", quota exceeded - one `localStorage.setItem` on the
+instruction banner was unguarded) and discards stored drafts that are corrupt,
+structurally unusable or written by an older app version instead of feeding them
+to the timeline. The participant/study/day check now lives in
+`matchesTimelineContext()`, covered by unit tests.
+- DEV: new `frontend/tests/unit/draft_storage.test.js` (quota, blocked storage,
+corrupt JSON, unusable payloads, freshness window, other-participant draft,
+clearing) and E2E `frontend/tests/e2e/draft_restore.spec.js` asserting that
+unsaved activities survive a reload (verified to fail when the restore is
+disabled).
 - DEV: new static-asset guards: `frontend/tests/unit/static_assets.test.js`
 checks that every asset referenced by HTML/CSS exists, and the new E2E spec
 `frontend/tests/e2e/no_broken_static_requests.spec.js` visits all participant
