@@ -2758,7 +2758,7 @@ class ImportStudiesConfigStudy(BaseModel):
     inactivity_page_custom_text: Optional[Dict[str, str]] = None
     footer_links: Optional[List[Dict[str, Any]]] = None
     hide_server_wide_links: bool = False
-    save_browser_identification: bool = True
+    save_browser_identification: bool = False
 
 
 class UpdateConsentRequest(BaseModel):
@@ -8883,7 +8883,7 @@ class StudyConfigResponse(BaseModel):
     # Study-specific footer links
     footer_links: Optional[List[Dict[str, Any]]] = None
     hide_server_wide_links: bool = False
-    save_browser_identification: bool = True
+    save_browser_identification: bool = False
 
 
 @app.get(
