@@ -173,11 +173,6 @@
             color: #64748b;
         }
 
-        .app-name {
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-
         @media (max-width: 480px) {
             body {
                 grid-template-columns: 12px 1fr 12px;
@@ -217,14 +212,15 @@
 
         <p class="subtitle" data-i18n="thankYou.subtitle">Your submission has been saved successfully.</p>
 
-        <p id="study-custom-message-end" class="message">
-            Thank you for participating in our <span class="app-name">TRAC</span> study.
+        <p id="study-custom-message-end" class="message" data-i18n-html="thankYou.defaultMessage">
+            Thank you for participating in our study.
             Your responses have been recorded and will contribute to valuable research.
         </p>
     </div>
     </main>
 
     <script src="../settings/tud_settings.js"></script>
+    <script src="../js/maintenance.js" type="module"></script>
     <script type="module">
         import i18n from '../js/i18n.js';
         import { renderMarkdown } from '../js/markdown.js';
@@ -279,6 +275,10 @@
             const customText = studyConfig?.[selectedField];
             if (typeof customText === 'string' && customText.trim() !== '') {
                 customEndElement.innerHTML = customText;
+                // The study text replaces the built-in default, so drop the
+                // i18n hook – otherwise a later applyTranslations() (language
+                // change, stale-locale repair) would overwrite it again.
+                customEndElement.removeAttribute('data-i18n-html');
             }
 
             document.documentElement.lang = language;

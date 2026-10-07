@@ -1,27 +1,42 @@
 {
+  "maintenance": {
+    "banner": "Hinweis: In Kürze finden kurze Wartungsarbeiten statt. Bitte speichern Sie Ihre aktuelle Arbeit."
+  },
   "instructions": {
     "pageTitle": "Anleitung | Zeitnutzungstagebuch",
     "title": "Anleitung",
     "welcomeTitle": "Willkommen zu Ihrem wöchentlichen Zeit-Tagebuch. Vielen Dank für Ihre Teilnahme!",
     "generalInfoTitle": "Allgemeine Informationen zur Studie",
     "studyIntroDefault": "Dies ist unsere Zeitnutzungsstudie.<br><br>Wir bitten Sie, <b>eine typische Woche</b> Ihrer täglichen Aktivitäten mit unserem Zeitnutzungstool zu rekonstruieren.<br><br>Welche Woche soll ich wählen? Bitte denken Sie an die vergangene Woche (die letzten 7 Tage).<br>Ausnahme: Wenn Sie letzte Woche krank waren oder im Urlaub, wählen Sie bitte eine andere kürzliche Woche, die Ihren normalen Alltag besser widerspiegelt.",
+    "instructionsDefault": "#### So füllen Sie das Tagebuch aus\n\nAm unteren Bildschirmrand sehen Sie eine Liste von Aktivitäten. Klicken Sie eine Aktivität an, um sie auszuwählen, und klicken Sie dann auf die Zeitleiste, um anzugeben, was Sie im Laufe des Tages gemacht haben.\n\n- **Dauer anpassen:** Ziehen Sie den linken oder rechten Rand einer platzierten Aktivität, um die Dauer festzulegen.\n- **Aktivität löschen:** Klicken Sie auf dem Desktop mit der rechten Maustaste auf eine Aktivität oder drücken Sie auf dem Mobilgerät lange darauf und wählen Sie „Löschen\".\n\nJe nach Studie kann es mehr als eine Zeitleiste pro Tag geben. Diese erfassen verschiedene Aspekte Ihres Tages oder ermöglichen es Ihnen, parallel ausgeführte Aktivitäten aufzuzeichnen.\n\n**Zeitsparfunktion:** Sie müssen nicht jeden Tag von vorne beginnen. Nachdem Sie den ersten Tag ausgefüllt haben, wird Ihr Zeitplan automatisch als Vorlage für den nächsten Tag übernommen. Bitte passen Sie diese Vorlage an, um Änderungen in Ihren Aktivitäten für diesen Tag widerzuspiegeln.",
     "visualGuideTitle": "Visuelle Darstellungen zur Nutzung der Oberfläche",
     "startPrompt": "Bitte klicken Sie auf den blauen Start-Button, um mit Ihrem Tagebucheintrag zu beginnen.",
-    "mainInstruction": "Denken Sie an die Aktivitäten, die Sie <span class=\"emphasis\">gestern</span> ausgeführt haben. Füllen Sie anschließend die gesamte Zeitleiste mit Ihren Aktivitäten aus.",
     "step1": {
       "title": "Aktivität auswählen und platzieren",
       "horizontal": "Wählen Sie eine Aktivität aus dem Menü am unteren Bildschirmrand und platzieren Sie sie auf der Zeitleiste.",
-      "vertical": "Tippen Sie auf die (+)-Schaltfläche unten rechts, um das Aktivitätsmenü zu öffnen, wählen Sie eine Aktivität aus und tippen Sie auf die gewünschte Stelle in der Zeitleiste."
+      "imageAltHorizontal": "Auswahl einer Aktivität aus dem unteren Menü",
+      "vertical": "Tippen Sie auf die (+)-Schaltfläche unten rechts, um das Aktivitätsmenü zu öffnen, wählen Sie eine Aktivität aus und tippen Sie auf die gewünschte Stelle in der Zeitleiste.",
+      "imageAltVertical": "Auswahl einer Aktivität in der vertikalen Ansicht"
     },
     "step2": {
       "title": "Dauer der Aktivität anpassen",
       "horizontal": "Klicken und ziehen Sie die Ränder horizontal, um die Dauer festzulegen. Auf dem Desktop können Sie außerdem mit der rechten Maustaste auf eine Aktivität klicken und \"Info anzeigen\" oder \"Löschen\" wählen.",
-      "vertical": "Ziehen Sie die Ränder vertikal, um die Dauer festzulegen."
+      "imageAltHorizontal": "Aktivität platzieren und Dauer horizontal anpassen",
+      "vertical": "Ziehen Sie die Ränder vertikal, um die Dauer festzulegen.",
+      "imageAltVertical": "Aktivität platzieren und Dauer vertikal anpassen"
     },
     "step3": {
-      "title": "Tagebuch absenden",
-      "description": "Nachdem Sie alle Aktivitäten des Tages erfasst haben, klicken Sie auf die Schaltfläche „Absenden“, um Ihr Tagebuch abzuschließen.",
-      "submitHelp": "Klicken Sie, um Ihr ausgefülltes Tagebuch abzusenden"
+      "title": "Einen Tag kopieren",
+      "horizontal": "Wenn ein anderer Tag ähnlich aussieht, können Sie die Aktivitäten dieses Tages kopieren: Klicken Sie neben dem Tagestitel auf \"Tag kopieren\" und wählen Sie den Zieltag aus. Die kopierten Einträge können Sie anschließend noch anpassen.",
+      "imageAltHorizontal": "Aktivitäten eines Tages in der horizontalen Ansicht auf einen anderen Tag kopieren",
+      "vertical": "Wenn ein anderer Tag ähnlich aussieht, können Sie die Aktivitäten dieses Tages kopieren: Tippen Sie neben dem Tagestitel auf \"Tag kopieren\" und wählen Sie den Zieltag aus. Die kopierten Einträge können Sie anschließend noch anpassen.",
+      "imageAltVertical": "Aktivitäten eines Tages in der vertikalen Ansicht auf einen anderen Tag kopieren"
+    },
+    "step4": {
+      "title": "Tagebuch speichern und absenden",
+      "description": "Nachdem Sie Ihre Aktivitäten für einen Tag erfasst haben, klicken Sie auf die Schaltfläche \"Tag speichern\", um sie zu speichern. Sie können diesen Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
+      "saveHelp": "Klicken Sie, um die Aktivitäten des Tages zu speichern, an dem Sie gerade arbeiten",
+      "submitStudyHelp": "Klicken Sie, um Ihr Tagebuch abzusenden, sobald alle Tage vollständig sind"
     },
     "helpfulTools": "Hilfreiche Werkzeuge",
     "removeLastHelp": "Die zuletzt platzierte Aktivität entfernen",
@@ -31,44 +46,41 @@
   },
   "consent": {
     "pageTitle": "Einwilligung | Zeitnutzungstagebuch",
+    "pageTitleWithStudy": "{{study}} - Einwilligung | Zeitnutzungstagebuch",
     "title": "Einwilligung",
     "eyebrow": "Studieneinwilligung",
     "subtitle": "Bitte lesen Sie die Einwilligungsinformationen unten, bevor Sie mit der Studie beginnen.",
     "studyName": "Studienname",
     "checkboxLabel": "Ich habe die Informationen auf dieser Seite gelesen und verstanden.",
     "checkboxTooltip": "Bitte aktivieren Sie das obige Kontrollkästchen",
+    "reviewPrompt": "Bitte lesen Sie die Informationen, bevor Sie fortfahren.",
     "description": "Beschreibung",
     "studyNameShort": "Studienkürzel",
     "saving": "Einwilligung wird gespeichert...",
     "saveError": "Die Einwilligung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
     "loadError": "Die Einwilligungsinformationen konnten nicht geladen werden.",
+    "loadErrorReload": "Die Einwilligungsinformationen konnten nicht geladen werden. Bitte laden Sie die Seite neu.",
     "studyNotFound": "Die angeforderte Studie existiert nicht."
   },
   "common": {
     "language": "Sprache",
     "chooseLanguage": "Sprache wählen",
-    "day": "Tag"
+    "day": "Tag",
+    "loading": "Wird geladen ..."
   },
   "buttons": {
-    "submit": "Tag absenden",
     "saveDay": "Tag speichern",
-    "finishStudy": "Tag absenden und Studie abschließen",
+    "submitStudy": "Studie absenden",
     "start": "Start",
     "removeLast": "Letzte entfernen",
     "cleanRow": "Zeile leeren",
-    "next": "Nächste Zeitleiste",
     "skipReporting": "Zeiterfassung überspringen",
     "previousTimeline": "Vorherige Zeitleiste",
-    "backToInstructions": "Zurück zur Anleitung",
     "giveConsent": "Einwilligen und fortfahren",
     "declineConsent": "Einwilligung ablehnen",
     "ok": "OK",
     "cancel": "Abbrechen",
-    "save": "Speichern",
-    "close": "Schließen",
-    "confirm": "Bestätigen",
-    "yes": "Ja",
-    "no": "Nein"
+    "close": "Schließen"
   },
   "modals": {
     "customActivity": {
@@ -85,15 +97,6 @@
       "title": "Option auswählen",
       "titleFor": "Option für \"{activityName}\" auswählen"
     },
-    "confirmSubmit": {
-      "title": "Daten für {{dayLabel}} (Tag {{currentDay}} von {{totalDays}}) einreichen?",
-      "message": "Sie können Ihre Antworten für Tag {{dayLabel}} nicht mehr ändern.",
-      "infoOnTemplate": "Für den nächsten Tag werden die Daten, die Sie heute eingegeben haben, als Vorlage angezeigt. Bitte passen Sie sie nach Bedarf an.<br /><br /> Denken Sie daran, dass Sie Daten löschen können, indem Sie lange auf die Aktivität in der Zeitleiste drücken oder mit der Maus darüber fahren und 'd' oder ENTF drücken.",
-      "studyEnd": "Diese Einreichung schließt die Studie ab.",
-      "submitDay": "Tag {{dayLabel}} einreichen",
-      "submitDayAndFinish": "Tag {{dayLabel}} einreichen und Studie beenden",
-      "submitDayNoDay": "Tag einreichen"
-    },
     "confirmSkip": {
       "title": "Möchten Sie die Zeiterfassung wirklich überspringen?",
       "message": "Sie werden direkt zur Dankesseite weitergeleitet."
@@ -101,10 +104,6 @@
     "confirmCleanRow": {
       "title": "Aktuelle Zeitleisten-Zeile leeren?",
       "message": "Möchten Sie wirklich alle Aktivitäten in der aktuellen Zeitleisten-Zeile löschen?"
-    },
-    "loading": {
-      "title": "Ihr Tagebuch wird übermittelt...",
-      "message": "Bitte warten Sie, während Ihre Antworten gespeichert werden."
     },
     "activityContext": {
       "copy": "Kopieren",
@@ -124,13 +123,6 @@
     "selectStudy": "Bitte wählen Sie eine Studie, um fortzufahren",
     "noStudiesAvailable": "Keine Studien auf dem Server verfügbar.",
     "studyNotFound": "Die angeforderte Studie existiert nicht.",
-    "loading": "Lädt...",
-    "saving": "Speichert...",
-    "saved": "Erfolgreich gespeichert",
-    "error": "Ein Fehler ist aufgetreten",
-    "noActivities": "Keine Aktivitäten gefunden",
-    "fillRequired": "Bitte füllen Sie alle erforderlichen Aktivitäten aus",
-    "submitSuccess": "Tagebuch erfolgreich übermittelt",
     "submitError": "Fehler beim Übermitteln des Tagebuchs",
     "sending_retry": "Erneuter Versuch beim Speichern (Versuch {{attempt}}/{{maxRetries}})...",
     "timelineCoverageMet": "✓",
@@ -145,24 +137,22 @@
     "timelineValidationError": "Fehler bei der Zeitleistenvalidierung: {{message}}",
     "templateLoadedBanner": "Wir haben Ihre Aktivitäten von <strong>{{day}}</strong> als Ausgangspunkt geladen. Klicken Sie auf <strong>'Zeile leeren'</strong>, um neu zu beginnen, oder bearbeiten Sie die untenstehenden Aktivitäten. Auf dem Handy löschen Sie eine einzelne Aktivität durch langes Drücken. Auf dem Desktop klicken Sie mit der rechten Maustaste auf eine Aktivität und wählen <strong>'Löschen'</strong> (oder fahren mit der Maus darüber und drücken DEL oder 'd').",
     "templateCopiedBanner": "Wir haben Ihr Tagebuch mit Aktivitäten eines Vorlagen-Teilnehmers vorausgefüllt. Klicken Sie auf <strong>'Zeile leeren'</strong>, um neu zu beginnen, oder bearbeiten Sie die untenstehenden Aktivitäten.",
-    "reportingForDay": "Bericht für Tag:",
     "studyDayOf": "Tag {{current}} von {{total}}",
     "currentDayTooltip": "{{dayName}} (Tag {{current}} von {{total}})",
     "goBackToEditPreviousDays": "Zu Tag wechseln:",
     "copyDayLink": "Tag kopieren",
     "copyToDay": "Auf anderen Tag kopieren",
+    "copyFromDay": "Von anderem Tag kopieren",
     "copySuccess": "{{sourceDay}} nach {{targetDay}} kopiert",
     "copyError": "Fehler beim Kopieren: {{message}}",
     "copyEmptySource": "Der Quell-Tag hat keine Aktivitäten zum Kopieren.",
-    "completeMinimumActivitiesBeforeSwitching": "Mindestaktivitäten vervollständigen, bevor Sie den Tag wechseln.",
-    "completeMinimumActivitiesBeforeCopying": "Mindestaktivitäten vervollständigen, bevor Sie den aktuellen Tag kopieren.",
     "completeOtherDaysFirst": "Vervollständigen Sie zuerst {{days}}, um die Studie abzuschließen.",
-    "daySavedStayOnPage": "Day saved.",
-    "copyDayEmpty": "empty",
-    "copyDayHasData": "has data",
-    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
-    "submitStudyIncomplete": "Incomplete days: {{days}}",
-    "submitStudySuccess": "Study submitted successfully!"
+    "daySavedStayOnPage": "Tag gespeichert.",
+    "copyDayEmpty": "leer",
+    "copyDayHasData": "hat Daten",
+    "copyOverwriteConfirm": "{{day}} hat bereits Daten. Überschreiben?",
+    "submitStudyIncomplete": "Unvollständige Tage: {{days}}",
+    "submitStudyIncompleteHint": "Alle Tage abschließen, bevor Sie absenden"
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Fehler beim Laden der Aktivitätskonfiguration:",
@@ -172,14 +162,11 @@
   "banner": {
     "dayOneInstructions": "Anleitung: Wählen Sie eine Aktivität unten aus, klicken Sie dann auf die Zeitleiste, um sie zu platzieren, und ziehen Sie an den Rändern, um sie zu verlängern. Um eine Aktivität zu löschen, halten Sie sie auf dem Handy gedrückt oder verwenden Sie am Desktop das Rechtsklick-Menü."
   },
-  "activities": {
-    "otherNotListed": "Sonstiges (eingeben)"
-  },
   "thankYou": {
     "title": "Vielen Dank - TRAC",
     "heading": "Vielen Dank!",
     "subtitle": "Ihre Übermittlung wurde erfolgreich abgeschlossen.",
-    "message": "Vielen Dank für Ihre Teilnahme an unserer <span class=\"app-name\">TRAC</span>-Studie. Ihre Antworten wurden gespeichert und tragen zu wertvoller Forschung bei.",
+    "defaultMessage": "Vielen Dank für Ihre Teilnahme an unserer Studie. Ihre Angaben wurden gespeichert und tragen zu wertvoller Forschung bei.",
     "continueLink": "Klicken Sie hier, um fortzufahren."
   },
   "taskPage": {
@@ -195,6 +182,11 @@
     "diaryTaskStatusCompleted": "Abgeschlossen",
     "diaryTaskStatusNotCompleted": "Nicht abgeschlossen"
   },
+  "timeout": {
+    "title": "Sitzung abgelaufen - Zeitnutzungstagebuch",
+    "heading": "TRAC Zeitnutzungsstudie - Sitzung abgelaufen",
+    "message": "Ihre Sitzung wurde wegen Inaktivität beendet. Bitte verwenden Sie Ihren Einladungslink, um zum Tagebuch zurückzukehren und Ihre Eingabe fortzusetzen."
+  },
   "footer": {
     "title": "TRAC",
     "backend_status_connecting": "Verbindung zum Backend wird hergestellt...",
@@ -208,6 +200,7 @@
     "pageTitle": "Offene Studien | TRAC",
     "heading": "TRAC -- Offene Studien",
     "noStudies": "Keine offenen Studien verfügbar.",
-    "accessLink": "Zur Studie"
+    "loadError": "Offene Studien konnten nicht geladen werden: {{message}}",
+    "accessStudy": "Studie „{{study}}“ aufrufen"
   }
 }

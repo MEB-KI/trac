@@ -5,9 +5,19 @@
 - Backend integration tests (`backend/tests/integration/`) validate API/database behavior.
 - Frontend E2E tests (`frontend/tests/e2e/`) validate complete user flows.
 
+## Guard Specs (cheap, non-flow checks)
+- `frontend/tests/e2e/participant_pages.js` lists the participant pages; the static-asset, accessibility and mobile guards all sweep it.
+- `no_broken_static_requests.spec.js` fails on any static request >= 400 (missing image, locale, settings, font).
+- `accessibility.spec.js` runs axe-core via `@axe-core/playwright` (dev dependency) over each page plus the activity dialogs and fails on any WCAG A/AA violation; animations are frozen before analysis so colour is measured on a settled page.
+- `keyboard_accessibility.spec.js` and `mobile_layout.spec.js` cover Tab/Escape focus behaviour and the 390x844 phone layout (no sideways scrolling, >= 24x24 targets, touch placement).
+- When adding such a guard, prove it fails with the fix reverted before trusting it.
+- Install/refresh browsers with the repo-local binary and from `frontend/` (`npx playwright install firefox webkit`): running `npx playwright ...` from the repo root resolves to an unrelated `playwright` release and stops at an interactive "Ok to proceed?" prompt, which looks like a stalled download.
+- Playwright renders differently per engine, so a layout-dependent tap/click point can pass on chromium and fail elsewhere: ask the page which element is on top at a candidate point (`document.elementFromPoint`, see `findTimelinePoint()` in `e2e_helpers.js`) instead of computing a point from a bounding box alone.
+
 ## Preferred Entry Commands
 - `./test_backend_unit.sh`
 - `./test_backend_integration.sh`
+- `./test_backend_migrations.sh` (real migrations; starts a throwaway database or uses `TUD_MIGRATION_TEST_DATABASE_URL`)
 - `./test_e2e.sh`
 
 ## Environment Notes

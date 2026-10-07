@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRAC Tasks</title>
+    <title data-i18n="taskPage.title">TRAC Tasks</title>
     <link href="../assets/fonts/inter/inter.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/fonts/fontawesome/css/all.min.css">
     <style>
@@ -36,6 +36,8 @@
         }
 
         .tasks-container {
+            /* border-box: width:100% + padding otherwise overflows phones. */
+            box-sizing: border-box;
             grid-column: 2;
             width: 100%;
             margin: 0;
@@ -155,7 +157,8 @@
             border-radius: 10px;
             text-decoration: none;
             color: white;
-            background: var(--success-color);
+            /* #059669 (--success-color) gives white text only 3.76:1. */
+            background: #047857;
             font-weight: 600;
         }
 
@@ -195,6 +198,7 @@
     </main>
 
     <script src="../settings/tud_settings.js"></script>
+    <script src="../js/maintenance.js" type="module"></script>
     <script type="module">
         import i18n from '../js/i18n.js';
 

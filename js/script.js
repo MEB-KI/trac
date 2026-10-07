@@ -19,6 +19,18 @@ import {
 } from './utils.js';
 import { updateIsMobile, getIsMobile } from './globals.js';
 import {
+  PENDING_TIMELINE_STATE_KEY,
+  DRAFT_TIMELINE_STATE_KEY,
+  clearTimelineState,
+  readStoredTimelineState,
+  storeTimelineState,
+  isStoredTimelineStateFresh,
+  matchesTimelineContext,
+  safeGetItem,
+  safeSetItem,
+  safeRemoveItem,
+} from './draft_storage.js';
+import {
   createModal,
   createFloatingAddButton,
   updateFloatingButtonPosition,
@@ -100,13 +112,17 @@ function _daySavedKey(study, pid, dayIndex) {
 function markDaySaved(study, pid, dayIndex) {
   try {
     sessionStorage.setItem(_daySavedKey(study, pid, dayIndex), '1');
-  } catch (_) { /* storage full or unavailable — best effort */ }
+  } catch (_) {
+    /* storage full or unavailable — best effort */
+  }
 }
 
 function wasDaySaved(study, pid, dayIndex) {
   try {
     return sessionStorage.getItem(_daySavedKey(study, pid, dayIndex)) === '1';
-  } catch (_) { return false; }
+  } catch (_) {
+    return false;
+  }
 }
 
 window.markDaySaved = markDaySaved;
@@ -514,8 +530,9 @@ function initInstructionBanner() {
     return;
   }
 
-  // Check if user has already closed the banner (using localStorage)
-  const bannerClosed = localStorage.getItem(bannerStorageKey);
+  // Check if user has already closed the banner (using localStorage). Storage
+  // access itself can throw (blocked cookies, private mode), so it is guarded.
+  const bannerClosed = safeGetItem(localStorage, bannerStorageKey);
   if (bannerClosed === 'true') {
     banner.remove();
     return;
@@ -528,7 +545,7 @@ function initInstructionBanner() {
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       banner.style.display = 'none';
-      localStorage.setItem(bannerStorageKey, 'true');
+      safeSetItem(localStorage, bannerStorageKey, 'true');
     });
   }
 }
@@ -1021,8 +1038,16 @@ function ensureActivityInfoModal() {
   modalOverlay = document.createElement('div');
   modalOverlay.id = 'activityInfoModal';
   modalOverlay.className = 'modal-overlay';
+  // The role belongs to the element that is shown and hidden (the overlay), not
+  // to an inner wrapper: ui.js detects open/close by watching the style of the
+  // [role="dialog"] element, so a role buried inside the overlay meant the
+  // dialog was treated as "always open" and focus was never given back (WebKit
+  // then left focus on a control the user can no longer see).
+  modalOverlay.setAttribute('role', 'dialog');
+  modalOverlay.setAttribute('aria-modal', 'true');
+  modalOverlay.setAttribute('aria-labelledby', 'activityInfoModalTitle');
   modalOverlay.innerHTML = `
-        <div class="modal activity-info-modal" role="dialog" aria-modal="true" aria-labelledby="activityInfoModalTitle">
+        <div class="modal activity-info-modal">
             <div class="modal-header">
                 <h3 id="activityInfoModalTitle">${translateOrFallback(
                   'modals.activityContext.infoTitle',
@@ -3756,6 +3781,9 @@ function initTimelineInteraction(timeline) {
     const timelineName =
       window.timelineManager?.metadata?.[timelineElement.id]?.name ||
       'Timeline';
+    // A bare div cannot carry aria-label (axe: aria-prohibited-attr), so the
+    // timeline is exposed as a named group - the blocks inside stay operable.
+    timelineElement.setAttribute('role', 'group');
     timelineElement.setAttribute('aria-label', timelineName);
 
     if (!timelineElement.dataset.spaceKeyActivationBound) {
@@ -5368,10 +5396,6 @@ function getPreferredLanguage(
   );
 }
 
-const PENDING_TIMELINE_STATE_KEY = 'trac.pendingTimelineState.v1';
-const DRAFT_TIMELINE_STATE_KEY = 'trac.timelineDraftState.v1';
-const DRAFT_TIMELINE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
 function getPendingTimelineContext() {
   const urlParams = new URLSearchParams(window.location.search);
   return {
@@ -5393,45 +5417,7 @@ function hasAnyLocalActivities() {
 }
 
 function clearStoredTimelineState() {
-  sessionStorage.removeItem(PENDING_TIMELINE_STATE_KEY);
-  localStorage.removeItem(DRAFT_TIMELINE_STATE_KEY);
-}
-
-function storeTimelineState(storage, key, payload) {
-  try {
-    storage.setItem(key, JSON.stringify(payload));
-    return true;
-  } catch (error) {
-    console.warn(`Failed to store timeline state in ${key}:`, error);
-    return false;
-  }
-}
-
-function readStoredTimelineState(storage, key) {
-  const raw = storage.getItem(key);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn(
-      `Invalid stored timeline state payload for ${key}, clearing it:`,
-      error
-    );
-    storage.removeItem(key);
-    return null;
-  }
-}
-
-function isStoredTimelineStateFresh(payload) {
-  const savedAt = Number(payload?.savedAt);
-  if (!Number.isFinite(savedAt)) {
-    return false;
-  }
-
-  return Date.now() - savedAt <= DRAFT_TIMELINE_MAX_AGE_MS;
+  clearTimelineState({ sessionStorage, localStorage });
 }
 
 window.__TRAC_CAPTURE_PENDING_STATE = function capturePendingTimelineState() {
@@ -5508,25 +5494,20 @@ async function tryRestorePendingTimelineState(
 
   if (!payload) {
     if (localPayload && !isStoredTimelineStateFresh(localPayload)) {
-      localStorage.removeItem(DRAFT_TIMELINE_STATE_KEY);
+      safeRemoveItem(localStorage, DRAFT_TIMELINE_STATE_KEY);
     }
     return false;
   }
 
-  const expected = {
+  const sameContext = matchesTimelineContext(payload, {
     pid: participantId || '',
     study_name: studyName || '',
     day_label_index: String(dayIndex),
-  };
-
-  const sameContext =
-    payload?.pid === expected.pid &&
-    payload?.study_name === expected.study_name &&
-    payload?.day_label_index === expected.day_label_index;
+  });
 
   if (!sameContext) {
     if (localPayload && payload === localPayload) {
-      localStorage.removeItem(DRAFT_TIMELINE_STATE_KEY);
+      safeRemoveItem(localStorage, DRAFT_TIMELINE_STATE_KEY);
     }
     return false;
   }
@@ -5716,7 +5697,8 @@ async function saveAndSwitchToDay(targetDayIndex) {
   // Copy Days: mark the source day as saved so templates aren't re-loaded
   // if the user intentionally saved an empty day.
   const urlParams = new URLSearchParams(window.location.search);
-  const studyName = urlParams.get('study_name') ||
+  const studyName =
+    urlParams.get('study_name') ||
     window.studyConfigManager?.getCurrentStudy?.()?.name_short;
   const pid = urlParams.get('pid');
   if (studyName && pid) {
@@ -5823,8 +5805,11 @@ function renderPreviousDaysSwitchRow() {
         await saveAndSwitchToDay(dayIndex);
       });
 
-      const hasData = dayIndicesWithData.includes(dayIndex);
-      if (hasData && !window.globals?.isMobile) {
+      // Right-click (desktop) on a day button copies THAT day to another day.
+      // Attached for every non-current day; if the day has no activities yet,
+      // showCopyTargetPicker explains there is nothing to copy instead of
+      // silently doing nothing.
+      if (!getIsMobile()) {
         button.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           showCopyTargetPicker(dayIndex, event);
@@ -6929,8 +6914,12 @@ function hasFrontendActivities() {
 // Keep old name as alias for backward compatibility with any remaining callers.
 function getEmptyTargetDayIndices() {
   return getAllTargetDayIndices()
-    .filter(function (t) { return !t.hasData; })
-    .map(function (t) { return t.index; });
+    .filter(function (t) {
+      return !t.hasData;
+    })
+    .map(function (t) {
+      return t.index;
+    });
 }
 
 function removeCopyDayContextMenu() {
@@ -6943,17 +6932,38 @@ function removeCopyDayContextMenu() {
 function showCopyTargetPicker(sourceDayIndex, event) {
   removeCopyDayContextMenu();
 
-  const targets = getAllTargetDayIndices(sourceDayIndex);
-  if (!targets.length) {
-    return;
-  }
-
   const t =
     window.i18n && window.i18n.isReady()
       ? window.i18n.t.bind(window.i18n)
       : function (key) {
           return key;
         };
+
+  // Copy Days: right-click on a day button (desktop) copies THAT day to
+  // another.  If the source day has no activities yet there is nothing to
+  // copy — inform the user instead of showing an empty picker or silently
+  // doing nothing.  The current viewing day may hold unsaved frontend data,
+  // so check its in-memory state (same logic as getAllTargetDayIndices).
+  const currentDayIndex = getCurrentDayIndex();
+  const dayIndicesWithData = Array.isArray(
+    window.timelineManager?.dayIndicesWithData
+  )
+    ? window.timelineManager.dayIndicesWithData
+    : [];
+  const sourceHasData =
+    sourceDayIndex === currentDayIndex
+      ? hasFrontendActivities()
+      : dayIndicesWithData.includes(sourceDayIndex);
+
+  if (!sourceHasData) {
+    showCopyToast(t('messages.copyEmptySource'), false);
+    return;
+  }
+
+  const targets = getAllTargetDayIndices(sourceDayIndex);
+  if (!targets.length) {
+    return;
+  }
 
   const sourceDayName =
     window.studyConfigManager?.getDayDisplayLabel(sourceDayIndex) ||
@@ -6986,17 +6996,9 @@ function showCopyTargetPicker(sourceDayIndex, event) {
     menu.appendChild(item);
   }
 
-  const isMobile = false;
-
-  if (
-    window.globals &&
-    typeof window.globals.getIsMobile === 'function' &&
-    window.globals.getIsMobile()
-  ) {
-    document.body.appendChild(menu);
-    return;
-  }
-
+  // Position the menu at the cursor.  The CSS keeps the menu position:fixed,
+  // so this works both for the desktop right-click entry point and for the
+  // "Copy this day" button (which supplies clientX/clientY).
   const menuX = Math.min(event.clientX, window.innerWidth - 210);
   const menuY = Math.min(event.clientY, window.innerHeight - 200);
   menu.style.position = 'fixed';
@@ -7032,7 +7034,9 @@ function showCopySourcePicker(targetDayIndex, event) {
   const t =
     window.i18n && window.i18n.isReady()
       ? window.i18n.t.bind(window.i18n)
-      : function (key) { return key; };
+      : function (key) {
+          return key;
+        };
 
   const targetDayName =
     window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
@@ -7065,16 +7069,9 @@ function showCopySourcePicker(targetDayIndex, event) {
     menu.appendChild(item);
   }
 
-  // Position the menu
-  if (
-    window.globals &&
-    typeof window.globals.getIsMobile === 'function' &&
-    window.globals.getIsMobile()
-  ) {
-    document.body.appendChild(menu);
-    return;
-  }
-
+  // Position the menu at the cursor.  The CSS keeps the menu position:fixed,
+  // so this works both for the desktop right-click entry point and for the
+  // "Copy from..." button (which supplies clientX/clientY).
   const menuX = Math.min(event.clientX, window.innerWidth - 210);
   const menuY = Math.min(event.clientY, window.innerHeight - 200);
   menu.style.position = 'fixed';
@@ -7129,9 +7126,10 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
     ? window.timelineManager.dayIndicesWithData
     : [];
   const currentDayIndex = getCurrentDayIndex();
-  const targetHasData = (targetDayIndex === currentDayIndex)
-    ? hasFrontendActivities()
-    : dayIndicesWithData.includes(targetDayIndex);
+  const targetHasData =
+    targetDayIndex === currentDayIndex
+      ? hasFrontendActivities()
+      : dayIndicesWithData.includes(targetDayIndex);
 
   if (targetHasData) {
     const targetDayName =

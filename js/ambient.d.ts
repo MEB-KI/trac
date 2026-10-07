@@ -9,6 +9,9 @@ declare var TUD_SETTINGS: {
   API_BASE_URL: string;
   DEFAULT_STUDY_NAME?: string;
   DEFAULT_STUDIES_FILE?: string;
+  // Maintenance notice (see js/maintenance.js)
+  IS_MAINTENANCE_MODE?: boolean;
+  MAINTENANCE_MESSAGE?: string | null;
   [key: string]: unknown;
 };
 
@@ -49,7 +52,6 @@ interface Window {
   showToast?: (...args: any[]) => any;
   toggleDebugOverlay?: (...args: any[]) => any;
   tudClearCustomActivityText?: (...args: any[]) => any;
-  updateConfirmationModalContent?: (...args: any[]) => any;
   updateDisabledButtonOverlays?: (...args: any[]) => any;
   deleteActivityBlock?: (...args: any[]) => any;
   // legacy hacky globals

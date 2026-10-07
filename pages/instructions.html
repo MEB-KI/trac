@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -34,13 +34,15 @@
                     <div class="layout-specific horizontal-layout">
                         <p data-i18n="instructions.step1.horizontal">Choose an activity from the menu at the bottom of the screen, then place it on the timeline.</p>
                         <div class="gif-container loading" data-src="../assets/select_horizontal.gif">
-                            <img src="../assets/select_horizontal.gif" alt="Selecting an activity from the bottom menu" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <img src="../assets/select_horizontal.gif" alt="Selecting an activity from the bottom menu" data-i18n-alt="instructions.step1.imageAltHorizontal" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <span class="gif-loading-label" data-i18n="common.loading">Loading...</span>
                         </div>
                     </div>
                     <div class="layout-specific vertical-layout">
                         <p data-i18n="instructions.step1.vertical">Tap the (+) button in the bottom right corner to open the activity menu, then select an activity and tap where you want to place it on the timeline.</p>
                         <div class="gif-container loading" data-src="../assets/select_vertical_new.gif">
-                            <img src="../assets/select_vertical_new.gif" alt="Selecting an activity in vertical layout" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <img src="../assets/select_vertical_new.gif" alt="Selecting an activity in vertical layout" data-i18n-alt="instructions.step1.imageAltVertical" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <span class="gif-loading-label" data-i18n="common.loading">Loading...</span>
                         </div>
                     </div>
                 </div>
@@ -53,29 +55,61 @@
                     <div class="layout-specific horizontal-layout">
                         <p data-i18n="instructions.step2.horizontal">Click and drag the edges horizontally to set the duration.</p>
                         <div class="gif-container loading" data-src="../assets/adjust_horizontal.gif">
-                            <img src="../assets/adjust_horizontal.gif" alt="Placing and adjusting activity duration horizontally" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <img src="../assets/adjust_horizontal.gif" alt="Placing and adjusting activity duration horizontally" data-i18n-alt="instructions.step2.imageAltHorizontal" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <span class="gif-loading-label" data-i18n="common.loading">Loading...</span>
                         </div>
                     </div>
                     <div class="layout-specific vertical-layout">
                         <p data-i18n="instructions.step2.vertical">Drag the edges vertically to set the duration.</p>
                         <div class="gif-container loading" data-src="../assets/adjust_vertical_new.gif">
-                            <img src="../assets/adjust_vertical_new.gif" alt="Placing and adjusting activity duration vertically" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <img src="../assets/adjust_vertical_new.gif" alt="Placing and adjusting activity duration vertically" data-i18n-alt="instructions.step2.imageAltVertical" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <span class="gif-loading-label" data-i18n="common.loading">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instruction-step" id="instruction-step-copy-day">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h2 data-i18n="instructions.step3.title">Copy a Day</h2>
+                    <div class="layout-specific horizontal-layout">
+                        <p data-i18n="instructions.step3.horizontal">If another day looks similar, you can copy this day's activities: click "Copy this day" next to the day title and choose the day you want to copy it to. You can still adjust the copied entries afterwards.</p>
+                        <div class="gif-container loading" data-src="../assets/copy_day_horizontal.gif">
+                            <img src="../assets/copy_day_horizontal.gif" alt="Copying the activities of a day to another day in horizontal layout" data-i18n-alt="instructions.step3.imageAltHorizontal" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <span class="gif-loading-label" data-i18n="common.loading">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="layout-specific vertical-layout">
+                        <p data-i18n="instructions.step3.vertical">If another day looks similar, you can copy this day's activities: tap "Copy this day" next to the day title and choose the day you want to copy it to. You can still adjust the copied entries afterwards.</p>
+                        <div class="gif-container loading" data-src="../assets/copy_day_vertical.gif">
+                            <img src="../assets/copy_day_vertical.gif" alt="Copying the activities of a day to another day in vertical layout" data-i18n-alt="instructions.step3.imageAltVertical" loading="lazy" onload="this.parentElement.classList.remove('loading')" />
+                            <span class="gif-loading-label" data-i18n="common.loading">Loading...</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="instruction-step">
-                <div class="step-number">3</div>
+                <div class="step-number">4</div>
                 <div class="step-content">
-                    <h2 data-i18n="instructions.step3.title">Submit Your Diary</h2>
-                    <p data-i18n="instructions.step3.description">Once you've recorded all your activities for the day, click the Submit button to complete your diary.</p>
-                    <div class="feature-item">
-                        <button class="btn save-btn instructions-demo-btn" data-i18n-aria-label="instructions.step3.submitHelp" disabled>
-                            <i class="fas fa-check" aria-hidden="true"></i>
-                            <span data-i18n="buttons.submit">Submit</span>
-                        </button>
-                        <p data-i18n="instructions.step3.submitHelp">Click to submit your completed diary</p>
+                    <h2 data-i18n="instructions.step4.title">Save and Submit Your Diary</h2>
+                    <p data-i18n="instructions.step4.description">Once you have recorded your activities for a day, click the "Save Day" button to store them. You can still edit that day later. When all days of the study are complete, click the "Submit Study" button to send your diary and finish the study.</p>
+                    <div class="controls features-grid">
+                        <div class="feature-item">
+                            <button class="btn save-btn instructions-demo-btn" data-i18n-aria-label="instructions.step4.saveHelp" disabled>
+                                <i class="fas fa-save" aria-hidden="true"></i>
+                                <span data-i18n="buttons.saveDay">Save Day</span>
+                            </button>
+                            <p data-i18n="instructions.step4.saveHelp">Click to save the activities of the day you are working on</p>
+                        </div>
+                        <div class="feature-item">
+                            <button class="btn submit-study-btn instructions-demo-btn" data-i18n-aria-label="instructions.step4.submitStudyHelp" disabled>
+                                <i class="fas fa-check-double" aria-hidden="true"></i>
+                                <span data-i18n="buttons.submitStudy">Submit Study</span>
+                            </button>
+                            <p data-i18n="instructions.step4.submitStudyHelp">Click to submit your diary when every day is complete</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -126,6 +160,7 @@
         </button>
     </nav>
     <script src="../settings/tud_settings.js"></script>
+    <script src="../js/maintenance.js" type="module"></script>
     <script type="module" src="instructions.js"></script>
     <script src="../js/footer.js"></script>
 </body>
