@@ -82,6 +82,11 @@ test('all locales contain the banner and recently added keys', () => {
     'common.pageTitle',
     'common.pageTitleWithStudy',
     'common.error',
+    // Consent page error states: the participant has to be able to tell a
+    // broken link / paused study from a temporary backend problem.
+    'consent.accessDenied',
+    'consent.studyUnavailable',
+    'consent.saveDenied',
     // Autosave status chip (slice 3)
     'messages.syncSaving',
     'messages.syncSaved',
