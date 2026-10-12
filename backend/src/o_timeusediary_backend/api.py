@@ -1679,6 +1679,23 @@ def submit_activities(
             )
             session.add(study_participant)
 
+    # Reject edits once the study has been submitted. The frontend redirects
+    # submitted participants to the thank-you page, but that is a UX
+    # convenience only - this endpoint is the actual guarantee that a
+    # submitted diary is immutable.
+    if study_participant.study_submitted_at is not None:
+        logger.info(
+            "Rejected activity submission for participant '%s' in study '%s': "
+            "already submitted at %s",
+            participant_id,
+            study_name_short,
+            study_participant.study_submitted_at.isoformat(),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Study '{study_name_short}' has already been submitted and can no longer be edited.",
+        )
+
     # Validate day label exists for this study
     day_label = session.exec(
         select(DayLabel).where(
@@ -9566,6 +9583,22 @@ async def set_participant_consent(
             participant_id=participant_id,
         )
         session.add(association)
+
+    # Consent is part of the submitted record: once the study has been
+    # submitted it can no longer be changed. External task confirmations are
+    # intentionally left mutable (see confirm_external_task_callback).
+    if association.study_submitted_at is not None:
+        logger.info(
+            "Rejected consent change for participant '%s' in study '%s': "
+            "already submitted at %s",
+            participant_id,
+            study_name_short,
+            association.study_submitted_at.isoformat(),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Study '{study_name_short}' has already been submitted; consent can no longer be changed.",
+        )
 
     association.consent_given = payload.consent_given
     association.consent_decided_at = utc_now()
