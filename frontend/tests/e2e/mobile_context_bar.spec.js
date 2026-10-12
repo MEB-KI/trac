@@ -153,14 +153,16 @@ test('the timeline menu lists every timeline with its coverage', async ({
   // One item per timeline (the study has two) plus "Clear timeline".
   await expect(menu.locator('.timeline-menu-item')).toHaveCount(2);
   await expect(menu.locator('.timeline-menu-item').first()).toBeDisabled();
-  // Each entry carries its coverage on a second line: the primary timeline has a
-  // min_coverage requirement, the secondary has none (so it reads as met).
+  // Each entry carries its state on a second line: the primary timeline has a
+  // min_coverage requirement, the secondary has none - so an empty secondary
+  // reads as empty, not as a met requirement. (It used to say "✓", which is
+  // true of min_coverage 0 but told participants an untouched track was done.)
   await expect(
     menu.locator('.timeline-menu-item').first().locator('.context-menu-item-detail')
   ).toContainText('required minutes covered');
   await expect(
     menu.locator('.timeline-menu-item').nth(1).locator('.context-menu-item-detail')
-  ).toHaveText('✓');
+  ).toHaveText('nothing entered yet');
 
   await menu.locator('.timeline-menu-item').nth(1).click();
   await expect(page.locator('#contextTimelineName')).toHaveText(

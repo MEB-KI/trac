@@ -1173,6 +1173,51 @@ resizes without scrolling, still touch opens the menu) on Chromium. Note the
 other mobile specs drive the phone layout with a *mouse*, which browsers never
 subject to `touch-action` - that is why this class of bug was invisible to them.
 
+## Done — the second timeline says what it is (2026-10-12)
+
+Two findings from the same probe, in a study with two timelines where the second
+one is optional (`min_coverage: 0`):
+
+1. **The second timeline claimed to be done while it was empty.** `min_coverage: 0`
+   is satisfied by an empty timeline, so `updateTimelineCoverageIndicators()` took
+   the "met" branch and rendered `✓` next to a timeline nobody had touched - the
+   probe read the label as `Nebenaktivität✓`. For a track a participant is meant
+   to *notice and use*, a green ✓ means "skip it". The timeline menu
+   (`buildTimelineMenu`) had the same vacuous ✓ in its detail line.
+2. **Nothing on a phone said the second timeline existed.** Only the active
+   timeline is laid out below the breakpoint (every other container measures 0×0),
+   so the page showed one timeline, and a participant who never opened the context
+   bar's timeline picker never learned about the other one.
+
+Fix, from one rule - a ✓ is earned by a met requirement, never by the absence of
+one:
+
+- `getTimelineCoverageText(timelineKey)` in `ui.js` is the single formatter: met
+  requirement → `✓` (green, `is-met`); required and short → the red "N von M …"
+  (`is-missing`); no requirement and no entries → "nothing entered yet"
+  (`is-empty`, grey, no verdict). Used by the title indicator *and* the timeline
+  menu, so the two cannot drift apart.
+- `updateEmptyTimelineHints()` renders one row per other timeline that is empty on
+  the current day, inside the active timeline's label block below the description,
+  phone-only: `Nebenaktivität · noch nichts eingetragen ›`. Tapping it calls
+  `navigateToTimelineByKey()` - the same path the picker uses. ~44 px tap target
+  with a dashed outline (an offer, not another toolbar control), and it is gone as
+  soon as that timeline has an entry for the day. Called from
+  `updateButtonStates()`, the same chokepoint as the indicator, because the same
+  events change both.
+
+Deliberately not built (discussed; the cheaper options won): no vertical lane for
+the second timeline, no horizontal swipe, no side-by-side stacked columns - each
+costs day height or competes with editing - and no second full copy of the
+timeline. Still open from the same discussion: a "(1/2)" counter next to the
+timeline name as an alternative to the inserted row, deferred until participants
+have seen the row.
+
+Guarded by `mobile_timeline_visibility.spec.js`: the neutral state of an empty
+optional timeline and the ✓ once it has an entry, the row appearing, vanishing and
+switching on a *real touch* tap, and the desktop case (two indicators, no rows).
+`mobile_context_bar.spec.js` had encoded the old ✓ for the timeline menu.
+
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
 The feedback asked for (a) a visible marker that a block's edges can be dragged,

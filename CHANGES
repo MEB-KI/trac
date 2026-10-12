@@ -53,6 +53,25 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   0 px, while the same swipe 30 px further left scrolled it. The block body may
   pan vertically now, and the top/bottom bands keep `touch-action: none`
   (`activity-block-edge-zone`) so a resize is not cancelled by a scroll mid-drag.
+- FIX: a timeline with no coverage requirement is no longer reported as
+  "requirement met" while it is empty. `min_coverage: 0` is satisfied by nothing
+  at all, so the secondary timeline of the pilot study showed a green ✓ next to
+  its name before the participant had entered anything - read as "this one is
+  done, skip it". A ✓ is now only shown where the study requires something and
+  that requirement is met; no requirement plus no entries reads as "nothing
+  entered yet" in a neutral colour, and the red shortfall text is unchanged. The
+  timeline menu shows the same wording as the timeline itself (it had the same
+  vacuous ✓), both from one formatter in `frontend/src/js/ui.js`.
+- NEW: on a phone an untouched second timeline is advertised inside the day it
+  belongs to. Below the breakpoint only the active timeline is laid out (every
+  other container measures 0×0), so nothing on the page mentioned the other
+  timeline and a participant who never opened the context bar's timeline picker
+  never learned it existed. The active timeline's label block now lists one
+  tappable row per other timeline that is still empty on the current day
+  ("Secondary Activity · nothing entered yet ›"); a tap switches timelines
+  through the same path the picker uses, and the row disappears as soon as that
+  timeline has an entry. Desktop shows both timelines side by side and gets no
+  rows.
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------

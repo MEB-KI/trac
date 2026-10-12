@@ -92,6 +92,11 @@ test('all locales contain the banner and recently added keys', () => {
     'messages.syncSaved',
     'messages.syncNotSaved',
     'messages.syncRetry',
+    // Timeline coverage wording: a timeline with no requirement and no entries
+    // is reported as empty, not as a met requirement (no vacuous ✓), and the
+    // phone-only row that advertises an untouched other timeline.
+    'messages.timelineNothingEntered',
+    'messages.timelineSwitchHintAria',
   ];
   for (const file of localeFiles) {
     const keys = flattenKeys(parsed[file]);
