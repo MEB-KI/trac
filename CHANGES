@@ -10,6 +10,12 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   timestamp. MySQL/MariaDB and SQL Server keep less sub-second precision than
   PostgreSQL, so the datetime column and the blob used to disagree on the same
   capture, which made the backend integration tests fail on those DBMS.
+- FIX: a submitted study can no longer be edited through the API. The activity
+  submission and consent endpoints now return HTTP 403 once the participant's
+  `study_submitted_at` is set; previously only the frontend redirected submitted
+  participants to the thank-you page, so the endpoints still accepted diary and
+  consent changes when called directly. External task confirmations intentionally
+  remain possible after submission.
 
 
 
