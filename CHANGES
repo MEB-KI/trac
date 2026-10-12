@@ -72,6 +72,12 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   through the same path the picker uses, and the row disappears as soon as that
   timeline has an entry. Desktop shows both timelines side by side and gets no
   rows.
+- NEW: every place a timeline names itself now also says where it sits in the
+  set - "Main Activity (1/2)": the timeline title, the phone context bar, the
+  timeline menu and the desktop switch-timeline button. Same compact pattern the
+  phone day counter already uses ("(3/7)"), and plain numbers, so it needed no
+  translation. A study with a single timeline is unchanged ("(1/1)" would
+  announce a choice that does not exist).
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------

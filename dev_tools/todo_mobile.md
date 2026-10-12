@@ -1209,14 +1209,17 @@ one:
 Deliberately not built (discussed; the cheaper options won): no vertical lane for
 the second timeline, no horizontal swipe, no side-by-side stacked columns - each
 costs day height or competes with editing - and no second full copy of the
-timeline. Still open from the same discussion: a "(1/2)" counter next to the
-timeline name as an alternative to the inserted row, deferred until participants
-have seen the row.
+timeline. The "(1/2)" counter that came out of the same discussion is in as well:
+`getTimelineLabel()` (script.js) is used by the container title, the phone context
+bar, the timeline menu and the desktop switch button, mirroring the phone day
+counter's `(3/7)` - and single-timeline studies keep the bare name.
 
 Guarded by `mobile_timeline_visibility.spec.js`: the neutral state of an empty
 optional timeline and the ✓ once it has an entry, the row appearing, vanishing and
-switching on a *real touch* tap, and the desktop case (two indicators, no rows).
-`mobile_context_bar.spec.js` had encoded the old ✓ for the timeline menu.
+switching on a *real touch* tap, the position counter on both widths, and the
+desktop case (two indicators and two titles, no rows).
+`mobile_context_bar.spec.js` had encoded the old ✓ for the timeline menu and the
+bare timeline names.
 
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
