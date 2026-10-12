@@ -1221,6 +1221,75 @@ desktop case (two indicators and two titles, no rows).
 `mobile_context_bar.spec.js` had encoded the old ✓ for the timeline menu and the
 bare timeline names.
 
+## Done — a short entry, and help in reach (2026-10-12)
+
+Participant/reviewer feedback asked for the entry to be reduced ("Es wird vieles
+erklärt, was selbsterklärend sein sollte") and for the basics to be offered as an
+optional help button instead. Measuring the page first turned the claim into a
+different, harder problem:
+
+| (iPhone 13, German, default study) | before | after |
+| --- | --- | --- |
+| page height | 4779 px = **7.2 screens** | 1524 px = **2.3 screens** |
+| generic walk-through | y 1063–4393 = **5 screens** | one 48 px summary row |
+| Start button | y **4623**, last element (`.navigation` is `static`) | y 605, **inside the first screen** |
+
+The walk-through was not merely verbose, it was an entry *gate*: the only way
+into the study was to scroll past it. The study's own text (`study_text_intro`,
+`study_text_instructions`) sits above it and was never the problem - that text is
+the study's protocol, so it stays where it is.
+
+Therefore: don't delete, don't hide behind a page switch.
+
+- The walk-through is a closed `<details class="how-to">` (`.instruction-card`)
+  with a 48 px summary row; the steps and their GIFs load on demand. The page
+  keeps every word it had, so nothing about what participants *can* read
+  changed.
+- The Start nav is `position: fixed` **on phones only** (`max-width: 1439.98px`,
+  with matching `body` padding): with the walk-through expanded the page is long
+  again, and Start used to be 4000 px away. On desktop the collapsed page is
+  ~1 screen, so a full-width bar would be noise (`instructions_entry.spec.js`
+  asserts both).
+- Not a per-study switch. A flag would change *what participants were told*,
+  which is a study condition (and a protocol decision mid-pilot), not styling.
+  If it should become one, `study_show_visual_guide` is the place.
+
+Help while working is the other half of the request, and it is a **modal, not a
+navigation**: the ⋮ menu entry "How to use the diary" loads the instructions page
+in `?embed=1` mode into an iframe (`.help-modal-frame`) - same steps, GIFs and
+translations, no study text, no language pill, no Start button. One source of
+truth instead of a second copy of four animated GIFs. In embed mode the page also
+skips its study-config redirects and the language pill (a dead config must not
+navigate the iframe), and opens the `<details>`. `openHelpModal()` arms the shared
+modal focus manager by itself, because Escape/focus-trap used to depend on the
+activity picker having been opened once (`createModal()` armed it).
+
+Guarded by `instructions_entry.spec.js` (short entry, steps restored, pinned nav,
+desktop unchanged) and `help_modal.spec.js` (embed contract, modal opening,
+day still intact afterwards, Escape, desktop).
+
+Desktop bottom, fixed after a look at the rendered page (nothing failed): the
+Start row was a 101 px opaque-white slab with an upward shadow, sitting 69 px
+below the last line of text and above the footer links, with the button hugging
+the far right of the 1100 px column - it read as a stray toolbar bolted onto the
+page. The "please click the blue Start button" line above it (`instructions.
+startPrompt`, removed from all 7 locales) explained a button that sits directly
+below the sentence. Desktop now gets a hairline across the content column with
+the primary action on the right; the phone keeps the pinned bar, where it earns
+its place.
+
+Same pass, from a second look at a big window: the Start button rendered as a
+**square**. The page body is a grid with `grid-auto-rows: auto`, whose default
+`align-content` is `stretch` - so on a window taller than the page the rows grew
+to fill it (measured: 163 px and 196 px for the Start row at 1920x1200 and
+1600x1300, footer row 140 px) and the button, a flex item with the default
+`align-items: stretch`, grew with the row (140x131 at 1600x1300, 140x98 at
+1920x1200). Fixed with `align-content: start` on `body` plus `align-items:
+center` on `.navigation`; measured after: 140x56 at every size (900/1200/1300 px
+tall windows, and the phone's fixed bar unchanged). Guarded by the "on a tall
+window" case in `instructions_entry.spec.js`. Note this was pre-existing CSS -
+the white slab just hid it.
+
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
 The feedback asked for (a) a visible marker that a block's edges can be dragged,

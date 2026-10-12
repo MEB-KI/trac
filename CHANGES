@@ -78,6 +78,33 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   phone day counter already uses ("(3/7)"), and plain numbers, so it needed no
   translation. A study with a single timeline is unchanged ("(1/1)" would
   announce a choice that does not exist).
+- NEW: the instructions page no longer pushes the study's own text behind a
+  reading assignment. The generic walk-through ("Visual Illustrations", 4
+  animated GIFs plus helpful tools) is a closed section now and the Start button
+  is pinned on the phone layout: measured at 390x664 the page went from 4779 px
+  (7.2 screens, Start at px 4623 as the last element of the document) to 1524 px
+  (2.3 screens, Start inside the first screen). Nothing is removed - one tap
+  opens the steps, and the study's own intro/instruction text, which is the
+  study's protocol rather than ours, keeps its place at the top. The bottom of a
+  desktop page is a hairline action row now instead of a 101 px white slab with
+  an upward shadow wedged between the text and the footer links (~70 px of dead
+  space above it, the button hugging the far right of the column), and the
+  redundant "please click the blue Start button" line is gone: the button says
+  Start and it is right there.
+- FIX: the instructions page no longer stretches on a window taller than itself.
+  The body is a grid, and its auto rows stretched to fill the viewport, so the
+  Start row grew (163 px at 1920x1200, 196 px at 1600x1300, plus a 140 px footer
+  row) and the button - a flex item with the default `align-items: stretch` -
+  grew with it into a square (140x131). Rows are content-sized now and the row
+  centers its button, so the page simply ends where its content ends.
+- NEW: "How to use the diary" in the ⋮ menu (both layouts) opens the walk-
+  through in a modal instead of leaving the day. It is the instructions page in
+  `?embed=1` mode - same steps, GIFs and translations, without the study text,
+  the language pill or the Start button - loaded in an iframe so there is no
+  second copy of four animated GIFs to maintain. Leaving the page would be safe
+  (the day autosaves and comes back from the URL) but costs a page load, the
+  scroll position and the selected activity, and mid-task error pages are what
+  the pilot's "could not load" report was about.
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------
