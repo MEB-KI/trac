@@ -31,6 +31,19 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   shared by the diary config sync and the consent page; both the retry policy and
   the failure classification have unit tests, and the consent error states have
   Playwright coverage.
+- NEW: activity blocks on desktop show a small grip on their left and right edge
+  (hover, keyboard focus, or while resizing). The edges could always be dragged to
+  adjust a duration, but nothing on the block said so, and participants asked for
+  a visible marker in the style of an Excel fill handle. The grips are decoration
+  (`pointer-events: none`), so the resize zones and cursors are unchanged; they
+  are not shown on the phone layout (deferred, see `dev_tools/todo_mobile.md`).
+- FIX: on a phone a swipe that starts on an activity block scrolls the day again.
+  `touch-action: none` on `.activity-block` turned the block surface - about 75 %
+  of the timeline width - into a scroll dead zone, reported as "the scrolling
+  doesn't work on my phone"; measured with real touch input it moved the timeline
+  0 px, while the same swipe 30 px further left scrolled it. The block body may
+  pan vertically now, and the top/bottom bands keep `touch-action: none`
+  (`activity-block-edge-zone`) so a resize is not cancelled by a scroll mid-drag.
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------
