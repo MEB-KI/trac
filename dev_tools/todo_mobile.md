@@ -1146,6 +1146,51 @@ Everything that had to be adapted for steps 4–6 has been adapted:
   reachability bug live) is **closed**: `mobile_context_bar.spec.js` fills both
   timelines of a phone day and saves.
 
+## Done — the block surface scrolls on phones (2026-10-12)
+
+Reported as "Handy-Scrollen defekt" and confirmed by measurement at 408×900 with
+real touch input (CDP `Input.dispatchTouchEvent`): a swipe starting on an activity
+block moved `.timelines-wrapper` by **0 px**, the identical swipe 30 px to the left
+(the free gutter) scrolled it by ~244 px. Cause: `.activity-block` carried
+`touch-action: none` at every width - it was there for the desktop drag - while
+blocks cover 75 % of the timeline width (`MOBILE_BLOCK_WIDTH = 75`), so most of
+the surface could not scroll. The vendored `interact.min.js` does not manage
+`touch-action` (0 occurrences), so it was purely our CSS.
+
+Fix (`styles.css`, `script.js`): below 1440 px the block body is
+`touch-action: pan-y pinch-zoom`, and each block gets two hit-testable
+`activity-block-edge-zone` spans (`touch-action: none`) reserving the top/bottom
+bands for the resize. Measured trade-off, tuned in one place: interact starts a
+resize 4–20 px from an end, so the band is `min(16px, 40%)` - ~80 % of the old
+resize target kept, and a 30-minute block (~51 px) still has a scrollable middle.
+`.timeline-canvas` additionally allows `pan-y` so engines that intersect
+touch-action strictly (Safari) do not veto the scroll - Chrome scrolled either
+way, and this is not verified on a real iPhone.
+
+Guarded by `mobile_block_scroll.spec.js`: computed touch-action + the reachable
+end band on every engine, and real-touch behaviour (swipe scrolls, end drag
+resizes without scrolling, still touch opens the menu) on Chromium. Note the
+other mobile specs drive the phone layout with a *mouse*, which browsers never
+subject to `touch-action` - that is why this class of bug was invisible to them.
+
+## Deferred — phone affordances from participant feedback (2026-10-12)
+
+The feedback asked for (a) a visible marker that a block's edges can be dragged,
+and (b) a way to move a whole block. Desktop got (a) in this slice:
+`.activity-block-grip` spans in `createActivityBlock()`, shown on hover,
+keyboard focus and while resizing (`desktop_resize_affordance.spec.js`). Open for
+phones:
+
+- (a) phone: the grips are `display: none` below 1440 px on purpose — the
+  vertical layout needs the marker rotated onto the top/bottom edges
+  (`ns-resize`).
+- (b) phone: there is no whole-block drag at all (interact.js' draggable is
+  desktop-only), and long-press already opens the context menu (§3), so
+  long-press-then-drag has to be designed against that gesture.
+- (b) desktop: it already works (`drag_move_activity_block.spec.js`) but is never
+  mentioned in the instructions or the day-one banner ("Drag its edges to extend
+  it"), which is why it was reported as missing. Deliberately left unchanged.
+
 ## Known gaps, deliberately not asserted
 
 - Footer/legal links and the two language `<select>`s are 16–19 px high on a
