@@ -4,6 +4,15 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- FIX: the backend now ships `psycopg` (v3) as its PostgreSQL driver instead of
+  `psycopg2-binary`, and declares an explicit `sqlalchemy>=2.1` floor. SQLAlchemy
+  2.1 changed the driver it loads for a plain `postgresql://` URL from psycopg2 to
+  psycopg, so a fresh install of the wheel (as the wheel smoke test does, resolving
+  dependencies unpinned) picked up SQLAlchemy 2.1.4 and then died on
+  `ModuleNotFoundError: No module named 'psycopg'`. SQLModel had to move to 0.0.48
+  (its versions below that cap SQLAlchemy to < 2.1) and uv.lock was re-resolved for
+  sqlalchemy 2.1.4, sqlmodel 0.0.48, psycopg 3.3.6. No configuration changes are
+  needed: every `postgresql://` URL (env templates, CI, Docker stacks) keeps working.
 - NEW: make page title of instructions text configurable by user via study_text_instructions_title key in studies_config.json section of study.
 - FIX: record the stored (DBMS-normalized) capture instant as the browser
   identification blob's `first_captured_at` instead of the pre-write Python
