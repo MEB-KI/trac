@@ -16,8 +16,21 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   participants to the thank-you page, so the endpoints still accepted diary and
   consent changes when called directly. External task confirmations intentionally
   remain possible after submission.
-
-
+- FIX: the consent page no longer reports permanent failures as temporary ones. A
+  broken or expired participant link (400/403 `study_access_denied`), a paused or
+  closed study (403 `study_unavailable`) and an already submitted study (403 on
+  the consent POST) each get their own message now; before, every one of them
+  ended in "please try again" / "reload the page", which could never succeed.
+- FIX: the consent page retries transient failures (network error, 5xx) twice with
+  linear backoff, like the diary's config sync, so a short backend restart during
+  maintenance no longer shows an error at all. When the consent information cannot
+  be loaded the accept/decline buttons now stay disabled - the page used to offer
+  them anyway, so a participant could consent to text that never appeared (the
+  "could not load / could not save" report from the MPIAE pilot study).
+- DEV: the retry policy now lives in `frontend/src/js/api_request.js` and is
+  shared by the diary config sync and the consent page; both the retry policy and
+  the failure classification have unit tests, and the consent error states have
+  Playwright coverage.
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------
