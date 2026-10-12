@@ -370,9 +370,15 @@ async function openSkipConfirmation(page, maxAttempts = 5) {
       if (!(await menu.isVisible().catch(() => false))) {
         await page.locator('#moreMenuBtn').click();
       }
+      // Bounded: a layout shift while the menu is opening (the day-one banner
+      // settles, the scrollbar appears and `resize` fires - which closes any
+      // open popup) can leave this item unreachable. Unbounded, this click
+      // consumed the whole test timeout, so the retry above never got a second
+      // attempt and the failure looked like "the handler is not wired".
       await page
         .locator('#moreMenu [data-control-id="skipReportingBtn"]')
-        .click();
+        .click({ timeout: 3000 })
+        .catch(() => undefined);
     }
 
     const opened = await modal

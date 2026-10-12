@@ -97,6 +97,10 @@ test('all locales contain the banner and recently added keys', () => {
     // phone-only row that advertises an untouched other timeline.
     'messages.timelineNothingEntered',
     'messages.timelineSwitchHintAria',
+    // Instructions page: the collapsed walk-through's label and the diary's
+    // "How to use the diary" menu entry / modal title.
+    'instructions.howToSummary',
+    'buttons.help',
   ];
   for (const file of localeFiles) {
     const keys = flattenKeys(parsed[file]);
