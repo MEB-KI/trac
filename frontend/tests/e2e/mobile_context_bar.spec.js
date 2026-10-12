@@ -62,7 +62,9 @@ test('the context bar replaces the day row and the timeline button', async ({
   );
   await expect(page.locator('#prevDayBtn')).toBeDisabled();
   await expect(page.locator('#nextDayBtn')).toBeEnabled();
-  await expect(page.locator('#contextTimelineName')).toHaveText('Main Activity');
+  await expect(page.locator('#contextTimelineName')).toHaveText(
+    'Main Activity (1/2)'
+  );
 
   // Step to the next day: the arrow saves the current day and navigates.
   await page.locator('#nextDayBtn').click();
@@ -166,7 +168,7 @@ test('the timeline menu lists every timeline with its coverage', async ({
 
   await menu.locator('.timeline-menu-item').nth(1).click();
   await expect(page.locator('#contextTimelineName')).toHaveText(
-    'Secondary Activity'
+    'Secondary Activity (2/2)'
   );
 });
 

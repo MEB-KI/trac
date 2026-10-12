@@ -69,11 +69,17 @@ test('an empty timeline without a requirement is not reported as met', async ({
   await expect(indicator).toHaveText('0 of 10 required minutes covered');
   await expect(indicator).toHaveClass(/is-missing/);
 
+  // The name carries its position in the set, so "the study has a second
+  // timeline" is visible before the participant looks for any switcher.
+  await expect(
+    page.locator(".timeline-container[data-active='true'] .title")
+  ).toContainText('Main Activity (1/2)');
+
   // The secondary has min_coverage 0 and is empty. "Met" is true there and says
   // nothing, so it must not be claimed.
   await switchTimeline(page, 1);
   await expect(page.locator('#contextTimelineName')).toHaveText(
-    'Secondary Activity'
+    'Secondary Activity (2/2)'
   );
   await expect(indicator).toHaveText('nothing entered yet');
   await expect(indicator).toHaveClass(/is-empty/);
@@ -102,7 +108,7 @@ test('the phone advertises an untouched other timeline inside the day', async ({
   // phone sends.
   await row.tap();
   await expect(page.locator('#contextTimelineName')).toHaveText(
-    'Secondary Activity'
+    'Secondary Activity (2/2)'
   );
 
   // The row now advertises the timeline left behind, which is still empty.
@@ -113,7 +119,9 @@ test('the phone advertises an untouched other timeline inside the day', async ({
   // needs no introduction.
   await placeActivityMobile(page, 40);
   await switchTimeline(page, 0);
-  await expect(page.locator('#contextTimelineName')).toHaveText('Main Activity');
+  await expect(page.locator('#contextTimelineName')).toHaveText(
+    'Main Activity (1/2)'
+  );
   await expect(page.locator(HINT_ROW)).toHaveCount(0);
 });
 
@@ -127,8 +135,14 @@ test.describe('desktop', () => {
 
     await expect(page.locator(HINT_ROW)).toHaveCount(0);
 
-    // Both timelines report their own state, and the optional empty one reads
-    // as empty here too instead of claiming a met requirement.
+    // Both timelines report their own state and position in the set, and the
+    // optional empty one reads as empty here too instead of claiming a met
+    // requirement.
+    const titles = page.locator('.timeline-container .title');
+    await expect(titles).toHaveCount(2);
+    await expect(titles.nth(0)).toContainText('Main Activity (1/2)');
+    await expect(titles.nth(1)).toContainText('Secondary Activity (2/2)');
+
     const indicators = page.locator('.timeline-coverage-indicator');
     await expect(indicators).toHaveCount(2);
     await expect(indicators.nth(0)).toHaveText(
