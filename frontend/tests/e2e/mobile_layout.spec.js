@@ -241,3 +241,91 @@ test('an activity can be placed with touch alone', async ({ page }) => {
     page.locator('.timeline-container[data-active="true"] .activity-block').first()
   ).toBeVisible({ timeout: 10000 });
 });
+
+test('an activity block and its time chip keep clear of the screen edge', async ({
+  page,
+}) => {
+  // A block used to run flush against the right edge of the phone, with its time
+  // chip hanging 50 px further out (`right: -50px`), so at 390 px width the chip
+  // was clipped to a ~1 px black sliver: the block looked cut off. The block now
+  // stops 5 % short of the edge and the chip lives inside it.
+  await page.goto('index.html?pid=mobile_block_edge&study_name=default&lang=en', {
+    waitUntil: 'load',
+  });
+  await enterStudyIfNeeded(page);
+
+  await page.locator('.floating-add-button').tap();
+  await expect(page.locator('#activitiesModal')).toBeVisible();
+  const activityButton = page
+    .locator(
+      '#modalActivitiesContainer .activity-button:not(.has-child-items):not(.custom-input)'
+    )
+    .first();
+  await activityButton.waitFor({ state: 'visible', timeout: 30000 });
+  await activityButton.tap();
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (!(await page.locator('#activitiesModal').isVisible())) break;
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+  }
+  await expect(page.locator('#activitiesModal')).toBeHidden();
+
+  const timeline = page
+    .locator('.timeline-container[data-active="true"] .timeline')
+    .first();
+  await timeline.scrollIntoViewIfNeeded();
+  const tapPoint = await findTimelinePoint(page);
+  await page.touchscreen.tap(tapPoint.x, tapPoint.y);
+
+  const block = page
+    .locator('.timeline-container[data-active="true"] .activity-block')
+    .first();
+  await expect(block).toBeVisible({ timeout: 10000 });
+
+  const geometry = await block.evaluate((element) => {
+    const timeline = element.closest('.timeline');
+    const chip = element.querySelector('.time-label');
+    const blockBox = element.getBoundingClientRect();
+    const timelineBox = timeline.getBoundingClientRect();
+    const chipBox = chip ? chip.getBoundingClientRect() : null;
+    return {
+      gapShare:
+        ((timelineBox.right - blockBox.right) / timelineBox.width) * 100,
+      blockRight: blockBox.right,
+      viewportWidth: window.innerWidth,
+      chip: chipBox
+        ? {
+            text: chip.textContent.trim(),
+            left: chipBox.left,
+            right: chipBox.right,
+            isInsideBlock:
+              chipBox.left >= blockBox.left - 1 &&
+              chipBox.right <= blockBox.right + 1,
+            isOnScreen:
+              chipBox.left >= 0 && chipBox.right <= window.innerWidth,
+          }
+        : null,
+    };
+  });
+
+  expect(
+    geometry.gapShare,
+    'the block has to stop short of the right edge, not touch it'
+  ).toBeGreaterThanOrEqual(4);
+  expect(
+    geometry.chip,
+    'the time chip is part of the block, so it has to be there'
+  ).not.toBeNull();
+  expect(
+    geometry.chip.text,
+    'the chip has to carry the time range'
+  ).toMatch(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/);
+  expect(
+    geometry.chip.isInsideBlock,
+    `the time chip must not hang outside the block (chip ${geometry.chip.left}-${geometry.chip.right}, block right ${geometry.blockRight})`
+  ).toBe(true);
+  expect(
+    geometry.chip.isOnScreen,
+    `the time chip has to be on screen (chip right ${geometry.chip.right}, viewport ${geometry.viewportWidth})`
+  ).toBe(true);
+});

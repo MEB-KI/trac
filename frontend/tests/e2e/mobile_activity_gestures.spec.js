@@ -69,6 +69,8 @@ test('a long press opens the activity menu instead of deleting', async ({
   await expect(menu.locator('.activity-context-menu-item')).toHaveText([
     'Copy',
     'Show info',
+    'Move earlier',
+    'Move later',
     'Delete',
   ]);
 
@@ -127,6 +129,89 @@ test('deleting through the long-press menu offers a working undo', async ({
   await expect(page.locator('.activity-block')).toHaveCount(1);
   await expect(toast).toHaveCount(0);
   expect(await countActivities(), 'undo must put the activity back').toBe(1);
+});
+
+test('the menu moves a whole block in 10-minute steps', async ({ page }) => {
+  await openDiary(page, `e2e-longpress-move-${Date.now()}`);
+  const block = await placeActivityMobile(page);
+
+  const timing = () =>
+    block.evaluate((element) => ({
+      start: Number(element.dataset.startMinutes),
+      end: Number(element.dataset.endMinutes),
+      top: element.style.top,
+      chip: element.querySelector('.time-label')?.textContent.trim() ?? null,
+    }));
+  const before = await timing();
+  const menu = page.locator(CONTEXT_MENU);
+
+  // A phone has no drag-to-move (interact.js' draggable is desktop-only and the
+  // long press owns the gesture), so this menu action is the only way to shift a
+  // block. It keeps the duration and steps on the grid the desktop drag snaps to.
+  await pressAndHold(page, block, 700);
+  await menu.locator('[data-action="move-later"]').click();
+  await expect(menu).toBeHidden();
+
+  const later = await timing();
+  expect(later.start, 'one tap moves the block ten minutes').toBe(
+    before.start + 10
+  );
+  expect(later.end, 'moving must not change the duration').toBe(before.end + 10);
+  expect(later.top, 'the block has to move on screen too').not.toBe(before.top);
+  expect(later.chip, 'the time chip has to follow the block').not.toBe(
+    before.chip
+  );
+
+  // ... and back, twice over: the step is symmetric.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await pressAndHold(page, block, 700);
+    await menu.locator('[data-action="move-earlier"]').click();
+  }
+  const earlier = await timing();
+  expect(
+    earlier.start,
+    'two steps back leave the block ten minutes earlier than it started'
+  ).toBe(before.start - 10);
+  expect(earlier.end).toBe(before.end - 10);
+
+  // The move has to reach the state the day is stored from, not just the DOM.
+  const stored = await page.evaluate(() => {
+    const key =
+      window.timelineManager.keys[window.timelineManager.currentIndex];
+    const entry = (window.timelineManager.activities[key] || [])[0];
+    return { start: entry.startMinutes, end: entry.endMinutes };
+  });
+  expect(stored.start, 'the move must reach the timeline state').toBe(
+    before.start - 10
+  );
+  expect(stored.end).toBe(before.end - 10);
+});
+
+test('a block cannot be moved past the start of the day', async ({ page }) => {
+  await openDiary(page, `e2e-longpress-move-edge-${Date.now()}`);
+  // Placed at the very top of the timeline, i.e. at 04:00.
+  const block = await placeActivityMobile(page, 0);
+  const menu = page.locator(CONTEXT_MENU);
+
+  const startMinutes = () =>
+    block.evaluate((element) => Number(element.dataset.startMinutes));
+
+  expect(
+    await startMinutes(),
+    'the day starts at 04:00 (240 minutes)'
+  ).toBe(240);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await pressAndHold(page, block, 700);
+    await menu.locator('[data-action="move-earlier"]').click();
+  }
+
+  // The day runs 04:00 - 04:00(+1): there is nothing earlier to move into, so
+  // those taps are no-ops rather than a move off the timeline.
+  expect(
+    await startMinutes(),
+    'asking to move earlier than 04:00 must leave the block where it is'
+  ).toBe(240);
 });
 
 test('a horizontal drag does not save the day or navigate', async ({ page }) => {

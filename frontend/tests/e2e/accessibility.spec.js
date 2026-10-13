@@ -188,12 +188,10 @@ test('no accessibility violations: autosave status chip', async ({ page }) => {
   await settle(page);
 
   // renderSyncStatus is the hook ui.js exposes for the autosave engine, so this
-  // renders the real chip markup and classes without waiting for an edit to be
-  // saved (or for a save to fail).
-  for (const state of ['saved', 'error']) {
-    await page.evaluate((value) => window.renderSyncStatus(value), state);
-    await expect(page.locator('#syncStatus')).toBeVisible();
+  // renders the real chip markup and classes. `error` is the only state that
+  // shows the chip now - a stored day is not announced.
+  await page.evaluate(() => window.renderSyncStatus('error'));
+  await expect(page.locator('#syncStatus')).toBeVisible();
 
-    await expectNoA11yViolations(page, `autosave status chip (${state})`);
-  }
+  await expectNoA11yViolations(page, 'autosave status chip (error)');
 });

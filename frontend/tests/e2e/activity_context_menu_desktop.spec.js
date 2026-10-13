@@ -155,6 +155,11 @@ test('desktop context menu deletes activity and shows info modal in English', as
   );
   await expect(menu.locator('[data-action="delete"]')).toHaveText('Delete');
 
+  // Moving a whole block is a phone action - desktop drags it, and the arrow
+  // keys move one edge at a time - so the menu stays as it is here.
+  await expect(menu.locator('[data-action="move-earlier"]')).toHaveCount(0);
+  await expect(menu.locator('[data-action="move-later"]')).toHaveCount(0);
+
   await menu.locator('[data-action="delete"]').click();
 
   await expect(firstBlock).toHaveCount(0);

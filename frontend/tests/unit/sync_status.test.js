@@ -1,23 +1,48 @@
 // Tests for the autosave status chip mapping.
 //
-// The chip is the only thing that tells a participant their day is stored when
-// they never press a button - so the two rules that matter are: it says something
-// for every state the engine can be in, and it hides when it has nothing to say.
+// The chip only ever speaks about failure. A day that IS stored needs no
+// announcement, and "Saving..."/"Saved" within a second of every edit made the
+// app feel busy - and, since the write is debounced by ~2 s, laggy - for
+// information the participant cannot act on. So the rules that matter now are:
+// the failure state is presented, and nothing else is.
 // The DOM part lives in ui.js; this covers state -> label/kind/icon.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  SYNC_STATUS_SAVED_VISIBLE_MS,
-  syncStatusView,
-} from '../../src/js/sync_status.js';
-import {
-  AUTOSAVE_DEBOUNCE_MS,
-  AUTOSAVE_RETRY_DELAYS_MS,
-} from '../../src/js/autosave.js';
+import { syncStatusView } from '../../src/js/sync_status.js';
 
-test('an idle day shows no chip', () => {
+test('a quiet day shows no chip', () => {
   assert.equal(syncStatusView('idle'), null);
+});
+
+test('working states show no chip: saving is not news', () => {
+  // pending = debouncing, saving = request in flight, saved = stored. All three
+  // mean "the app is doing its job", and none of them asks the participant for
+  // anything, so none of them gets a chip.
+  for (const state of ['pending', 'saving', 'saved']) {
+    assert.equal(syncStatusView(state), null, `'${state}' must stay quiet`);
+  }
+});
+
+test('a failure is presented, with a retry', () => {
+  const view = syncStatusView('error');
+  assert.ok(view, 'the failure state has to be presented');
+  assert.equal(view.kind, 'error');
+  assert.equal(view.textKey, 'messages.syncNotSaved');
+  assert.ok(view.icon, 'the failure state has no icon');
+  assert.equal(view.canRetry, true);
+});
+
+test('the chip can never claim success', () => {
+  const shown = ['idle', 'pending', 'saving', 'saved', 'error']
+    .map((state) => syncStatusView(state))
+    .filter(Boolean);
+  assert.equal(
+    shown.length,
+    1,
+    `expected exactly one visible state, got ${shown.length}`
+  );
+  assert.equal(shown[0].textKey, 'messages.syncNotSaved');
 });
 
 test('an unknown state shows no chip rather than a stale label', () => {
@@ -31,54 +56,10 @@ test('every state the engine reports is covered', () => {
   const engineStates = ['idle', 'pending', 'saving', 'saved', 'error'];
   for (const state of engineStates) {
     const view = syncStatusView(state);
-    if (state === 'idle') {
-      assert.equal(view, null);
+    if (state === 'error') {
+      assert.ok(view, 'the failure state must be presented');
       continue;
     }
-    assert.ok(view, `state '${state}' has no presentation`);
-    assert.ok(view.textKey, `state '${state}' has no label key`);
-    assert.ok(view.icon, `state '${state}' has no icon`);
+    assert.equal(view, null, `state '${state}' must show no chip`);
   }
-});
-
-test('debouncing and sending read the same to the participant', () => {
-  assert.equal(syncStatusView('pending').textKey, 'messages.syncSaving');
-  assert.equal(syncStatusView('saving').textKey, 'messages.syncSaving');
-  assert.equal(syncStatusView('pending').kind, 'progress');
-  assert.equal(syncStatusView('saving').kind, 'progress');
-});
-
-test('only the in-progress states animate', () => {
-  assert.equal(syncStatusView('pending').spin, true);
-  assert.equal(syncStatusView('saving').spin, true);
-  assert.equal(syncStatusView('saved').spin, false);
-  assert.equal(syncStatusView('error').spin, false);
-});
-
-test('only the failure state offers a retry', () => {
-  assert.equal(syncStatusView('error').canRetry, true);
-  assert.equal(syncStatusView('pending').canRetry, false);
-  assert.equal(syncStatusView('saving').canRetry, false);
-  assert.equal(syncStatusView('saved').canRetry, false);
-});
-
-test('a failure is not dressed up as success', () => {
-  const views = ['pending', 'saving', 'saved', 'error'].map((state) =>
-    syncStatusView(state)
-  );
-  const kinds = views.map((view) => view.kind);
-  assert.equal(new Set(kinds).size, 3, `expected 3 kinds, got ${kinds}`);
-  assert.equal(syncStatusView('error').kind, 'error');
-  assert.notEqual(
-    syncStatusView('error').textKey,
-    syncStatusView('saved').textKey
-  );
-});
-
-test('the confirmation outlasts the debounce it follows', () => {
-  // A "Saved" that appears for less time than the save takes to start would be
-  // invisible in practice.
-  assert.ok(SYNC_STATUS_SAVED_VISIBLE_MS >= 2000);
-  assert.ok(SYNC_STATUS_SAVED_VISIBLE_MS <= AUTOSAVE_DEBOUNCE_MS * 2);
-  assert.ok(AUTOSAVE_RETRY_DELAYS_MS[0] > 0);
 });
