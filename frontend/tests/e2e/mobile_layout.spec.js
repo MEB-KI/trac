@@ -3,7 +3,7 @@ const {
   PARTICIPANT_PAGES,
   MOBILE_VIEWPORT,
 } = require('./participant_pages.js');
-const { enterStudyIfNeeded, findTimelinePoint, openParticipantPage } = require('./e2e_helpers.js');
+const { enterStudyIfNeeded, findTimelinePoint, openParticipantPage, switchToDay } = require('./e2e_helpers.js');
 
 // Phone layout checks. Every other spec runs at a desktop window size (or sets a
 // narrow viewport only to reach the mobile *controls*), so a page that pushes
@@ -167,7 +167,7 @@ test.describe('on desktop', () => {
   });
 });
 
-test('the day-one banner explains the layout the participant is in', async ({
+test('the instruction banner explains the layout the participant is in', async ({
   page,
 }) => {
   const pid = `banner_${Date.now()}`;
@@ -191,6 +191,56 @@ test('the day-one banner explains the layout the participant is in', async ({
   await expect(desktopText).toBeVisible({ timeout: 20000 });
   await expect(desktopText).toContainText('select an activity below');
   await expect(page.locator('.banner-text-mobile')).toBeHidden();
+});
+
+test('the instruction banner stays on every day until it is closed', async ({
+  page,
+}) => {
+  const pid = `banner_days_${Date.now()}`;
+
+  // Landing on a later day is the case the day-one-only banner got wrong: it
+  // removed itself while the page initialised, so a participant who came back
+  // the next day - the ones who most need reminding of the gestures - saw
+  // nothing at all.
+  await page.goto(
+    `index.html?pid=${pid}&study_name=default&lang=en&day_label_index=1`,
+    { waitUntil: 'load' }
+  );
+  await enterStudyIfNeeded(page);
+
+  // The premise, asserted rather than assumed: if the entry flow rewrote the
+  // day back to the first one, the check below would pass for the wrong reason.
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('day_label_index'))
+    .toBe('1');
+
+  const banner = page.locator('#instructionBanner');
+  await expect(
+    banner,
+    'a later day needs the reminder too'
+  ).toBeVisible({ timeout: 20000 });
+
+  // A day switch inside the running page is a separate promise: it does not
+  // reload, so the banner must survive it too.
+  await switchToDay(page, 2);
+  await expect(banner).toBeVisible();
+
+  // Closing it is what ends it...
+  await banner.locator('.banner-close').click();
+  await expect(banner).toBeHidden();
+
+  // ... on every later day (and going back to day one does not undo it)...
+  await switchToDay(page, 0);
+  await expect(
+    banner,
+    'a closed banner must not come back on another day'
+  ).toBeHidden();
+
+  // ... and not just for this page load.
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#instructionBanner')).toHaveCount(0, {
+    timeout: 20000,
+  });
 });
 
 test('an activity can be placed with touch alone', async ({ page }) => {

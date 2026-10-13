@@ -69,8 +69,8 @@ test('all locales contain the banner and recently added keys', () => {
   const requiredKeys = [
     'messages.templateLoadedBannerMobile',
     'messages.templateLoadedBannerDesktop',
-    'banner.dayOneInstructionsMobile',
-    'banner.dayOneInstructionsDesktop',
+    'banner.instructionsMobile',
+    'banner.instructionsDesktop',
     'messages.templateCopiedBanner',
     'buttons.submitStudy',
     'messages.timelineCleared',
