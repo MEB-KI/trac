@@ -104,13 +104,16 @@ picker) and a one-row toolbar (40 px).
   "Secondary Activity"). That is why it moves out of the action row.
 - New keys for the `⋮` menu and the sheets must be added to all 7 files.
 
-### Instruction banner — done, see §7
+### Instruction banner — done, see §7 and the entry below
 
-`banner.dayOneInstructions` is one string for all widths and tells mobile users
+`banner.dayOneInstructions` was one string for all widths and told mobile users
 about the 1200 ms long-press that decision 5 removes. It needs a **mobile and a
 desktop variant** (two keys, or two spans toggled in CSS) — and once split, both
 can be much shorter than today's three-sentence block (124 px = 14 % of a 900 px
-phone screen on day 1). New keys → all 7 locales.
+phone screen on day 1). New keys → all 7 locales. (The keys are
+`banner.instructionsMobile` / `...Desktop` since 2026-10-13 — the banner is no
+longer day-one-only, so the old names were retired; that entry is at the end of
+this file.)
 
 ### Id hygiene — done (2026-09-30)
 
@@ -386,7 +389,8 @@ Not yet committed. The day-one banner and the template-loaded banner each mixed
 both platforms into one string ("...on mobile ... or on desktop ..."), which also
 meant a phone was told to "click".
 
-- **Day-one banner**: two keys, `banner.dayOneInstructionsMobile` /
+- **Day-one banner** (renamed `banner.instructions*` on 2026-10-13, see the entry
+  at the end of this file): two keys, `banner.dayOneInstructionsMobile` /
   `...Desktop`, rendered as two `<span>`s in `index.html` and toggled purely by
   the 1439.98 px breakpoint in CSS (`.banner-text-mobile` / `.banner-text-desktop`)
   — no JS, and `applyTranslations()` covers both.
@@ -1453,6 +1457,50 @@ Edge case deliberately left alone: an activity name long enough to fill the text
 container (90 % of the block) can run under the chip's left third. It is already
 ellipsised there, and moving the text left instead would de-centre every short
 name.
+
+## Done — the instruction banner lasts until it is closed (2026-10-13)
+
+Reported: "that blue instruction banner, it only shows on first day of study,
+which is irritating. we should show it on all days, UNTIL user first closes it."
+
+One early return caused it, in `initInstructionBanner()`:
+
+```js
+if (getCurrentDayIndex() !== 0) { banner.remove(); return; }
+```
+
+The gate was checked **once, while the page initialised**, and the day it asks
+about is the day the page was opened on (`getCurrentDayIndex()` reads
+`day_label_index` from the URL, which every day switch rewrites). It therefore
+did the opposite of what it looked like: a participant sitting on day 1 was
+never affected, while the one who came back on day 3 - the one who needs the
+reminder - got the page without any instructions. Removed; the banner is now
+shown on every day until it is closed.
+
+What deliberately stays: the dismissal, per participant and study, stored under
+the **unchanged** key `instructionBannerClosed:<study>:<pid>:day1`. The `:day1`
+suffix is history (the flag was never per-day - it is per participant), and
+renaming it would resurrect the banner for everyone who had already closed it on
+a running pilot. The key string therefore gets a comment instead of a rename.
+
+The two i18n keys do get renamed, because they had started to lie: the text
+never mentioned a day, only the key name did.
+
+- `banner.dayOneInstructionsMobile` / `...Desktop` → `banner.instructionsMobile`
+  / `banner.instructionsDesktop` (both `<span>`s in `index.html`, all 7 locales,
+  and the required-keys list in `locales_consistency.test.js`; the earlier §7
+  entry and the i18n memory note quote the old names).
+- `mobile_layout.spec.js`: the existing banner test drops "day-one" from its name,
+  and a new one pins the contract - `the instruction banner stays on every day
+  until it is closed`. It **loads straight into the second day**
+  (`day_label_index=1`) rather than switching there, because a switch inside a
+  running page never hits the init path; the premise is asserted too (the URL
+  still says day 1), so the test cannot pass while the entry flow rewrote the day
+  back to the first. Then: switch to another day (still there), close it (gone),
+  switch to a third day (still gone), reload (gone from the DOM, not just hidden).
+
+The banner is inserted while the page settles, so specs that measure geometry
+must still dismiss it first (see the gotcha in the touch-action notes above).
 
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
