@@ -4,6 +4,23 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- FIX: footer links no longer take the participant out of the study. The default
+  study's Contact link carried `in_new_tab: false`, so following it navigated the
+  diary page away and the back button was the only way home ("if people click the
+  footer links, they effectively left study"). Both flags are gone - the
+  per-link `in_new_tab` and the deployment's `OPEN_LEGAL_LINKS_IN_NEW_TAB` - and
+  the footer decides by origin: a `target_url` on our own server opens in a
+  dialog over the page the participant is on (nothing navigates at all),
+  anything external opens in a new tab with `rel="noopener noreferrer"` and says
+  so in its accessible name plus a decoration marker. The dialog lives in
+  `footer.js` because those pages load neither `ui.js` nor `styles.css`: it is a
+  real dialog (role/aria-modal, labelled, Escape, backdrop, focus back on the
+  link, scroll lock). External targets deliberately keep the new tab - another
+  site can refuse framing (`X-Frame-Options`, `frame-ancestors`) and a blank
+  frame cannot be detected from JS. The config parser now rejects the removed
+  field (`extra="forbid"`), so a stale key fails loudly instead of being ignored.
+  Guarded by `study_footer_links.spec.js` (external target/rel/accessible name,
+  and the dialog: opens, keeps the URL, closes on Escape, restores focus).
 - CHG: the footer no longer reports the backend connection. "Connected to
   backend" sat under the app name and version on every participant page, cost a
   line of space and made participants wonder what it referred to - it was

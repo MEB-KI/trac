@@ -381,13 +381,17 @@ def validate_external_tasks_for_study(
 
 
 class CfgFileFooterLink(BaseModel):
-    """A study-specific footer link with localized title."""
+    """A study-specific footer link with localized title.
+
+    There is no "new tab" flag: the footer decides by origin. A link to our own
+    server opens in a dialog (the study keeps the participant on the page they
+    are working on), anything external opens in a new tab.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     title: Dict[str, str]
     target_url: str
-    in_new_tab: bool = True
 
 
 class CfgFileStudy(BaseModel):

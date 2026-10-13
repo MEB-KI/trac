@@ -14,7 +14,6 @@ const TUD_SETTINGS = {
     TEMPLATE_ENABLED: false,            // Copy Days: enable/disable template feature
     IMPRINT_URL: "https://www.aesthetics.mpg.de/en/imprint.html",
     PRIVACY_URL: "https://www.aesthetics.mpg.de/en/data-protection-information.html",
-    OPEN_LEGAL_LINKS_IN_NEW_TAB: true,
     FOOTER_LINK_LABELS: {
         de: { imprint: 'Impressum', privacy: 'Datenschutz' },
         en: { imprint: 'Imprint', privacy: 'Data Protection Information' },

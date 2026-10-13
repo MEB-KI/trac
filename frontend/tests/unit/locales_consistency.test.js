@@ -91,6 +91,9 @@ test('all locales contain the banner and recently added keys', () => {
     // labels exist (see sync_status.test.js).
     'messages.syncNotSaved',
     'messages.syncRetry',
+    // Footer links: external targets open in a new tab, and the accessible name
+    // says so (same-origin targets get a dialog instead, see footer.js).
+    'footer.opensInNewTab',
     // Timeline coverage wording: a timeline with no requirement and no entries
     // is reported as empty, not as a met requirement (no vacuous ✓), and the
     // phone-only row that advertises an untouched other timeline.
