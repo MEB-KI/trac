@@ -53,6 +53,34 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   0 px, while the same swipe 30 px further left scrolled it. The block body may
   pan vertically now, and the top/bottom bands keep `touch-action: none`
   (`activity-block-edge-zone`) so a resize is not cancelled by a scroll mid-drag.
+- FIX: on a phone the day can be scrolled back up again. A document-level
+  `touchmove` guard for pull-to-refresh called `preventDefault()` whenever
+  `window.pageYOffset === 0` and the finger moved down - on the diary the window
+  never scrolls (the day scrolls inside `.timelines-wrapper`), so the condition
+  was permanently true and every downward drag was cancelled: the day could be
+  swiped forward to its end, but the way back did nothing at all ("I cannot
+  scroll up again, I'm stuck"). The guard is gone; pull-to-refresh stays off
+  through `overscroll-behavior: none` alone, now set on the root element and the
+  body. A mouse never triggers the old handler and the mobile suite drives the
+  phone layout with the mouse, which is why it went unnoticed -
+  `mobile_day_scroll.spec.js` covers the gesture with real touch input (CDP).
+- FIX: on a phone the end of the day - its last hour line - can be scrolled into
+  view. The content ended exactly on the bottom edge of the scroller, so at
+  maximum scroll the line sat on the boundary and the day appeared to stop ~5
+  minutes short of it. `.last-initialized-timeline-wrapper` now keeps 20 px of
+  padding below the timeline (content-box, so the hour spacing is unchanged).
+- FIX: on a phone the block's resize ends are real again. `touch-action: none`
+  on `.activity-block-edge-zone` was meant to reserve the top/bottom band of a
+  block for resizing, but the base `.activity-block-edge-zone { display: none }`
+  was declared *after* the mobile override with the same specificity, so the
+  bands were never rendered (measured: `display: none`, height 0 - and a hidden
+  element still reports `touch-action: none`, so the contract test passed while
+  the reservation did not exist). The base rule now comes first, and the band is
+  capped at `min(16px, 30%)` of the block so a 10-minute block (~17 px tall)
+  keeps a scrollable middle - at 40 % the two bands left 3 px of it, which is the
+  "scrolling doesn't work on my phone" dead zone again. The band test in
+  `mobile_block_scroll.spec.js` now asserts a rendered height and that the resize
+  drag starts on a band, so a silently hidden band cannot pass again.
 - FIX: a timeline with no coverage requirement is no longer reported as
   "requirement met" while it is empty. `min_coverage: 0` is satisfied by nothing
   at all, so the secondary timeline of the pilot study showed a green ✓ next to

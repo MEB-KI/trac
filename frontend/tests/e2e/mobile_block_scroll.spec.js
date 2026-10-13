@@ -157,6 +157,14 @@ test('the block body pans the timeline and its ends stay reserved for resizing',
   // The permission that keeps the resize gesture from being stolen by a scroll.
   expect(contract.hasBothZones).toBe(true);
   expect(contract.zoneTouchAction).toBe('none');
+  // ... and the band has to be on screen. A hidden band reports
+  // `touch-action: none` as well, so without this the two assertions above kept
+  // passing while the reserved ends existed only in the DOM - the resize stayed
+  // alive on a document-level touchmove guard that made the day unscrollable.
+  expect(
+    contract.zoneHeight,
+    'a resize band that is not rendered reserves nothing'
+  ).toBeGreaterThan(0);
 
   // The middle of the block has to be free for scrolling: the point is verified
   // against the live layout, so a stale coordinate cannot make this vacuous.
@@ -230,6 +238,10 @@ test('a swipe on a block scrolls the timeline and an end drag resizes it', async
   //    block) is the app's business, what matters here is that the gesture is
   //    not swallowed by a scroll.
   const end = await pointOnBlock(page, block, 'bottom');
+  expect(
+    end.hit,
+    'the drag that resizes has to start on the reserved band'
+  ).toContain('activity-block-edge-zone');
   const scrollBeforeDrag = await scrollTop(page);
   const timingBeforeDrag = await blockTiming(page);
 
