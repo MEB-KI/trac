@@ -125,6 +125,8 @@
     "activityContext": {
       "copy": "Kopiera",
       "showInfo": "Visa info",
+      "moveEarlier": "Flytta tidigare",
+      "moveLater": "Flytta senare",
       "delete": "Ta bort",
       "infoTitle": "Aktivitetsdetaljer",
       "start": "Start",
@@ -144,8 +146,6 @@
     "studyNotFound": "Den begärda studien finns inte.",
     "submitError": "Fel vid inskickning av dagbok",
     "sending_retry": "Nytt försök att spara dagboken (försök {{attempt}}/{{maxRetries}})...",
-    "syncSaving": "Sparar ...",
-    "syncSaved": "Sparat",
     "syncNotSaved": "Inte sparat",
     "syncRetry": "Försök igen",
     "timelineCoverageMet": "✓",

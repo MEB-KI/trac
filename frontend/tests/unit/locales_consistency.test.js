@@ -87,9 +87,8 @@ test('all locales contain the banner and recently added keys', () => {
     'consent.accessDenied',
     'consent.studyUnavailable',
     'consent.saveDenied',
-    // Autosave status chip (slice 3)
-    'messages.syncSaving',
-    'messages.syncSaved',
+    // Autosave status chip: only the failure is ever shown, so only these two
+    // labels exist (see sync_status.test.js).
     'messages.syncNotSaved',
     'messages.syncRetry',
     // Timeline coverage wording: a timeline with no requirement and no entries

@@ -860,9 +860,15 @@ the participant is dragging blocks. It was unacceptable for the reason this whol
 plan exists, so below 1440 px the chip is `position: fixed` at the bottom left,
 mirroring the `+` button on the right: header stays **99 px**, and the chip is
 visible even when the timeline is scrolled. Guarded by
-`autosave.spec.js > the status does not push the phone layout around` and, for
-desktop, by the toolbar-height check in `the toolbar reports what happened to the
-day`.
+`autosave.spec.js > the toolbar stays quiet while the day is being stored` and, for
+desktop, by the toolbar-height check in the same spec.
+
+**Changed 2026-10-13: the chip is failure-only.** "Saving..." and "Saved" are
+gone (from the mapping, the CSS and all 7 locales) after participant feedback that
+the constant saving chatter read as lag - so the guards above now assert that
+*storing a day puts nothing on screen*, and that only the failure state appears.
+The chip is still built with the toolbar, because an `aria-live` region has to
+exist in the DOM before the failure it announces is written into it.
 
 ### i18n
 
@@ -870,6 +876,8 @@ day`.
 `messages.syncNotSaved`, `messages.syncRetry`, plus the four in the required-keys
 list of `locales_consistency`. (Chosen over a `buttons.retry` key because it keeps
 one insertion point per locale file - the anchor is the identical `✓` line.)
+`syncSaving` and `syncSaved` were dropped again on 2026-10-13 (see above), so the
+chip now owns two keys.
 
 ### Guards
 
@@ -1389,6 +1397,30 @@ complaint from the earlier slice, back for a second round. Capped at
 asserts `zoneHeight > 0` and that the resize drag lands on a band, so "declared
 but not rendered" and "rendered too large to scroll past" both fail loudly.
 
+## Done — phone blocks keep their distance from the edge (2026-10-13)
+
+Reported: "activities on mobile are aligned on right with screen border, which at
+first impression looks almost cut off." Two things, measured at 390 px width:
+
+| | before | after |
+| --- | --- | --- |
+| block (`.activity-block`, mobile) | 75 % wide from left 25 % -> its right edge = the timeline's right edge | 70 % wide, ends 5 % (19 px) short of it |
+| time chip (`.time-label`, mobile) | `right: -50px`: a 48 px box starting *at* the block's right edge | `right: 4px`: inside the block, 6 px from its right edge |
+| chip pixels on screen | **~1 px** | all 48 px |
+
+The chip was the bigger half of the impression: a black chip clipped to a sliver
+at the screen edge reads as "cut off" far more than a block ending flush. The
+numbers live in `createActivityBlock` (`MOBILE_BLOCK_WIDTH`, `MOBILE_OFFSET`) and
+in the mobile `@media` block for `.time-label`; desktop is untouched, where time
+is the horizontal axis and a block's width is its duration. Guarded by
+`mobile_layout.spec.js > an activity block and its time chip keep clear of the
+screen edge` (gap share, chip inside the block, chip on screen).
+
+Edge case deliberately left alone: an activity name long enough to fill the text
+container (90 % of the block) can run under the chip's left third. It is already
+ellipsised there, and moving the text left instead would de-centre every short
+name.
+
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
 The feedback asked for (a) a visible marker that a block's edges can be dragged,
@@ -1400,9 +1432,16 @@ phones:
 - (a) phone: the grips are `display: none` below 1440 px on purpose — the
   vertical layout needs the marker rotated onto the top/bottom edges
   (`ns-resize`).
-- (b) phone: there is no whole-block drag at all (interact.js' draggable is
-  desktop-only), and long-press already opens the context menu (§3), so
-  long-press-then-drag has to be designed against that gesture.
+- (b) phone: **done 2026-10-13** - "Move earlier" / "Move later" in the
+  long-press menu, 10-minute steps, duration preserved, clamped to the day and
+  refused (block flash, like the arrow keys) when another activity is in the
+  way. This note said "long-press already opens the context menu, so
+  long-press-then-drag has to be designed against that gesture" - the answer is
+  that there is no drag at all: the menu owns the gesture, so the move became an
+  action. Menu is mobile-only; desktop drags. Covered by
+  `mobile_activity_gestures.spec.js` (step, duration, `timelineManager` state,
+  04:00 as the boundary) and by the desktop menu staying move-free in
+  `activity_context_menu_desktop.spec.js`.
 - (b) desktop: it already works (`drag_move_activity_block.spec.js`) but is never
   mentioned in the instructions or the day-one banner ("Drag its edges to extend
   it"), which is why it was reported as missing. Deliberately left unchanged.

@@ -281,20 +281,58 @@ test('a failed autosave is retried and the day ends up stored', async ({
   expect(attempts).toBeGreaterThan(1);
 });
 
-test('the toolbar reports what happened to the day', async ({ page }) => {
+test('the toolbar stays quiet while the day is being stored', async ({ page }) => {
   await openDiary(page, `e2e-autosave-status-${Date.now()}`);
   const chip = page.locator('#syncStatus');
 
-  // Nothing to say about a day nobody has touched yet.
+  // The chip is built with the toolbar - its live region has to be in the DOM
+  // before a failure could be announced in it - but it has nothing to say about
+  // a day nobody has touched.
+  await expect(chip).toHaveCount(1);
   await expect(chip).toBeHidden();
+
+  // Watch the chip itself. "Saving..." and "Saved" were transient, so polling the
+  // engine state afterwards would not notice a flash; every moment the chip is on
+  // screen is recorded instead, and there must be none.
+  await page.evaluate(() => {
+    const element = document.getElementById('syncStatus');
+    window.__chipShows = [];
+    new MutationObserver(() => {
+      if (!element.hidden) {
+        window.__chipShows.push(element.textContent.trim());
+      }
+    }).observe(element, {
+      attributes: true,
+      attributeFilter: ['hidden'],
+      childList: true,
+      subtree: true,
+    });
+  });
 
   await placeActivity(page, { activityName: 'Sleeping', positionPercent: 30 });
 
-  // The chip is built on the first state change, so this also covers the wiring
-  // between the engine and the toolbar.
+  // The edit is stored by itself - that is what autosave is for - and storing it
+  // is not news: no "Saving...", no "Saved", nothing on screen at all.
+  await expect
+    .poll(() => page.evaluate(() => window.autosave.state()), {
+      timeout: 15000,
+      message: 'waiting for the autosaved day',
+    })
+    .toBe('saved');
+  expect(
+    await page.evaluate(() => window.__chipShows),
+    'storing a day must not put anything on screen'
+  ).toEqual([]);
+  await expect(chip).toBeHidden();
+  expect(await page.evaluate(() => window.autosave.hasPendingChanges())).toBe(
+    false
+  );
+
+  // The failure state is the only one that shows, and showing it must not budge
+  // the toolbar: it is a child of the button group and hangs out of the flex
+  // flow...
+  await page.evaluate(() => window.renderSyncStatus('error'));
   await expect(chip).toBeVisible();
-  await expect(chip).toContainText('Saving');
-  await expect(chip.locator('.sync-status-retry')).toBeHidden();
 
   // It belongs to the toolbar's button group (as a plain child of .controls it
   // took a line of its own and moved the timeline - a burst of placements then
@@ -342,18 +380,10 @@ test('the toolbar reports what happened to the day', async ({ page }) => {
   );
   expect(shown.chip.right).toBeLessThanOrEqual(shown.viewport);
 
-  await page.evaluate(() => {
-    document.getElementById('syncStatus').hidden = false;
-  });
-
-  await expect(chip).toContainText('Saved', { timeout: 20000 });
-  expect(await page.evaluate(() => window.autosave.hasPendingChanges())).toBe(
-    false
-  );
-
-  // The confirmation is transient: it must not sit in the toolbar for the rest of
-  // the session.
-  await expect(chip).toBeHidden({ timeout: 10000 });
+  // Nothing brings the chip back around except another failure: a day that is
+  // stored is not announced.
+  await page.evaluate(() => window.renderSyncStatus('saved'));
+  await expect(chip).toBeHidden();
 });
 
 test('a failed save says so, and the retry action stores the day', async ({
@@ -397,6 +427,7 @@ test('a failed save says so, and the retry action stores the day', async ({
     .poll(() => attempts, { timeout: 1500 })
     .toBeGreaterThan(attemptsBefore);
 
-  await expect(chip).toContainText('Saved', { timeout: 20000 });
-  await expect(chip).toBeHidden({ timeout: 10000 });
+  // The day is stored now, so the failure message clears itself - without turning
+  // into a "Saved" confirmation.
+  await expect(chip).toBeHidden({ timeout: 20000 });
 });

@@ -4,6 +4,38 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- NEW: on a phone an activity can be moved along the day again. There was no way
+  to shift a whole block: interact.js' draggable is desktop-only, the long press
+  owns the menu gesture, and the arrow keys move one edge each (they resize).
+  The long-press menu now offers "Move earlier" / "Move later": 10-minute steps
+  (the grid the desktop drag snaps to), duration preserved, stopping at the day's
+  ends (04:00 / 04:00(+1)), and a move onto another activity flashes the block
+  instead of happening - exactly how the arrow keys behave. Desktop keeps its
+  drag, so its menu is unchanged. The tail those edits share (datasets, position,
+  time chip, timeline state, button states) now lives in one helper used by the
+  arrow keys and by the move. Guarded by `mobile_activity_gestures.spec.js`
+  (step, duration, timeline state, the day's start as a boundary) and by the
+  desktop menu staying move-free in `activity_context_menu_desktop.spec.js`.
+- CHG: on a phone an activity block no longer runs into the right edge of the
+  screen. Measured at 390 px it spanned 25 %-100 % of the timeline, flush against
+  the border, and its time chip - positioned 50 px *outside* the block - was
+  clipped to a ~1 px black sliver at the screen edge, which is what made a block
+  look cut off. The block now spans 25 %-95 % (`MOBILE_BLOCK_WIDTH` 75 -> 70 in
+  `script.js`) and the chip sits inside the block's right end (mobile
+  `.time-label` `right: -50px` -> `4px`). Desktop is untouched: time is the
+  horizontal axis there, so a block's width is its duration. Guarded by
+  `mobile_layout.spec.js > an activity block and its time chip keep clear of the
+  screen edge` (gap share, chip inside the block, chip on screen).
+- CHG: the diary no longer announces that it is saving. The autosave status chip
+  used to say "Saving..." within a second of every edit and "Saved" a moment
+  later, which participants reported as the app being laggy - the write itself is
+  debounced by ~2 s, so the chip drew attention to a wait they cannot act on. The
+  chip now appears for exactly one reason: the day could NOT be stored, with its
+  Retry that skips the engine's backoff. The saving states are silent; the
+  `messages.syncSaving` / `messages.syncSaved` labels are removed from all 7
+  locales, and the chip is built together with the toolbar so the failure has an
+  `aria-live` region to be announced in (`sync_status.test.js`,
+  `autosave.spec.js > the toolbar stays quiet while the day is being stored`).
 - FIX: the backend now ships `psycopg` (v3) as its PostgreSQL driver instead of
   `psycopg2-binary`, and declares an explicit `sqlalchemy>=2.1` floor. SQLAlchemy
   2.1 changed the driver it loads for a plain `postgresql://` URL from psycopg2 to
