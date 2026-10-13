@@ -128,8 +128,26 @@ test('the context bar replaces the day row and the timeline button', async ({
     )
     .toBe('4');
 
-  // Last day: stepping forward is no longer possible.
-  await page.locator('#dayPickerBtn').click();
+  // The jump is a real page load, and the URL changes as soon as it STARTS - so
+  // the old document is still live right here. Over the LAN (slower response)
+  // the next click landed on that old page's picker, and the navigation then
+  // destroyed the menu it had opened, leaving the item click waiting for a menu
+  // that no longer existed. Waiting for the *new* day to be rendered is the
+  // barrier that closes that window.
+  await expect(page.locator('#contextDayText')).toContainText('Friday', {
+    timeout: 20000,
+  });
+
+  // Last day: stepping forward is no longer possible. The menu is opened through
+  // a retry, because a click can also be swallowed while the fresh document is
+  // still wiring up its handlers.
+  await expect(async () => {
+    if (!(await page.locator('#dayMenu').isVisible())) {
+      await page.locator('#dayPickerBtn').click();
+    }
+    await expect(page.locator('#dayMenu')).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 15000 });
+
   await page.locator('#dayMenu .day-menu-item').nth(6).click();
   await expect
     .poll(
