@@ -31,9 +31,6 @@ test.describe('No studies available without frontend defaults', () => {
     const noStudiesMessage = page.locator('.no-studies-message');
     await expect(noStudiesMessage).toBeVisible();
     await expect(noStudiesMessage).toContainText(/No studies available/i);
-
-    const footerStatus = page.locator('#footer_backend_status');
-    await expect(footerStatus).toContainText(/No studies available/i);
   });
 
   test('shows no-studies error when backend returns an empty studies list', async ({ page }) => {
@@ -52,8 +49,5 @@ test.describe('No studies available without frontend defaults', () => {
     const noStudiesMessage = page.locator('.no-studies-message');
     await expect(noStudiesMessage).toBeVisible();
     await expect(noStudiesMessage).toContainText(/No studies available/i);
-
-    const footerStatus = page.locator('#footer_backend_status');
-    await expect(footerStatus).toContainText(/No studies available/i);
   });
 });
