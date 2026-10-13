@@ -181,6 +181,20 @@ test("the end of the day can be scrolled fully into view", async ({ page }) => {
     geometry.wrapperBottom - geometry.lastLabelBottom,
     'the last hour label has to stay inside the scroller too'
   ).toBeGreaterThan(8);
+
+  // ... and the scroller itself has to end on screen. The tail above was once
+  // there and invisible: `.timeline-canvas` carried a 20px vertical margin on
+  // top of a height that already subtracted header and footer, so the scroller's
+  // bottom edge sat below the viewport (measured 935px in a 915px viewport) and
+  // the day's last 20px - exactly the reserved tail - were off screen.
+  const viewportFit = await page.evaluate((sel) => {
+    const rect = document.querySelector(sel).getBoundingClientRect();
+    return { bottom: rect.bottom, viewportHeight: window.innerHeight };
+  }, WRAPPER);
+  expect(
+    viewportFit.bottom,
+    `the day scroller must end within the viewport (bottom ${viewportFit.bottom}, viewport ${viewportFit.viewportHeight})`
+  ).toBeLessThanOrEqual(viewportFit.viewportHeight + 1);
 });
 
 test('pull-to-refresh stays off without a document-level touchmove listener', async ({

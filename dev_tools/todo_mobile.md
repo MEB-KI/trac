@@ -1363,6 +1363,35 @@ body. The touch case fails on the old code with "a downward swipe has to bring
 the day back, not be cancelled" - checked by temporarily restoring the handler,
 not just by reasoning.
 
+### Correction (2026-10-13): the 20 px tail was there but off screen
+
+Reported from a Pixel right after the above: "still ends flush with the 4am
+time. 0 pixels of whitespace... looks a bit cut off." The tail was in place -
+and invisible, because the whole scroller sat 20 px too low:
+
+| measured at 412x915 | before | after |
+| --- | --- | --- |
+| `.timelines-wrapper` bottom vs. the viewport | **935 px in a 915 px viewport** | 915 px |
+| day's last hour line vs. the bottom of the screen | **915.4 px = flush/cut** | 895 px = 20 px clear |
+| `lastMarkerVisible` | `false` | `true` |
+
+Cause: `.timeline-canvas` had `margin: 20px 0` on top of a height already
+computed as `100vh` minus header and footer - so the box, and the scroller in it,
+started 20 px lower and ended 20 px past the screen, and the tail was exactly the
+part hanging off. Fixed by removing that margin on phones (the breathing room
+under the header is `padding-top` *inside* the canvas now, where it costs
+nothing), letting the scroller fill the canvas (`height: 100%`), and sizing the
+canvas with `100svh` (falling back to `100vh`): `vh` is the viewport with the
+browser chrome hidden, and since the page itself never scrolls the URL bar stays
+visible on Android - the day's end could hide behind it.
+
+Lesson, twice in one week: measuring the element's *internal* geometry ("the
+padding is there, 20 px") says nothing about whether that geometry is *on
+screen*. Measure against the viewport and the surrounding chrome too - the first
+version of this section reported success with a number that was true and
+irrelevant. `mobile_day_scroll.spec.js` now also asserts that the day's scroller
+ends within the viewport, not only that the line is inside the scroller.
+
 ### Ripple: the guard was holding a block bug together
 
 Removing the guard broke `mobile_block_scroll.spec.js` (deterministically, 3 of
