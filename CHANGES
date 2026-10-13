@@ -101,6 +101,18 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   maximum scroll the line sat on the boundary and the day appeared to stop ~5
   minutes short of it. `.last-initialized-timeline-wrapper` now keeps 20 px of
   padding below the timeline (content-box, so the hour spacing is unchanged).
+  Second half, reported from a Pixel after that change: the day *still* ended
+  flush, 0 px of whitespace - the padding was there but invisible. The scroller
+  was 20 px taller than the space it occupied: `.timeline-canvas` carried
+  `margin: 20px 0` on top of a height already computed as `100vh` minus header
+  and footer, so the scroller's bottom edge sat below the screen (measured at
+  412x915: 935 px in a 915 px viewport) and the 20 px tail was exactly the part
+  hanging off. The canvas now has no vertical margin (the breathing room under
+  the header is padding inside it), the scroller fills it (`height: 100%`), and
+  the mobile height uses `100svh` with a `100vh` fallback: `vh` is the viewport
+  with the browser chrome *hidden*, and since the page itself never scrolls the
+  URL bar stays - so the day's end could hide behind it. Result at 412x915: the
+  day's last line now sits 20 px above the bottom of the screen.
 - FIX: on a phone the block's resize ends are real again. `touch-action: none`
   on `.activity-block-edge-zone` was meant to reserve the top/bottom band of a
   block for resizing, but the base `.activity-block-edge-zone { display: none }`
