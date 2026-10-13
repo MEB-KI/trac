@@ -81,7 +81,6 @@ async def _import_footer_links_study(
                             "de": "Studieninformation",
                         },
                         "target_url": "https://example.com/study-info",
-                        "in_new_tab": True,
                     },
                     {
                         "title": {
@@ -90,7 +89,6 @@ async def _import_footer_links_study(
                             "de": "Kontakt",
                         },
                         "target_url": "https://example.com/contact",
-                        "in_new_tab": False,
                     },
                 ],
             }
@@ -139,23 +137,26 @@ async def test_study_config_includes_footer_links(created_studies_for_cleanup):
         len(footer_links) == 2
     ), f"Expected 2 footer links, got {len(footer_links)}: {footer_links}"
 
-    # Verify first link: Study Information (opens in new tab)
+    # Verify first link: Study Information
     link1 = footer_links[0]
     assert link1["target_url"] == "https://example.com/study-info"
-    assert link1["in_new_tab"] is True
     assert isinstance(link1["title"], dict)
     assert link1["title"]["en"] == "Study Information"
     assert link1["title"]["sv"] == "Studieinformation"
     assert link1["title"]["de"] == "Studieninformation"
 
-    # Verify second link: Contact (same tab)
+    # Verify second link: Contact
     link2 = footer_links[1]
     assert link2["target_url"] == "https://example.com/contact"
-    assert link2["in_new_tab"] is False
     assert isinstance(link2["title"], dict)
     assert link2["title"]["en"] == "Contact"
     assert link2["title"]["sv"] == "Kontakt"
     assert link2["title"]["de"] == "Kontakt"
+
+    # There is deliberately no per-link new-tab flag any more: the footer decides
+    # by origin (our own pages open in a dialog, everything else in a new tab).
+    assert "in_new_tab" not in link1
+    assert "in_new_tab" not in link2
 
 
 @pytest.mark.asyncio

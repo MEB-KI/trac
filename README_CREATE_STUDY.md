@@ -317,7 +317,7 @@ its own title scale; this table is about the instructions page.)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `footer_links` | `[object]` | No | Array of study-specific footer links. Each link has `title` (localized map), `target_url` (string), and `in_new_tab` (boolean, default `true`). |
+| `footer_links` | `[object]` | No | Array of study-specific footer links. Each link has `title` (localized map) and `target_url` (string). A `target_url` on this server (e.g. `pages/study-info.html`) opens in a dialog over the page the participant is on; anything external opens in a new tab. There is no per-link "new tab" flag. |
 | `hide_server_wide_links` | boolean | No | If `true`, hides the server-wide legal links (imprint/privacy) from the footer for this study. DIsplaying these is legally required in some countries, so check legislation before removing these. (Server-wide links are configured in the frontend in the `tud_settings.json` file.) Default: `false`. |
 
 #### Browser Identification
@@ -610,11 +610,15 @@ of) the server-wide legal links:
       "en": "Study Information",
       "de": "Studieninformation"
     },
-    "target_url": "https://example.com/study-info",
-    "in_new_tab": true
+    "target_url": "https://example.com/study-info"
   }
 ]
 ```
+
+Point `target_url` at a page on this server (`pages/…`) to have it shown in a
+dialog instead of a new tab - that keeps the participant on the diary page they
+are working on, which matters on phones, where even a new tab looks like leaving
+the study.
 
 Set `hide_server_wide_links: true` to hide the server-wide imprint and privacy
 links for this study.
@@ -756,8 +760,7 @@ window.
             "sv": "Studieinformation",
             "de": "Studieninformation"
           },
-          "target_url": "https://example.com/study-info",
-          "in_new_tab": true
+          "target_url": "https://example.com/study-info"
         },
         {
           "title": {
@@ -765,8 +768,7 @@ window.
             "sv": "Kontakt",
             "de": "Kontakt"
           },
-          "target_url": "https://example.com/contact",
-          "in_new_tab": false
+          "target_url": "https://example.com/contact"
         }
       ]
     }
