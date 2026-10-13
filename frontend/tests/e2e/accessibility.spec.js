@@ -156,29 +156,11 @@ test('no accessibility violations: activity info dialog (desktop)', async ({
   await expectNoA11yViolations(page, 'activity info dialog (desktop)');
 });
 
-// The two guards below cover colours that only exist in states the specs above
-// hit by accident, which is exactly how they shipped broken: the footer status
-// line is the readable #475569 while it says "Connecting...", and the autosave
-// chip is on screen for 2.5s at a time. Both were then measured at 1.53:1
-// (#ccc) and 3.58:1 (green on green) in CI, on whichever run happened to scan
-// after the state had settled. They drive the states instead of racing them.
-
-test('no accessibility violations: footer backend status (connected)', async ({
-  page,
-}) => {
-  await page.goto('index.html?pid=a11y_footer&study_name=default&lang=en', {
-    waitUntil: 'load',
-  });
-  await enterStudyIfNeeded(page);
-  // script.js only rewrites the placeholder into its final colour once the
-  // activities config has arrived; that is the state worth scanning.
-  await page
-    .locator('#footer_backend_status[data-i18n="footer.backend_status_connected"]')
-    .waitFor({ timeout: 30000 });
-  await settle(page);
-
-  await expectNoA11yViolations(page, 'footer backend status (connected)');
-});
+// The guard below covers a colour that only exists in a state the specs above
+// never reach: the autosave chip is invisible unless a save failed, and it used
+// to change colour on its own over time. It was measured at 3.58:1 (green on
+// green) in CI on whichever run happened to scan after the state had settled.
+// The test drives the state instead of racing it.
 
 test('no accessibility violations: autosave status chip', async ({ page }) => {
   await page.goto('index.html?pid=a11y_sync&study_name=default&lang=en', {

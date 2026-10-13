@@ -4,6 +4,16 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- CHG: the footer no longer reports the backend connection. "Connected to
+  backend" sat under the app name and version on every participant page, cost a
+  line of space and made participants wonder what it referred to - it was
+  diagnostics for us, not information for them. Removed together with its three
+  locale keys (`footer.backend_status_*`) and the colour table that existed only
+  to keep the line legible. Nothing is lost on a real failure: the diary still
+  renders the fatal-error panel in the timeline area
+  (`renderFatalInitializationError()`) and the "no studies available" / "study
+  not found" messages; the status line was a duplicate of those and was hidden
+  on the diary page anyway.
 - NEW: on a phone an activity can be moved along the day again. There was no way
   to shift a whole block: interact.js' draggable is desktop-only, the long press
   owns the menu gesture, and the arrow keys move one edge each (they resize).

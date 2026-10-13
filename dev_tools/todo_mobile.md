@@ -517,6 +517,10 @@ every page with footer links. So the version and the backend status the diary se
 were never visible; the footer showed the links row only. It now replaces just its
 own `.trac-legal-footer-links` row.
 
+(`#footer_backend_status` was removed outright on 2026-10-13 - it told
+participants "Connected to backend", which they had no use for; `#footer` now
+holds `#footer_app_title` and `#footer_app_version` only.)
+
 ### The rule that now holds
 
 **Chrome that JS fills must not carry `data-i18n`**, because any i18n pass (init,
