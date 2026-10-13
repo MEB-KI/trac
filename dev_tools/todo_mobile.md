@@ -1290,6 +1290,105 @@ tall windows, and the phone's fixed bar unchanged). Guarded by the "on a tall
 window" case in `instructions_entry.spec.js`. Note this was pre-existing CSS -
 the white slab just hid it.
 
+## Done — the day scrolls back, and to its very end (2026-10-12)
+
+Reported from a Pixel 10 Pro: "on timeline data entry page, when I do nothing but
+scroll down (to 4 am at end of timeline) I cannot scroll up again. Swiping with
+finger does nothing anymore. I'm stuck! Also the line for 4 am is offscreen, I
+can only view till ~3:55."
+
+Both were real, and neither was visible to the suite, because **the mobile
+specs drive the phone layout with the mouse** - and a mouse never goes through
+`touch-action`, touch listeners or the browser's gesture arbitration.
+
+Finding the first one needed real touch input (`Input.dispatchTouchEvent` over
+CDP, Chromium only; `mobile_block_scroll.spec.js` had the only precedent).
+Reproduced at 412x915: the day reached `scrollTop 1684` (= its end) and every
+further swipe moved it 0 px - in *both* directions. Patching `scrollTop`'s
+setter, `scrollTo`/`scrollBy` and `scrollIntoView` recorded **zero** programmatic
+writes, and `Input.dispatchMouseEvent` with `deltaY: -600` scrolled fine (1684 →
+1084), so the scroller was healthy and the *gesture* was being eaten. Patching
+`Event.prototype.preventDefault` named the culprit in one run:
+
+```
+at document.addEventListener.passive (report/js/ui.js:2636)
+```
+
+`preventPullToRefresh()`'s fallback:
+
+```js
+document.addEventListener('touchmove', (e) => {
+  if (window.pageYOffset === 0 && touchYDelta > 0) e.preventDefault();
+}, { passive: false });
+```
+
+On the diary the **window never scrolls** - the day scrolls inside
+`.timelines-wrapper` - so `pageYOffset === 0` is permanently true and *every
+downward finger drag* is cancelled. Finger-up drags were never touched, which is
+why the day could be swiped forward to its end and not back: the bug only shows
+up at the far end, where the way out is a downward drag. Pre-existing, not from
+this session's work.
+
+Fix: the document-level fallback is gone entirely; pull-to-refresh is stopped by
+`overscroll-behavior: none`, which every engine we support honours, now set on
+the root element *and* the body (Safari reads the body's). That also removes a
+non-passive `touchmove` listener that ran on every gesture pixel.
+
+The second symptom is geometry. The day's markers are 25 hour lines at 100 px
+spacing (`default` study: 04:00 → 04:00 next day, labels only up to 03:00), and
+the content ended exactly at the scroller's edge - measured at max scroll:
+
+| | before | after |
+| --- | --- | --- |
+| `scrollHeight` | 2500 | 2520 |
+| day's last hour line vs. the scroller's bottom edge | **0 px** (on the edge) | **-20 px** (inside) |
+
+so the final line could not be brought into view at all, and the day looked like
+it stopped "~3:55". `.last-initialized-timeline-wrapper` now keeps `padding: 0 0
+20px`; content-box, so the timeline keeps its 2500 px and the hour spacing is
+untouched (verified: marker gaps stay 99–100 px).
+
+`mobile_day_scroll.spec.js` pins down: with real touch (Chromium/CDP) the day
+walks to its end **and back**, repeatably; the last hour line and label come
+fully into view at maximum scroll; `overscroll-behavior` is `none` on root and
+body. The touch case fails on the old code with "a downward swipe has to bring
+the day back, not be cancelled" - checked by temporarily restoring the handler,
+not just by reasoning.
+
+### Ripple: the guard was holding a block bug together
+
+Removing the guard broke `mobile_block_scroll.spec.js` (deterministically, 3 of
+3 runs), so the old handler was doing a second job nobody had noticed: its
+`preventDefault()` on downward drags was what kept a resize alive. A drag on a
+block's end makes the browser start a scroll and fire `pointercancel`, which
+kills interact.js' resize - unless the element under the finger refuses to be
+scrolled, which is exactly what `touch-action: none` on
+`.activity-block-edge-zone` is for. Bisect: reverting the CSS alone still failed,
+reverting the `touchmove` guard alone passed - so the guard was the protection
+and the CSS was decoration.
+
+Cause, measured live on a phone viewport with a 10-minute block (17 px tall):
+
+| | before | after |
+| --- | --- | --- |
+| `.activity-block-edge-zone` computed `display` | **`none`**, height **0** | `block`, height 5 px |
+| share of a 17 px block left scrollable | 100 % (of nothing) | 40 % |
+| resize drag from the bottom band | works only via the touchmove guard | works via `touch-action: none` |
+
+The base rule `.activity-block-edge-zone { display: none }` sits *after* the
+mobile override and has the same specificity, so it won. Same bug class as the
+width-gated popup rule (§ "Facts worth not re-deriving"): base styling must come
+before the width-specific override, never after. The old spec could not see it -
+`getComputedStyle(hiddenEl).touchAction` is `'none'` and `zoneHeight` was only
+used in a `>` guard, so two vacuous assertions passed for a year's worth of runs.
+
+Second half of the same ripple: with the bands live, `min(16px, 40%)` covered all
+but 3 px of a 17 px block, so the block stopped scrolling - the participant
+complaint from the earlier slice, back for a second round. Capped at
+`min(16px, 30%)` the middle is never smaller than 40 % of the block. The spec now
+asserts `zoneHeight > 0` and that the resize drag lands on a band, so "declared
+but not rendered" and "rendered too large to scroll past" both fail loudly.
+
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
 The feedback asked for (a) a visible marker that a block's edges can be dragged,
