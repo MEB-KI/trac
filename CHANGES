@@ -4,6 +4,19 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- NEW: activity blocks show the resize grips on phones too. Desktop has had them
+  since the "like an Excel cell" feedback, but below the breakpoint they were
+  hidden: the vertical layout needs the marker rotated onto the ends that can
+  actually be dragged, the block's top and bottom edge. The same two spans are
+  re-used (no markup change), so the bars simply become horizontal and sit flush
+  in the band that `touch-action: none` reserves for the resize. Unlike desktop
+  there is no hover on a touch device - a grip waiting for it would never appear
+  and the gesture would stay undiscovered - so they are visible at a modest
+  opacity and step up while the block is focused or being resized. Guarded by
+  `mobile_block_scroll.spec.js`, which asserts both grips are rendered, are thin
+  horizontal bars, never take the touch (`pointer-events: none`), and each sits
+  inside its own resize band - a marker that is not where the gesture works is
+  worse than no marker.
 - FIX: footer links no longer take the participant out of the study. The default
   study's Contact link carried `in_new_tab: false`, so following it navigated the
   diary page away and the back button was the only way home ("if people click the
