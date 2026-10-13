@@ -1462,9 +1462,14 @@ and (b) a way to move a whole block. Desktop got (a) in this slice:
 keyboard focus and while resizing (`desktop_resize_affordance.spec.js`). Open for
 phones:
 
-- (a) phone: the grips are `display: none` below 1440 px on purpose — the
-  vertical layout needs the marker rotated onto the top/bottom edges
-  (`ns-resize`).
+- (a) phone: **done 2026-10-13** - the grips are shown on the block's top and
+  bottom edge (the ends that can be dragged in the vertical layout), as thin
+  horizontal bars flush in the resize band. No markup change: the two spans
+  desktop uses are re-used, and the mobile rules live AFTER the base
+  `display: none` (same specificity - putting them before would hide them again,
+  the trap that once hid the resize bands). No hover on touch, so they are
+  visible at 0.7 opacity and full while focused/resizing. Asserted in
+  `mobile_block_scroll.spec.js`.
 - (b) phone: **done 2026-10-13** - "Move earlier" / "Move later" in the
   long-press menu, 10-minute steps, duration preserved, clamped to the day and
   refused (block flash, like the arrow keys) when another activity is in the

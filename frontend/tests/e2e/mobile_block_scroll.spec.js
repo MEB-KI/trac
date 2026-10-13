@@ -143,12 +143,33 @@ test('the block body pans the timeline and its ends stay reserved for resizing',
     const top = el.querySelector('.activity-block-edge-zone-top');
     const bottom = el.querySelector('.activity-block-edge-zone-bottom');
     const topRect = top ? top.getBoundingClientRect() : null;
+    const bottomRect = bottom ? bottom.getBoundingClientRect() : null;
+    const grips = [...el.querySelectorAll('.activity-block-grip')].map((grip) => {
+      const style = getComputedStyle(grip);
+      const rect = grip.getBoundingClientRect();
+      const side = grip.classList.contains('activity-block-grip-right')
+        ? 'right'
+        : 'left';
+      // On the vertical layout the block's start is its top edge and its end is
+      // its bottom edge, so that is the band each grip must sit in.
+      const band = side === 'left' ? topRect : bottomRect;
+      return {
+        side,
+        display: style.display,
+        pointerEvents: style.pointerEvents,
+        height: Math.round(rect.height),
+        width: Math.round(rect.width),
+        insideItsBand:
+          !!band && rect.top >= band.top - 1 && rect.bottom <= band.bottom + 1,
+      };
+    });
     return {
       blockTouchAction: getComputedStyle(el).touchAction,
       hasBothZones: !!top && !!bottom,
       zoneTouchAction: top ? getComputedStyle(top).touchAction : null,
       zoneHeight: topRect ? Math.round(topRect.height) : 0,
       blockHeight: Math.round(el.getBoundingClientRect().height),
+      grips,
     };
   });
 
@@ -165,6 +186,30 @@ test('the block body pans the timeline and its ends stay reserved for resizing',
     contract.zoneHeight,
     'a resize band that is not rendered reserves nothing'
   ).toBeGreaterThan(0);
+
+  // The phone shows the same grips desktop does, turned onto the ends that can
+  // be dragged here. A marker that is not where the gesture works is worse than
+  // no marker, so each one has to sit inside its own reserved band.
+  expect(
+    contract.grips.map((grip) => grip.side),
+    'both ends need a grip'
+  ).toEqual(['left', 'right']);
+  for (const grip of contract.grips) {
+    expect(grip.display, 'the phone has to show the grips too').toBe('block');
+    expect(
+      grip.pointerEvents,
+      'a grip is decoration, never the touch target'
+    ).toBe('none');
+    expect(
+      grip.height,
+      'a mobile grip is a thin horizontal bar'
+    ).toBeLessThanOrEqual(5);
+    expect(grip.width, 'the bar has to be visible').toBeGreaterThanOrEqual(12);
+    expect(
+      grip.insideItsBand,
+      `the ${grip.side} grip has to sit in the band that resizes it`
+    ).toBe(true);
+  }
 
   // The middle of the block has to be free for scrolling: the point is verified
   // against the live layout, so a stale coordinate cannot make this vacuous.
