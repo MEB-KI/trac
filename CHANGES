@@ -4,6 +4,31 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- NEW: on phones the timeline switcher is a pair of tabs naming both timelines,
+  instead of a button labelled with the one you are already in. Testers reported
+  they had "missed the existence of the 2nd timeline entirely", and the previous
+  mitigation could not fix that: the picker only hinted at the second timeline
+  with a "(1/2)" inside its own label, and a button labelled with the state you
+  are currently in reads as a status readout - there is no reason to press it. A
+  segmented control shows the track you are *not* on, so the second timeline
+  exists without any interaction, and switching is one tap instead of opening a
+  sheet and picking a row. Mobile only, and only for a study with exactly two
+  timelines: one timeline has nothing to switch to (the control hides, as
+  before) and three or more segments would run off the row, so those keep the
+  picker. That rule is `shouldShowTimelineTabs()` in `constants.js`, pinned by
+  `tests/unit/timeline_tabs.test.js` - no study has anything but two timelines,
+  and a stubbed activities config with a different timeline set does not bring
+  the diary up at all, so the other branches cannot be reached over E2E. The strip
+  takes its own row under the day control, because two
+  study-authored names do not fit beside it (measured: ~190 px day control plus
+  ~300 px of segments in a 382 px row); German is the long case, and a guard
+  asserts both names render in full rather than ellipsised, next to the existing
+  no-sideways-scrolling sweep. Semantics are `role="tablist"`/`role="tab"` with
+  `aria-selected`, a roving tabindex and Left/Right arrows; the picker keeps its
+  caret (and its full label while the tabs are off) as the way into the timeline
+  sheet, which still carries the per-timeline coverage and "Clear timeline".
+  The segments drop the "(1/2)" counter, which stays in the canvas title.
+  Guarded by `mobile_context_bar.spec.js`.
 - CHG: the blue instruction banner now stays until the participant closes it, on
   every day of the study. It used to delete itself on any day but the first
   ("it only shows on first day of study, which is irritating. we should show it
