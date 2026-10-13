@@ -78,6 +78,89 @@ You can now connect to [http://localhost:3000](http://localhost:3000) to access 
 * API: [/tud_backend/api](http://localhost:3000/tud_backend/api)
 * API docs: [/tud_backend/docs](http://localhost:3000/tud_backend/docs)
 
+#### Testing from a Phone (Same Wifi)
+
+`localhost` is useless on a phone - there it means the phone itself. Use this
+machine's address on your wifi instead (`ip -br -4 addr show` shows it; on this
+box it is `192.168.178.47`):
+
+    http://192.168.178.47:3000/report/index.html?study_name=default&lang=de
+
+That works as it is, for four reasons:
+
+* The dev nginx `listen 3000;` has no host part, so it accepts connections on
+  every interface, not just loopback.
+* The API is reached **same-origin**: `tud_settings.dev-nginx.js` uses the
+  relative base `/tud_backend/api`, so the page talks to whichever host it was
+  loaded from and nginx proxies `/tud_backend/` to `127.0.0.1:8000`. (An
+  absolute `http://localhost:8000/...` would point the phone at itself.) The
+  backend itself keeps listening on loopback only, which is why nginx is the
+  single entry point.
+* `run_dev_nginx_both.bash` derives this machine's LAN address on every start and
+  writes it into the generated `backend/.env`: it is added to
+  `TUD_ALLOWED_ORIGINS` (so direct API use from that origin is allowed) and it
+  becomes `TUD_FRONTEND_URL`, because the backend's redirects (thank-you page,
+  inactivity timeout, external tasks) have to lead somewhere the phone can
+  reach. The script prints the phone URL when it starts.
+
+The address is not stored in the repo. `run_dev_nginx_both.bash` detects it on
+every start (the interface of the default route, falling back to the first global
+address when offline) and writes it into the generated `backend/.env`, then
+prints the phone URL. Another machine, or this one on a different network, needs
+no edits at all. If the detection picks the wrong interface, override it:
+
+```bash
+TUD_DEV_LAN_IP=10.0.0.5 ./run_dev_nginx_both.bash
+```
+
+Note that `frontend/src/settings/tud_settings.js` and `backend/.env` are copies
+of the files in `dev_tools/local_nginx/`: `run_dev_nginx_both.bash` overwrites
+them on every start, so edit the sources there, not the copies. Everything that
+is *not* host-specific - the frontend settings, the nginx template - stays
+committed and unchanged across networks, so a second configuration directory is
+not needed.
+
+The test suite can be pointed at the same origin, which checks a flow exactly as
+a phone would see it (relative URLs, real host names, no localhost shortcut):
+
+```bash
+cd frontend/
+PLAYWRIGHT_BASE_URL=http://192.168.178.47:3000/report/ npx playwright test --project=chromium tests/e2e/mobile_context_bar.spec.js
+```
+
+The page answering on port 80 is **not** TRAC. The nginx package installs a
+system service (`systemctl status nginx`, `/etc/nginx/sites-enabled/default`)
+that serves the distribution's default "Welcome to nginx" page on port 80; the
+dev nginx is a second, user-level instance started by `run_dev_nginx_both.bash`
+on port 3000. To serve TRAC on the bare address instead - no `:3000`, and no
+separate server for it - run the following yourself (it needs root):
+
+```bash
+sudo tee /etc/nginx/sites-available/trac-dev >/dev/null <<'EOF'
+server {
+    listen 80;
+    server_name 192.168.178.47;
+
+    location /report/      { proxy_pass http://127.0.0.1:3000; }
+    location /tud_backend/ { proxy_pass http://127.0.0.1:3000; }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/trac-dev /etc/nginx/sites-enabled/trac-dev
+sudo rm -f /etc/nginx/sites-enabled/default     # this is the "Welcome to nginx" page
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+After that `http://192.168.178.47/report/index.html` works without the port, and
+the two LAN entries *without* `:3000` in `TUD_ALLOWED_ORIGINS` and
+`TUD_FRONTEND_URL` become the relevant ones.
+
+A study whose data-collection window has passed answers with 403
+(`study_unavailable`) and the participant sees the "study paused" message, which
+is easy to mistake for a broken phone setup. Worth knowing: `tud studies import`
+(part of the dev script) only *creates* studies, so a study whose window changed
+after the first import keeps its old dates in the `studies` table - the config
+file is not the only source of truth.
+
 #### Running Tests Locally (Without Docker)
 
 Now that you have all local test dependencies, you can run tests directly from your host machine:
