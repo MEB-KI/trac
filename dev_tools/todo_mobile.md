@@ -1502,6 +1502,86 @@ never mentioned a day, only the key name did.
 The banner is inserted while the page settles, so specs that measure geometry
 must still dismiss it first (see the gotcha in the touch-action notes above).
 
+## Done — the phone switcher shows both timelines (2026-10-13)
+
+Reported: testers "missed the existence of the 2nd timeline entirely", and the
+mitigation (the timeline name plus its `(1/2)` position in the switcher label,
+the empty-timeline hint row) did not settle it.
+
+The mechanism, once stated: a button labelled with **the timeline you are already
+in** reads as a status readout. The only question it appears to ask is "which
+timeline am I on?", and its own label answers that - so there is no reason to
+press it, and the second timeline stays a parenthetical inside a control nobody
+opens. (Desktop does not have this problem: its `#switchTimelineBtn` is labelled
+with the *destination* timeline.) A segmented control asks the other question -
+"which of these two tracks is this day's?" - and answers "there is another one"
+before any interaction.
+
+Shape was decided by the row budget, measured at 390 px in the `default` study:
+
+| | px |
+| --- | --- |
+| context row (total) | 382 (32 px high) |
+| day control (`‹ Mittwoch (3/7) ▾ ›` incl. both arrows) | ~190 |
+| timeline picker button (`Hauptaktivität (1/2)`) | 158 |
+| two segments, plain names (de) | ~300 |
+| caret for the sheet | ~30 |
+
+Day control + tabs would be ~490 px in a 382 px row, so the strip takes a row of
+its own (`flex: 1 1 100%` on `.timeline-switcher.has-tabs`): header 99 → ~135 px,
+still far below the 235 px §4 replaced. This is the row the user accepted paying
+for ("maybe a bit vertical for the bar where you switch").
+
+What shipped (`ui.js`, `styles.css`):
+
+- `#timelineSwitcher` > `#timelineTabs` (`role="tablist"`, `aria-label` =
+  `buttons.switchTimeline`, no new keys) + the existing picker button.
+- Tabs are rendered **only when the study has exactly two timelines**, named with
+  the plain timeline names - `getTimelineLabel()`'s "(1/2)" has nothing left to
+  say once both names are on screen (it stays in the canvas title and the sheet).
+  One timeline has nothing to switch to (the control hides, as before); three or
+  more would run off the row, so those keep the picker. The rule is
+  `shouldShowTimelineTabs()` in `constants.js`, pinned by
+  `tests/unit/timeline_tabs.test.js`: no study here has anything but two
+  timelines, and a stubbed activities config **cannot** stand in for it - a
+  timeline set that disagrees with the study config does not bring the diary up
+  at all (tried with one and with three; `activeTimeline` never arrives).
+  Trap found on the way: a route glob is matched against the full URL including
+  the query, so the activities-config stub needs `**/activities-config*` (the
+  real request carries `?participant_id=…&lang=…`).
+- Switching is `navigateToTimelineByKey(key)` - the same call the sheet's rows
+  make - so no new code path. Roving tabindex, `aria-selected`, Left/Right
+  arrows; the strip is rebuilt only when the key set changes, so focus survives.
+- The picker loses the name (it would only repeat a tab), keeps its caret and
+  stays the way into the timeline sheet, which still carries the per-timeline
+  coverage and "Clear timeline" - that is why it is not simply deleted.
+- `hidden` needs an author rule on anything with a `display` of its own
+  (`.timeline-tabs[hidden] { display: none !important }`), the same trap
+  documented for `.btn[hidden]`.
+
+Guards, `mobile_context_bar.spec.js`: the two names and `aria-selected`, the
+rendered geometry (`boundingBox`, because a hidden element still passes
+computed-style checks), the strip sitting below the day control, the switch
+reaching `timelineManager.keys`/`activeTimeline`, and the German names rendering
+in full (`scrollWidth - clientWidth`, since a clipped tab is still "visible").
+The other branches of the rule are unit-tested (above). The generic
+no-sideways-scrolling sweep covers the German diary page as well.
+
+Deliberately **not** fixed here, both for the scientists:
+
+- The rule for *when* the second timeline applies ("Zeitfenster, in denen Sie
+  gleichzeitig eine andere Aktivität … ausgeführt haben") is each timeline's own
+  `description`, rendered inside that timeline's canvas - so it is unreadable
+  until you have already switched. Making the names visible does not surface it.
+- The adult studies' `study_text_*` never mention a second timeline at all (only
+  the 15-year-olds study does). With `min_coverage: 0` on the secondary, whether
+  participants are *expected* to use it is a study-framing decision, not a UI
+  one - and a permanently visible empty second tab does create the opposite
+  pressure, so the study text has to say what the tab means.
+
+The empty-timeline hint row is kept (it is now largely redundant). Removing it
+would be a separate, deliberate change.
+
 ## Deferred — phone affordances from participant feedback (2026-10-12)
 
 The feedback asked for (a) a visible marker that a block's edges can be dragged,

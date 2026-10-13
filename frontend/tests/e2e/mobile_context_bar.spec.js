@@ -293,3 +293,94 @@ test('the copy row is active on a filled day and offers the jump to the target',
     })
     .toBeGreaterThan(0);
 });
+
+test('both timelines are visible as tabs, and one tap switches', async ({
+  page,
+}) => {
+  await openDiary(page, `e2e-context-bar-tabs-${Date.now()}`);
+
+  const tabs = page.locator('#timelineTabs .timeline-tab');
+  await expect(tabs).toHaveCount(2);
+  // The study's names, without the "(1/2)" the picker label needed: with both
+  // names on screen the pair itself says that there are two timelines. This is
+  // the answer to the participants who never pressed the picker and therefore
+  // never learned that a second timeline existed.
+  await expect(tabs.nth(0)).toHaveText('Main Activity');
+  await expect(tabs.nth(1)).toHaveText('Secondary Activity');
+  await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'false');
+
+  // Rendered, not merely declared: a `display: none` element still reports its
+  // computed font and touch-action - the trap that once hid the resize bands.
+  const boxes = [];
+  for (let index = 0; index < 2; index += 1) {
+    const box = await tabs.nth(index).boundingBox();
+    expect(box.width, `tab ${index} width`).toBeGreaterThan(40);
+    expect(box.height, `tab ${index} height`).toBeGreaterThanOrEqual(24);
+    boxes.push(box);
+  }
+
+  // Both names readable is why the strip takes a row of its own, under the day
+  // control instead of beside it.
+  const dayBox = await page.locator('#dayPickerBtn').boundingBox();
+  expect(boxes[0].y).toBeGreaterThanOrEqual(dayBox.y + dayBox.height);
+  expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThanOrEqual(1);
+
+  // The picker stays as the way into the sheet (per-timeline coverage and
+  // "Clear timeline"); it only drops the name that a tab now shows.
+  await expect(page.locator('#timelinePickerBtn')).toBeVisible();
+  await expect(page.locator('#contextTimelineName')).toBeHidden();
+
+  // One tap switches - no sheet in between.
+  await tabs.nth(1).click();
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'false');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const manager = window.timelineManager;
+          return {
+            key: manager.keys[manager.currentIndex],
+            active: manager.activeTimeline?.id || null,
+          };
+        }),
+      { timeout: 15000, message: 'waiting for the timeline switch' }
+    )
+    .toEqual({ key: 'secondary', active: 'secondary' });
+});
+
+test('the tabs fit the longest timeline names (de)', async ({ page }) => {
+  await page.goto(
+    `index.html?pid=e2e-tabs-de-${Date.now()}&study_name=default&lang=de`,
+    { waitUntil: 'load' }
+  );
+  await enterStudyIfNeeded(page);
+  await expect(page.locator('#contextBar')).toBeVisible({ timeout: 30000 });
+
+  const tabs = page.locator('#timelineTabs .timeline-tab');
+  await expect(tabs).toHaveCount(2);
+
+  // German is the long case ("Hauptaktivität (1/2)" measured 158 px as a button
+  // label). A truncated tab is still "on screen", so assert the text is not
+  // clipped away - half a name is exactly the confusion this control is for.
+  const rendered = await tabs.evaluateAll((elements) =>
+    elements.map((element) => ({
+      text: (element.textContent || '').trim(),
+      overflow: element.scrollWidth - element.clientWidth,
+    }))
+  );
+  expect(rendered).toHaveLength(2);
+  for (const tab of rendered) {
+    expect(tab.text, 'timeline names come from the study config').toContain(
+      'aktivität'
+    );
+    expect(tab.overflow, `"${tab.text}" is truncated`).toBeLessThanOrEqual(1);
+  }
+});
+
+// The other two branches of "which studies get tabs" (one timeline, three or
+// more) have no study to run against, and a stubbed activities config whose
+// timeline set disagrees with the study config does not bring the diary up at
+// all - so that rule is pinned in `tests/unit/timeline_tabs.test.js` instead.
+
