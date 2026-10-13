@@ -4,6 +4,25 @@ TRAC MPIAE Changes
 
 Current WIP -- Version 0.23.0 -- Make instructions title configurable
 --------------------------------------------------------
+- CHG: the blue instruction banner now stays until the participant closes it, on
+  every day of the study. It used to delete itself on any day but the first
+  ("it only shows on first day of study, which is irritating. we should show it
+  on all days, UNTIL user first closes it"), which inverted the intent: the gate
+  was checked while the page initialised, and the day it looks at is the one the
+  page was opened on (`day_label_index`, written on every day switch) - so it
+  fired for the participant who came back on day 3 and had to remember the
+  gestures, and never for the one sitting on day 1. Closing it is still
+  remembered per participant and study, and the storage key string is unchanged
+  (it keeps its historical `:day1` suffix on purpose - renaming it would show the
+  banner again to everyone who had already dismissed it). The two i18n keys lose
+  their misleading `dayOne` prefix: `banner.instructionsMobile` /
+  `banner.instructionsDesktop` in all 7 locales, `index.html` and the
+  required-keys list in `locales_consistency.test.js` (the text never mentioned a
+  day). Guarded by `mobile_layout.spec.js > the instruction banner stays on every
+  day until it is closed`: it loads straight into the second day - the case the
+  old gate broke, with the day asserted so the test cannot pass while landing on
+  day 1 - switches days, closes the banner, and checks it stays gone on other
+  days and after a reload.
 - NEW: activity blocks show the resize grips on phones too. Desktop has had them
   since the "like an Excel cell" feedback, but below the breakpoint they were
   hidden: the vertical layout needs the marker rotated onto the ends that can
