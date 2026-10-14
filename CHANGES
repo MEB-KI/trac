@@ -2,8 +2,8 @@ TRAC MPIAE Changes
 ===================
 
 
-Current WIP -- Version 0.23.0 -- Make instructions title configurable
---------------------------------------------------------
+Version 0.24.0 -- Mobile improvements, backup endpoints, many fixes
+----------------------------------------------------------------------------------
 - NEW: on phones the timeline switcher is a pair of tabs naming both timelines,
   instead of a button labelled with the one you are already in. Testers reported
   they had "missed the existence of the 2nd timeline entirely", and the previous
@@ -364,6 +364,11 @@ Version 0.22.0 -- Optional opt-in browser identification
   that the data is personal and usage of the feature belongs in the consent text,
   and `README.md` documents the new participant export alongside the activities export.
 
+
+Version 0.23.0 -- Minor text adjustments
+----------------------------------------
+- NEW: make instructions page title user configurable
+- CHG: change default german welcome text
 
 
 Version 0.21.0 -- New mobile interface, i18n hardening, clarify DB migration policy
