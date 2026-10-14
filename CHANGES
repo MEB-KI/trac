@@ -319,6 +319,35 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   `tests/integration/test_admin_extract_endpoints.py` (allowed on exactly the
   three extracts, 403 `extraction_only_account` on a representative set of the
   others).
+- NEW: the activity extract can be paged, and the participant extract no longer
+  costs the whole study. A full-server copy used to build the entire response in
+  memory: measured at ~670 bytes per activity row in JSON and ~3.9 KB of RAM per
+  row, one thousand participants with seven days and thirty entries each (210k
+  rows) was already a 141 MB response and +785 MB of resident memory, so a
+  "few thousand participants" study would have needed several GB and a couple of
+  minutes for a single request. `GET /api/admin/activities` now returns one page
+  of participants at a time (`limit`, default 200, max 2000; `cursor` from the
+  previous page's `next_cursor`), and reports the state in both the JSON
+  metadata envelope and response headers (`X-Next-Cursor`, `X-Has-More`,
+  `X-Participants-Returned`, `X-Record-Count`) so a CSV consumer can follow it
+  too. Paging is by **participant**, not by row offset: saving a day deletes and
+  re-inserts that day's rows, so row positions shift under a concurrent write
+  while participant keys do not; a page is a half-open `(study_id,
+  participant_id)` key range, which also keeps one participant out of two pages.
+  Passing an explicit `participant` selection still returns everything in one
+  unpaged response (that is the documented workflow: poll `/participants` for
+  who is done, then pull those participants). Separately,
+  `_build_participant_completion_map()` gained an optional participant filter and
+  `/api/admin/participants` now passes the participants it is about to return:
+  the helper loads every activity row of the study to derive per-day coverage,
+  so without that the endpoint took 2.8 s and +371 MB for a 0.33 MB payload, and
+  the `submitted` filter made no difference to the cost because the map was built
+  before it was applied. Coverage: the paging cases in
+  `tests/unit/test_admin_extract.py` (every participant exactly once, a page
+  never splits a participant, paging across a study boundary whose participant
+  ids sort before the first study's, invalid/empty cursors, cursor+participant
+  rejected) and a two-page-over-HTTP walk in
+  `tests/integration/test_admin_extract_endpoints.py`.
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------

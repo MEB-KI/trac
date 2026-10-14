@@ -79,6 +79,7 @@ from .api_deps.available_activities import (
 )
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, update, exc as sa_exc
+from sqlalchemy import and_ as sa_and_, or_ as sa_or_
 from io import StringIO, BytesIO
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 import o_timeusediary_backend
@@ -737,8 +738,15 @@ def _is_external_tasks_locked_by_diary_requirement(
 def _build_participant_completion_map(
     session: Session,
     study: Study,
+    participant_ids: Optional[List[str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Compute per-participant diary and everything-completion timestamps.
+
+    ``participant_ids`` restricts the computation to those participants. The
+    function loads every activity row of the study to derive the per-day
+    coverage, so without the restriction its cost grows with the whole study
+    rather than with the participants actually needed - pass the participants of
+    the current page/filter whenever the caller only needs those.
 
     Returns a dict mapping participant_id to:
       {"diary_completed_at": datetime|None,
@@ -776,6 +784,11 @@ def _build_participant_completion_map(
     This function is self-contained (loads its own data) so it can be reused
     from the admin export, study overview, or anywhere participant completion
     timestamps are needed.
+
+    @param session Database session.
+    @param study Study whose participants are described.
+    @param participant_ids When given, only these participants are computed.
+    @returns participant_id -> completion fields.
     """
     day_labels = session.exec(
         select(DayLabel).where(DayLabel.study_id == study.id)
@@ -785,9 +798,12 @@ def _build_participant_completion_map(
     if study_days_count == 0:
         return {}
 
-    activities = session.exec(
-        select(Activity).where(Activity.study_id == study.id)
-    ).all()
+    activities_query = select(Activity).where(Activity.study_id == study.id)
+    if participant_ids is not None:
+        activities_query = activities_query.where(
+            Activity.participant_id.in_(participant_ids)
+        )
+    activities = session.exec(activities_query).all()
 
     external_tasks = session.exec(
         select(StudyExternalTask).where(StudyExternalTask.study_id == study.id)
@@ -818,11 +834,14 @@ def _build_participant_completion_map(
     if has_external_tasks:
         task_key_by_id = {t.id: t.task_key for t in external_tasks}
         ext_task_ids = [t.id for t in external_tasks]
-        all_assignments = session.exec(
-            select(StudyExternalTaskAssignment).where(
-                StudyExternalTaskAssignment.external_task_id.in_(ext_task_ids)
+        assignments_query = select(StudyExternalTaskAssignment).where(
+            StudyExternalTaskAssignment.external_task_id.in_(ext_task_ids)
+        )
+        if participant_ids is not None:
+            assignments_query = assignments_query.where(
+                StudyExternalTaskAssignment.participant_id.in_(participant_ids)
             )
-        ).all()
+        all_assignments = session.exec(assignments_query).all()
         for a in all_assignments:
             assignments_by_pid.setdefault(a.participant_id, []).append(a)
             tk = task_key_by_id.get(a.external_task_id)
@@ -7935,6 +7954,13 @@ async def export_study_participants(
 # require_admin_identity, so this dependency is the only way in for them.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Page size of the activity extract, counted in PARTICIPANTS (a participant
+# contributes days x timelines x entries rows). The default keeps a page in the
+# low megabytes even for a data-heavy study; measured at ~670 bytes per row, so
+# 200 participants x 7 days x 30 entries is ~40k rows / ~27 MB of JSON.
+EXTRACT_ACTIVITIES_PAGE_PARTICIPANTS = 200
+EXTRACT_ACTIVITIES_MAX_PAGE_PARTICIPANTS = 2000
+
 
 def _resolve_extract_study_filter(
     session: Session, study_short_names: Optional[List[str]]
@@ -7978,11 +8004,89 @@ def _validate_extract_format(format: str) -> str:
     return normalized
 
 
-def _extract_response(records: List[Dict[str, Any]], filename: str, format: str) -> Response:
-    """Render extraction records as JSON or CSV, allowing an empty result."""
+def _encode_activity_cursor(study_id: int, participant_id: str) -> str:
+    """Encode a page position as an opaque cursor for the activities extract."""
+    return f"{study_id}:{participant_id}"
+
+
+def _parse_activity_cursor(cursor: str) -> Tuple[int, str]:
+    """Decode a cursor produced by :func:`_encode_activity_cursor`.
+
+    Raises HTTP 400 for anything else, so a client that mangles the cursor gets
+    a clear error instead of a silently wrong page.
+    """
+    study_part, separator, participant_part = (cursor or "").partition(":")
+    valid = separator and participant_part
+    if valid:
+        try:
+            return int(study_part), participant_part
+        except ValueError:
+            valid = False
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"Invalid cursor '{cursor}'. Pass the 'next_cursor' value from the "
+            "previous page unchanged."
+        ),
+    )
+
+
+def _key_after(study_id_column, participant_id_column, study_id: int, participant_id: str):
+    """SQL predicate for ``(study_id, participant_id)`` keys strictly after the given one.
+
+    Extraction pages are half-open key ranges ordered by
+    ``(study_id, participant_id)``. Two range predicates therefore carry the
+    whole page boundary - no condition per participant, and no dialect-specific
+    tuple comparison.
+    """
+    return sa_or_(
+        study_id_column > study_id,
+        sa_and_(
+            study_id_column == study_id,
+            participant_id_column > participant_id,
+        ),
+    )
+
+
+def _key_before(study_id_column, participant_id_column, study_id: int, participant_id: str):
+    """SQL predicate for ``(study_id, participant_id)`` keys strictly before the given one."""
+    return sa_or_(
+        study_id_column < study_id,
+        sa_and_(
+            study_id_column == study_id,
+            participant_id_column < participant_id,
+        ),
+    )
+
+
+def _extract_response(
+    records: List[Dict[str, Any]],
+    filename: str,
+    format: str,
+    *,
+    extra_metadata: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Response:
+    """Render extraction records as JSON or CSV, allowing an empty result.
+
+    Pagination state goes into the JSON metadata envelope and into response
+    headers: headers are the only channel both formats share, so a CSV consumer
+    can follow the cursor too.
+    """
     if format == "csv":
-        return export_csv(records, filename, allow_empty=True)
-    return export_json(records, filename, allow_empty=True)
+        response = export_csv(records, filename, allow_empty=True)
+    else:
+        response = export_json(
+            records,
+            filename,
+            allow_empty=True,
+            extra_metadata=extra_metadata,
+        )
+
+    for header_name, header_value in (headers or {}).items():
+        response.headers[header_name] = header_value
+
+    return response
 
 
 @app.get("/api/admin/studies")
@@ -8203,7 +8307,15 @@ async def admin_extract_participants(
             query.order_by(StudyParticipant.participant_id)
         ).all()
 
-        completion_map = _build_participant_completion_map(session, current_study)
+        completion_map = (
+            _build_participant_completion_map(
+                session,
+                current_study,
+                [association.participant_id for association in study_participants],
+            )
+            if study_participants
+            else {}
+        )
 
         for study_participant in study_participants:
             submitted_at = study_participant.study_submitted_at
@@ -8271,7 +8383,26 @@ async def admin_extract_activities(
         None,
         description=(
             "Participant id to include; repeat the parameter to select several. "
-            "Omit to include every participant."
+            "Disables paging: the requested participants' rows are returned in "
+            "one page. Use this when you already know which participants you "
+            "want (the usual backup flow)."
+        ),
+    ),
+    limit: int = Query(
+        EXTRACT_ACTIVITIES_PAGE_PARTICIPANTS,
+        ge=1,
+        le=EXTRACT_ACTIVITIES_MAX_PAGE_PARTICIPANTS,
+        description=(
+            "Maximum number of PARTICIPANTS per page (not rows). One participant "
+            "contributes as many rows as the study has day labels x timelines x "
+            "entries, so this is the knob that bounds the response size."
+        ),
+    ),
+    cursor: Optional[str] = Query(
+        None,
+        description=(
+            "Page position. Pass the 'next_cursor' value of the previous page "
+            "unchanged (it is opaque; do not construct it yourself)."
         ),
     ),
     format: str = Query("json", description="Output format: 'json' or 'csv'"),
@@ -8290,41 +8421,138 @@ async def admin_extract_activities(
     ``participant``. Because a submitted diary is immutable, that pull only has
     to happen once.
 
+    **Paging.** Without ``participant`` the endpoint returns one page of
+    participants at a time, ordered by ``(study_id, participant_id)``:
+
+    * ``limit`` counts **participants**, not rows. A page contains every row of
+      its participants, so a participant is never split across pages.
+    * Read ``metadata.next_cursor`` (or the ``X-Next-Cursor`` header) and pass it
+      back as ``cursor`` until ``metadata.has_more`` is false. State is reported
+      in both the JSON envelope and response headers, so CSV consumers can follow
+      the cursor too.
+    * Paging by participant rather than by row offset is deliberate: saving a day
+      deletes and re-inserts that day's rows, so row positions shift under a
+      concurrent write. Participant keys only move when a participant is added,
+      which cannot re-order or skip an already returned page.
+
     Note ``activity_id`` is a database id that changes whenever a day is
     re-saved, so it is not a stable key; use the ``(study_id, participant_id,
     day_label, timeline_name, activity_code, start_minutes)`` tuple when the copy
     needs to identify a row across pulls. It is stable for submitted data.
 
     @param study Optional repeated ``name_short`` filter.
-    @param participant Optional repeated participant id filter.
+    @param participant Optional repeated participant id filter (disables paging).
+    @param limit Maximum participants per page when paging.
+    @param cursor Opaque position of the next page.
     @param format Output format, ``json`` (default) or ``csv``.
     @param identity Authenticated super admin or backup identity, used for audit logging.
     @param session Database session dependency.
     @returns A file-download response with one record per activity.
     """
     normalized_format = _validate_extract_format(format)
+
+    if participant and cursor:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "cursor cannot be combined with participant: an explicit "
+                "participant selection is returned in a single page."
+            ),
+        )
+
     studies = _resolve_extract_study_filter(session, study)
+    study_ids = [current_study.id for current_study in studies]
     study_by_id = {current_study.id: current_study for current_study in studies}
 
     rows = []
-    if study_by_id:
-        query = (
+    has_more = False
+    next_cursor: Optional[str] = None
+    participants_returned = 0
+
+    if study_ids and participant:
+        # Explicit selection: one page, no cursor.
+        rows = session.exec(
             select(Activity, DayLabel, Timeline)
             .join(DayLabel, Activity.day_label_id == DayLabel.id)
             .join(Timeline, Activity.timeline_id == Timeline.id)
-            .where(Activity.study_id.in_(list(study_by_id.keys())))
-        )
-        if participant:
-            query = query.where(Activity.participant_id.in_(participant))
-
-        rows = session.exec(
-            query.order_by(
+            .where(
+                Activity.study_id.in_(study_ids),
+                Activity.participant_id.in_(participant),
+            )
+            .order_by(
                 Activity.study_id,
                 Activity.participant_id,
                 DayLabel.display_order,
                 Activity.start_minutes,
             )
         ).all()
+        participants_returned = len({row[0].participant_id for row in rows})
+
+    elif study_ids:
+        # Page over the roster of the selected studies. One extra row decides
+        # `has_more`, and its key becomes the exclusive upper bound of this page.
+        cursor_key = _parse_activity_cursor(cursor) if cursor else None
+
+        roster_query = select(
+            StudyParticipant.study_id, StudyParticipant.participant_id
+        ).where(StudyParticipant.study_id.in_(study_ids))
+        if cursor_key:
+            roster_query = roster_query.where(
+                _key_after(
+                    StudyParticipant.study_id,
+                    StudyParticipant.participant_id,
+                    *cursor_key,
+                )
+            )
+
+        roster_rows = session.exec(
+            roster_query.order_by(
+                StudyParticipant.study_id, StudyParticipant.participant_id
+            ).limit(limit + 1)
+        ).all()
+
+        has_more = len(roster_rows) > limit
+        page_rows = roster_rows[:limit]
+        participants_returned = len(page_rows)
+
+        if has_more:
+            last_study_id, last_participant_id = page_rows[-1]
+            next_cursor = _encode_activity_cursor(last_study_id, last_participant_id)
+
+        if page_rows:
+            activities_query = (
+                select(Activity, DayLabel, Timeline)
+                .join(DayLabel, Activity.day_label_id == DayLabel.id)
+                .join(Timeline, Activity.timeline_id == Timeline.id)
+                .where(Activity.study_id.in_(study_ids))
+            )
+            if cursor_key:
+                activities_query = activities_query.where(
+                    _key_after(
+                        Activity.study_id, Activity.participant_id, *cursor_key
+                    )
+                )
+            if has_more:
+                # rows[limit] is the first key of the NEXT page; excluding it
+                # keeps a participant out of two pages.
+                upper_study_id, upper_participant_id = roster_rows[limit]
+                activities_query = activities_query.where(
+                    _key_before(
+                        Activity.study_id,
+                        Activity.participant_id,
+                        upper_study_id,
+                        upper_participant_id,
+                    )
+                )
+
+            rows = session.exec(
+                activities_query.order_by(
+                    Activity.study_id,
+                    Activity.participant_id,
+                    DayLabel.display_order,
+                    Activity.start_minutes,
+                )
+            ).all()
 
     records: List[Dict[str, Any]] = []
     for activity, day_label, timeline in rows:
@@ -8369,12 +8597,31 @@ async def admin_extract_activities(
         (
             "downloaded admin activity extract "
             f"(studies={[s.name_short for s in studies]}, "
-            f"participants={participant}, format={normalized_format}, "
-            f"records={len(records)})"
+            f"participants={participant}, limit={limit}, cursor={cursor}, "
+            f"format={normalized_format}, participants_returned={participants_returned}, "
+            f"records={len(records)}, has_more={has_more})"
         ),
     )
 
-    return _extract_response(records, f"admin_activities_{timestamp}", normalized_format)
+    return _extract_response(
+        records,
+        f"admin_activities_{timestamp}",
+        normalized_format,
+        extra_metadata={
+            "limit": limit,
+            "cursor": cursor,
+            "participants_returned": participants_returned,
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+            "paged": not participant,
+        },
+        headers={
+            "X-Participants-Returned": str(participants_returned),
+            "X-Record-Count": str(len(records)),
+            "X-Has-More": "true" if has_more else "false",
+            **({"X-Next-Cursor": next_cursor} if next_cursor else {}),
+        },
+    )
 
 
 def _client_info_lookup(blob: Any, *path: str) -> Any:
@@ -8522,7 +8769,12 @@ def export_csv(data: list, filename: str, allow_empty: bool = False) -> Response
     return response
 
 
-def export_json(data: list, filename: str, allow_empty: bool = False) -> Response:
+def export_json(
+    data: list,
+    filename: str,
+    allow_empty: bool = False,
+    extra_metadata: Optional[Dict[str, Any]] = None,
+) -> Response:
     """
     Export data as JSON with pretty formatting. Used in admin interface.
 
@@ -8532,19 +8784,25 @@ def export_json(data: list, filename: str, allow_empty: bool = False) -> Respons
         with ``total_records: 0`` instead of raising a 404. Used by the
         extraction endpoints so a script can distinguish "no new data" from a
         failed request.
+    @param extra_metadata: Additional keys merged into the metadata envelope
+        (used for pagination state by the extraction endpoints).
     @return A Response object containing the JSON data with appropriate headers for file download.
     """
     if not data and not allow_empty:
         raise HTTPException(status_code=404, detail="No data to export")
 
     # Create JSON response
+    metadata: Dict[str, Any] = {
+        "export_timestamp": utc_now().isoformat(),
+        "total_records": len(data),
+        "format": "json",
+        "version": "1.0",
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+
     response_data = {
-        "metadata": {
-            "export_timestamp": utc_now().isoformat(),
-            "total_records": len(data),
-            "format": "json",
-            "version": "1.0",
-        },
+        "metadata": metadata,
         "data": data,
     }
 

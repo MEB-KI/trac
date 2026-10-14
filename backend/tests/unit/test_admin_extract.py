@@ -16,6 +16,7 @@ import asyncio
 import json
 import os
 from datetime import datetime, timezone
+from typing import Dict, List
 
 os.environ.setdefault("TUD_DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("TUD_ALLOWED_ORIGINS", '["http://localhost:3000"]')
@@ -158,6 +159,60 @@ def _payload(response) -> dict:
     return json.loads(response.body)
 
 
+def _seed_study_with_activities(
+    session, name_short: str, participant_ids: List[str]
+) -> Study:
+    """A second study with one day label and one activity per participant."""
+    study = Study(
+        name=f"Study {name_short}",
+        name_short=name_short,
+        activities_json_url="file:///tmp/activities.json",
+        data_collection_start=datetime(2026, 1, 1),
+        data_collection_end=datetime(2026, 12, 31),
+    )
+    session.add(study)
+    session.commit()
+    session.refresh(study)
+
+    day_label = DayLabel(
+        study_id=study.id, name="monday", display_order=0, display_name="Monday"
+    )
+    timeline = Timeline(
+        study_id=study.id,
+        name="primary",
+        display_name="Main Activity",
+        mode="single-choice",
+        min_coverage=0,
+    )
+    session.add(day_label)
+    session.add(timeline)
+    session.commit()
+    session.refresh(day_label)
+    session.refresh(timeline)
+
+    for participant_id in participant_ids:
+        session.add(Participant(id=participant_id))
+        session.add(
+            StudyParticipant(study_id=study.id, participant_id=participant_id)
+        )
+        session.add(
+            Activity(
+                study_id=study.id,
+                participant_id=participant_id,
+                day_label_id=day_label.id,
+                timeline_id=timeline.id,
+                activity_code=100,
+                start_minutes=0,
+                end_minutes=60,
+                activity_name="Activity 100",
+                activity_path_frontend="primary: Main Activity > Activity 100",
+            )
+        )
+
+    session.commit()
+    return study
+
+
 def _call_participants(session, **overrides):
     kwargs = {
         "study": None,
@@ -175,12 +230,39 @@ def _call_activities(session, **overrides):
     kwargs = {
         "study": None,
         "participant": None,
+        # FastAPI's Query defaults are not usable when calling the endpoint
+        # directly, so the values that would come from the query string are
+        # always passed explicitly.
+        "limit": api.EXTRACT_ACTIVITIES_PAGE_PARTICIPANTS,
+        "cursor": None,
         "format": "json",
         "identity": _identity(),
         "session": session,
     }
     kwargs.update(overrides)
     return asyncio.run(api.admin_extract_activities(**kwargs))
+
+
+def _walk_activities(session, **overrides):
+    """Follow next_cursor to the end; returns (records, page_count)."""
+    records: list = []
+    cursor = None
+    pages = 0
+
+    while True:
+        payload = _payload(_call_activities(session, cursor=cursor, **overrides))
+        metadata = payload["metadata"]
+        records.extend(payload["data"])
+        pages += 1
+
+        if metadata["has_more"]:
+            assert metadata["next_cursor"], "has_more must come with a next_cursor"
+        else:
+            assert metadata["next_cursor"] is None
+            return records, pages
+
+        cursor = metadata["next_cursor"]
+        assert pages < 50, "paging did not terminate"
 
 
 def _call_studies(session, **overrides):
@@ -325,11 +407,123 @@ def test_activities_can_be_filtered_by_participant(session, seeded):
     assert records[0]["day_label_index"] == 0
 
 
+# ─── activities paging ───────────────────────────────────────────────────────
+
+
+def test_paging_walks_every_participant_exactly_once(session, seeded):
+    records, pages = _walk_activities(session, limit=1)
+
+    # p-done (2 rows), p-partial (1 row), p-empty (0 rows): one page each.
+    assert pages == 3
+    counts: Dict[str, int] = {}
+    for record in records:
+        counts[record["participant_id"]] = counts.get(record["participant_id"], 0) + 1
+    assert counts == {"p-done": 2, "p-partial": 1}
+
+
+def test_a_page_never_splits_a_participant(session, seeded):
+    payload = _payload(_call_activities(session, limit=1))
+
+    assert payload["metadata"]["participants_returned"] == 1
+    assert payload["metadata"]["has_more"] is True
+    # Both days of p-done arrive in the same page, even though limit is 1.
+    assert {row["participant_id"] for row in payload["data"]} == {"p-done"}
+    assert len(payload["data"]) == 2
+    assert payload["metadata"]["next_cursor"] == "1:p-done"
+
+
+def test_paging_reports_state_in_headers_too(session, seeded):
+    """CSV has no metadata envelope, so the headers are its only cursor channel."""
+    response = _call_activities(session, limit=1, format="csv")
+
+    assert response.status_code == 200
+    assert response.headers["X-Has-More"] == "true"
+    assert response.headers["X-Next-Cursor"] == "1:p-done"
+    assert response.headers["X-Participants-Returned"] == "1"
+    assert response.headers["X-Record-Count"] == "2"
+
+
+def test_paging_spans_multiple_studies_in_roster_order(session, seeded):
+    """A study boundary must not be able to skip a participant.
+
+    The second study's participants sort BEFORE the first study's, so a cursor
+    that carried only the participant id would skip them entirely.
+    """
+    _seed_study_with_activities(session, "second_study", ["a-first", "a-second"])
+
+    records, pages = _walk_activities(session, limit=1)
+
+    counts: Dict[str, int] = {}
+    for record in records:
+        counts[record["participant_id"]] = counts.get(record["participant_id"], 0) + 1
+    assert counts == {"p-done": 2, "p-partial": 1, "a-first": 1, "a-second": 1}
+    assert {record["study_name_short"] for record in records} == {
+        "extract_study",
+        "second_study",
+    }
+    assert pages == 5
+
+
+def test_explicit_participant_selection_is_a_single_unpaged_page(session, seeded):
+    payload = _payload(_call_activities(session, participant=["p-done", "p-partial"]))
+
+    assert payload["metadata"]["paged"] is False
+    assert payload["metadata"]["has_more"] is False
+    assert payload["metadata"]["next_cursor"] is None
+    assert payload["metadata"]["participants_returned"] == 2
+    assert len(payload["data"]) == 3
+
+
+def test_cursor_cannot_be_combined_with_participant(session, seeded):
+    with pytest.raises(HTTPException) as excinfo:
+        _call_activities(session, participant=["p-done"], cursor="1:p-done")
+
+    assert excinfo.value.status_code == 400
+
+
+@pytest.mark.parametrize("cursor", ["nonsense", "x:p-done", "1:", ":p-done"])
+def test_invalid_cursor_is_rejected(session, seeded, cursor):
+    with pytest.raises(HTTPException) as excinfo:
+        _call_activities(session, cursor=cursor)
+
+    assert excinfo.value.status_code == 400
+
+
+def test_empty_cursor_means_first_page(session, seeded):
+    """`?cursor=` (an empty variable in a shell script) must not be an error."""
+    payload = _payload(_call_activities(session, cursor="", limit=1))
+
+    assert payload["metadata"]["cursor"] == ""
+    assert payload["metadata"]["next_cursor"] == "1:p-done"
+
+
 def test_activities_empty_result_is_not_an_error(session):
     payload = _payload(_call_activities(session))
 
     assert payload["data"] == []
     assert payload["metadata"]["total_records"] == 0
+    assert payload["metadata"]["has_more"] is False
+
+
+# ─── completion map bounding ─────────────────────────────────────────────────
+
+
+def test_completion_map_can_be_restricted_to_given_participants(session, seeded):
+    """The map loads every activity of the study, so callers pass the participants they need.
+
+    It only contains participants that actually reported something (the admin
+    participants endpoint fills the gaps with "empty" day statuses itself).
+    """
+    assert set(api._build_participant_completion_map(session, seeded)) == {
+        "p-done",
+        "p-partial",
+    }
+
+    restricted = api._build_participant_completion_map(session, seeded, ["p-done"])
+
+    assert set(restricted) == {"p-done"}
+    assert restricted["p-done"]["days_meeting_min_coverage"] == 2
+    assert restricted["p-done"]["all_days_meet_min_coverage"] is True
 
 
 # ─── studies ─────────────────────────────────────────────────────────────────
