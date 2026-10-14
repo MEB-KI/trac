@@ -5,8 +5,10 @@ Covers the full workflow the endpoints exist for: a script polls
 pulls exactly their rows from ``/api/admin/activities`` and the reference data
 from ``/api/admin/studies``.
 
-Also pins the access rule: extraction is super-admin only. Scientists manage
-their own studies; running server backups is not their job.
+Also pins the access rule: the extracts are open to super admins and to
+read-only backup accounts (``TUD_API_BACKUP_USERS``), and to nobody else.
+Scientists manage their own studies; running server backups is not their job,
+and backup accounts must not reach any other admin route.
 """
 
 import os
@@ -27,9 +29,16 @@ SCIENTIST_AUTH = (
     (SCIENTISTS[0]["name"], SCIENTISTS[0]["password"]) if SCIENTISTS else None
 )
 
+BACKUP_USERS = settings.backup_credentials
+BACKUP_AUTH = BACKUP_USERS[0] if BACKUP_USERS else None
+
 requires_scientist = pytest.mark.skipif(
     SCIENTIST_AUTH is None,
-    reason="Needs a scientist in TUD_API_SCIENTISTS to verify super-admin-only access.",
+    reason="Needs a scientist in TUD_API_SCIENTISTS to verify access rules.",
+)
+requires_backup_account = pytest.mark.skipif(
+    BACKUP_AUTH is None,
+    reason="Needs an account in TUD_API_BACKUP_USERS to verify the backup role.",
 )
 
 
@@ -101,6 +110,36 @@ async def test_extraction_endpoints_are_super_admin_only():
             )
             assert response.status_code == 403, (path, response.text)
             assert response.json()["detail"]["code"] == "super_admin_required"
+
+
+@requires_backup_account
+@pytest.mark.asyncio
+async def test_backup_account_can_use_the_three_extraction_endpoints():
+    async with httpx.AsyncClient() as client:
+        for path in ("studies", "participants", "activities"):
+            response = await client.get(
+                f"{BASE_URL}/api/admin/{path}",
+                auth=BACKUP_AUTH,
+            )
+            assert response.status_code == 200, (path, response.text)
+            assert "data" in response.json()
+
+
+@requires_backup_account
+@pytest.mark.asyncio
+async def test_backup_account_is_denied_on_every_other_admin_route():
+    """Study scope does not cover these paths, so the admin gate itself must deny them."""
+    async with httpx.AsyncClient() as client:
+        for path in (
+            "/admin",
+            "/admin/tools",
+            "/admin/file-validation",
+            "/api/admin/export/studies-runtime-config",
+            "/api/admin/studies/default/available-activities-summary",
+        ):
+            response = await client.get(f"{BASE_URL}{path}", auth=BACKUP_AUTH)
+            assert response.status_code == 403, (path, response.text)
+            assert response.json()["detail"]["code"] == "extraction_only_account"
 
 
 @pytest.mark.asyncio

@@ -12,14 +12,20 @@ from fastapi import HTTPException
 from fastapi.security import HTTPBasicCredentials
 
 from o_timeusediary_backend.api_deps.admin_auth import (
+    ROLE_BACKUP,
     ROLE_SCIENTIST,
     ROLE_SUPER_ADMIN,
     AdminIdentity,
     _study_name_from_request_path,
     enforce_admin_study_scope,
+    require_admin_identity,
+    require_extraction_identity,
     resolve_admin_identity,
 )
 from o_timeusediary_backend.models import Study
+
+
+BACKUP_USER_JSON = '[{"name": "backup_bot", "password": "pw_backup"}]'
 
 
 def _set_admin_env(monkeypatch):
@@ -32,6 +38,12 @@ def _set_admin_env(monkeypatch):
             ' {"name": "bob", "password": "pw_bob"}]'
         ),
     )
+    monkeypatch.delenv("TUD_API_BACKUP_USERS", raising=False)
+
+
+def _set_backup_env(monkeypatch):
+    _set_admin_env(monkeypatch)
+    monkeypatch.setenv("TUD_API_BACKUP_USERS", BACKUP_USER_JSON)
 
 
 def _credentials(username: str, password: str) -> HTTPBasicCredentials:
@@ -95,6 +107,85 @@ def test_super_admin_can_access_every_study():
 
     assert identity.can_access_study(_study("any_study")) is True
     assert identity.can_access_study(_study("any_study", ["someone_else"])) is True
+
+
+def test_resolve_backup_identity(monkeypatch):
+    _set_backup_env(monkeypatch)
+
+    identity = resolve_admin_identity(_credentials("backup_bot", "pw_backup"))
+
+    assert identity.username == "backup_bot"
+    assert identity.role == ROLE_BACKUP
+    assert identity.is_backup is True
+    assert identity.is_super_admin is False
+    assert identity.granted_study_names == frozenset()
+
+
+def test_backup_identity_is_never_a_study_owner():
+    """A stale owner entry naming a backup account must not grant access."""
+    identity = AdminIdentity(username="backup_bot", role=ROLE_BACKUP)
+
+    assert identity.can_access_study(_study("owned_study", ["backup_bot"])) is False
+    assert identity.can_access_study(_study("unowned_study")) is False
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/admin",
+        "/admin/tools",
+        "/admin/file-validation",
+        "/api/admin/validate/files",
+        "/api/admin/studies/create-from-files",
+        "/api/admin/export/studies-runtime-config",
+        "/api/admin/studies/default",
+    ],
+)
+def test_backup_identity_is_denied_by_the_admin_gate(monkeypatch, path):
+    """Study scope alone would not stop a backup account on non-study-scoped routes."""
+    _set_backup_env(monkeypatch)
+    request = SimpleNamespace(scope={"path": path})
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_admin_identity(
+            request,
+            _credentials("backup_bot", "pw_backup"),
+            _FakeSession(None),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail["code"] == "extraction_only_account"
+
+
+def test_extraction_dependency_accepts_super_admins_and_backup_accounts(monkeypatch):
+    _set_backup_env(monkeypatch)
+
+    super_admin = require_extraction_identity(
+        _credentials("super_admin", "super_password")
+    )
+    assert super_admin.role == ROLE_SUPER_ADMIN
+
+    backup = require_extraction_identity(_credentials("backup_bot", "pw_backup"))
+    assert backup.role == ROLE_BACKUP
+
+
+def test_extraction_dependency_rejects_scientists(monkeypatch):
+    _set_backup_env(monkeypatch)
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_extraction_identity(_credentials("alice", "pw_alice"))
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail["code"] == "super_admin_required"
+
+
+def test_extraction_dependency_rejects_invalid_credentials(monkeypatch):
+    _set_backup_env(monkeypatch)
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_extraction_identity(_credentials("backup_bot", "wrong"))
+
+    assert exc_info.value.status_code == 401
 
 
 def test_scientist_access_via_ownership_and_env_grant():

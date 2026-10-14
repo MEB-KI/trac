@@ -1,6 +1,6 @@
 """Admin authentication and study-scope authorization.
 
-Two kinds of administrators exist:
+Three kinds of accounts exist:
 
 * **Super admins** are configured via ``TUD_API_ADMIN_USERNAME`` /
   ``TUD_API_ADMIN_PASSWORD`` and may manage every study.
@@ -8,6 +8,10 @@ Two kinds of administrators exist:
   the studies they own (``Study.owner_usernames``) plus the studies explicitly
   granted to them in their ``TUD_API_SCIENTISTS`` entry. Within those studies
   they have the full powers of an admin (including deleting the study).
+* **Backup accounts** are configured via ``TUD_API_BACKUP_USERS``. They are
+  read-only and server-wide and may only call the data-extraction endpoints
+  (see :func:`require_extraction_identity`); every other admin route rejects
+  them in :func:`require_admin_identity`.
 
 Study scope is enforced centrally in :func:`require_admin_identity`, which every
 admin route depends on - directly, or indirectly through the
@@ -47,6 +51,7 @@ security = HTTPBasic(realm=ADMIN_AUTH_REALM)
 
 ROLE_SUPER_ADMIN = "super_admin"
 ROLE_SCIENTIST = "scientist"
+ROLE_BACKUP = "backup"
 
 # Admin route paths that carry a study short name. Patterns (instead of an
 # explicit route list) are used so that new study-scoped routes are covered
@@ -67,7 +72,7 @@ class AdminIdentity:
     """An authenticated administrator and the studies she may manage."""
 
     username: str
-    role: Literal["super_admin", "scientist"]
+    role: Literal["super_admin", "scientist", "backup"]
     granted_study_names: frozenset[str] = field(default_factory=frozenset)
 
     @property
@@ -75,10 +80,20 @@ class AdminIdentity:
         """Whether this identity may manage every study."""
         return self.role == ROLE_SUPER_ADMIN
 
+    @property
+    def is_backup(self) -> bool:
+        """Whether this identity is a read-only extraction account."""
+        return self.role == ROLE_BACKUP
+
     def can_access_study(self, study: Study) -> bool:
         """Whether this identity may manage the given study."""
         if self.is_super_admin:
             return True
+        # Backup accounts are read-only extraction accounts, never study owners.
+        # The admin gate already denies them, so this is defence in depth: a
+        # stale owner entry naming a backup account must not grant access.
+        if self.is_backup:
+            return False
         if self.username in (study.owner_usernames or []):
             return True
         return study.name_short in self.granted_study_names
@@ -178,6 +193,21 @@ def resolve_admin_identity(credentials: HTTPBasicCredentials) -> AdminIdentity:
                 ),
             )
 
+    for expected_username, expected_password in settings.backup_credentials:
+        correct_username = secrets.compare_digest(
+            credentials.username, expected_username
+        )
+        correct_password = secrets.compare_digest(
+            credentials.password, expected_password
+        )
+        if correct_username and correct_password:
+            logger.info(
+                "Backup account '%s' authenticated successfully (role=%s).",
+                credentials.username,
+                ROLE_BACKUP,
+            )
+            return AdminIdentity(username=credentials.username, role=ROLE_BACKUP)
+
     logger.info(
         "Failed admin authentication attempt for user '%s'", credentials.username
     )
@@ -245,6 +275,31 @@ def require_admin_identity(
     depends on it, directly or through :func:`verify_admin`.
     """
     identity = resolve_admin_identity(credentials)
+
+    # Backup accounts are deliberately not admins: they may only call the
+    # extraction endpoints. Denying them here - at the one gate every admin
+    # route depends on - is what makes that restriction hold for routes without
+    # a study name in their path (the admin overview, file validation, study
+    # creation from files) and for admin routes added later. Study scope alone
+    # would not cover those, because it only fires for study-scoped paths.
+    if identity.is_backup:
+        logger.warning(
+            "Backup account '%s' denied access to admin route '%s'.",
+            identity.username,
+            request.scope.get("path"),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "extraction_only_account",
+                "message": (
+                    "This account is restricted to the read-only "
+                    "data-extraction endpoints (/api/admin/studies, "
+                    "/api/admin/participants, /api/admin/activities)."
+                ),
+            },
+        )
+
     enforce_admin_study_scope(request, identity, session)
     return identity
 
@@ -281,3 +336,35 @@ def verify_admin(identity: AdminIdentity = Depends(require_admin_identity)) -> s
     @return: The username of the authenticated admin.
     """
     return identity.username
+
+
+def require_extraction_identity(
+    credentials: HTTPBasicCredentials = Depends(security),
+) -> AdminIdentity:
+    """Authenticate the caller for the read-only data-extraction endpoints.
+
+    Accepts super admins and backup accounts. Scientists are rejected: they
+    administer individual studies and do not run server-wide server backups.
+
+    Built on :func:`resolve_admin_identity` rather than
+    :func:`require_admin_identity`, because that gate deliberately rejects
+    backup accounts.
+
+    @param credentials HTTP Basic credentials from the request.
+    @returns The authenticated identity (super admin or backup account).
+    """
+    identity = resolve_admin_identity(credentials)
+    if identity.role not in (ROLE_SUPER_ADMIN, ROLE_BACKUP):
+        logger.warning(
+            "Admin '%s' (role=%s) denied access to an extraction endpoint.",
+            identity.username,
+            identity.role,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "super_admin_required",
+                "message": "This action is restricted to super admins.",
+            },
+        )
+    return identity

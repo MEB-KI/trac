@@ -299,6 +299,26 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   picks the rendering, and an empty result is a `200` with zero records rather
   than the 404 the scientific exports raise - "nobody has finished yet" must not
   look like a failed request to the backup script.
+- NEW: read-only backup accounts (`TUD_API_BACKUP_USERS`), so the export job no
+  longer has to run with the super-admin credential. An account listed there can
+  call the three extraction endpoints and nothing else; every other admin route
+  answers 403. The restriction is enforced in `require_admin_identity`, the one
+  gate all admin routes already share, because study scope alone would not cover
+  the routes without a study name in their path - the admin overview, the
+  file-validation tools and "create study from files" would otherwise have
+  accepted the account. Entries are validated like the scientist ones, with two
+  deliberate differences: a username must not appear in `TUD_API_ADMIN_USERNAME`
+  or `TUD_API_SCIENTISTS` (the backend refuses to start, since the effective role
+  would otherwise depend on lookup order), and unsupported fields are rejected
+  rather than ignored - a `studies` key would have suggested a restriction that
+  does not exist, because a backup account is server-wide by design.
+  `AdminIdentity.can_access_study()` also returns False for the role, so a stale
+  owner entry naming a backup account can never grant it study access. Coverage:
+  `tests/unit/test_settings_backup_users.py`, the backup cases in
+  `tests/unit/test_admin_identity.py`, and
+  `tests/integration/test_admin_extract_endpoints.py` (allowed on exactly the
+  three extracts, 403 `extraction_only_account` on a representative set of the
+  others).
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------
