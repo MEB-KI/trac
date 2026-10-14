@@ -349,6 +349,13 @@ Version 0.24.0 -- Mobile improvements, backup endpoints, many fixes
   rejected) and a two-page-over-HTTP walk in
   `tests/integration/test_admin_extract_endpoints.py`.
 
+
+Version 0.23.0 -- Minor text adjustments
+----------------------------------------
+- NEW: make instructions page title user configurable
+- CHG: change default german welcome text
+
+
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------
 - NEW: browser/device identification, so researchers can tell whether the app
@@ -363,12 +370,6 @@ Version 0.22.0 -- Optional opt-in browser identification
 - DEV: `README_CREATE_STUDY.md` documents the setting as opt-in and points out
   that the data is personal and usage of the feature belongs in the consent text,
   and `README.md` documents the new participant export alongside the activities export.
-
-
-Version 0.23.0 -- Minor text adjustments
-----------------------------------------
-- NEW: make instructions page title user configurable
-- CHG: change default german welcome text
 
 
 Version 0.21.0 -- New mobile interface, i18n hardening, clarify DB migration policy
