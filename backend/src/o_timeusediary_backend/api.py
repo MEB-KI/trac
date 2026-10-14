@@ -7904,6 +7904,476 @@ async def export_study_participants(
         return export_csv(export_data, filename)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin backup extraction API
+#
+# Read-only endpoints for an admin team that copies TRAC data into a separate
+# system. They are split by grain so the copy can be loaded without joins and
+# without de-duplication:
+#
+#   GET /api/admin/studies       reference data (study metadata, day labels,
+#                                timelines, activity definitions) so the copy
+#                                stays interpretable without the source server
+#   GET /api/admin/participants  one row per participant-per-study, incl. the
+#                                submission status ("who has finished, when?")
+#   GET /api/admin/activities    one row per reported activity
+#
+# Intended workflow: poll /participants for newly submitted participants, then
+# pull those participants' rows from /activities once. Pulling once is safe
+# because a submitted study is immutable - see the post-submission guards on the
+# participant write endpoints (day save, copy day, consent).
+#
+# This is deliberately NOT the /api/admin/export/{study}/... family: those
+# exports are built for scientists doing statistical analysis and repeat
+# participant-level columns on every activity row, which makes them unusable as
+# a relational copy.
+#
+# All three endpoints are super-admin only: scientists manage their own studies,
+# running server backups is not their job.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _resolve_extract_study_filter(
+    session: Session, study_short_names: Optional[List[str]]
+) -> List[Study]:
+    """Resolve the optional ``study`` query filter into Study rows.
+
+    Without a filter every study is returned, ordered by the immutable numeric
+    id (never by ``name_short``, which admins can rename). Requested studies
+    that do not exist raise 404 so an extractor cannot silently copy less than
+    it asked for.
+
+    @param session Database session.
+    @param study_short_names Zero or more ``name_short`` values to include.
+    @returns The matching studies, possibly an empty list for an empty database.
+    """
+    query = select(Study).order_by(Study.id)
+    if study_short_names:
+        query = query.where(Study.name_short.in_(study_short_names))
+
+    studies = list(session.exec(query).all())
+
+    if study_short_names:
+        missing = sorted(set(study_short_names) - {s.name_short for s in studies})
+        if missing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Study/studies not found: {', '.join(missing)}",
+            )
+
+    return studies
+
+
+def _validate_extract_format(format: str) -> str:
+    """Normalize and validate the ``format`` query parameter for extracts."""
+    normalized = (format or "json").strip().lower()
+    if normalized not in {"json", "csv"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format '{format}'. Use 'csv' or 'json'.",
+        )
+    return normalized
+
+
+def _extract_response(records: List[Dict[str, Any]], filename: str, format: str) -> Response:
+    """Render extraction records as JSON or CSV, allowing an empty result."""
+    if format == "csv":
+        return export_csv(records, filename, allow_empty=True)
+    return export_json(records, filename, allow_empty=True)
+
+
+@app.get("/api/admin/studies")
+async def admin_extract_studies(
+    study: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Short name of a study to include; repeat the parameter to select "
+            "several. Omit to include every study."
+        ),
+    ),
+    identity: AdminIdentity = Depends(require_super_admin),
+    session: Session = Depends(get_session),
+):
+    """Export study configuration/reference data so an off-server copy is self-contained.
+
+    Returns one record per study containing the study metadata, its day labels,
+    its timelines (including ``min_coverage``) and the per-language
+    ``activities_json_data`` blobs. Together with the id/key columns on the
+    participant and activity extracts this is enough to interpret the copied
+    diary rows without the source server.
+
+    JSON only: the payload is nested (lists of day labels/timelines/language
+    blobs), which CSV cannot represent meaningfully.
+
+    @param study Optional repeated ``name_short`` filter.
+    @param identity Authenticated super admin identity, used for audit logging.
+    @param session Database session dependency.
+    @returns A JSON document with one record per study.
+    """
+    studies = _resolve_extract_study_filter(session, study)
+
+    records: List[Dict[str, Any]] = []
+    for current_study in studies:
+        day_labels = session.exec(
+            select(DayLabel)
+            .where(DayLabel.study_id == current_study.id)
+            .order_by(DayLabel.display_order)
+        ).all()
+        timelines = session.exec(
+            select(Timeline)
+            .where(Timeline.study_id == current_study.id)
+            .order_by(Timeline.name)
+        ).all()
+        activity_configs = session.exec(
+            select(StudyActivityConfigBlob)
+            .where(StudyActivityConfigBlob.study_id == current_study.id)
+            .order_by(StudyActivityConfigBlob.language)
+        ).all()
+
+        records.append(
+            {
+                "study_id": current_study.id,
+                "name": current_study.name,
+                "name_short": current_study.name_short,
+                "description": current_study.description,
+                "default_language": current_study.default_language,
+                "activities_json_url": current_study.activities_json_url,
+                "data_collection_start": current_study.data_collection_start.isoformat(),
+                "data_collection_end": current_study.data_collection_end.isoformat(),
+                "created_at": current_study.created_at.isoformat(),
+                # Behavioural flags: needed to interpret what was shown to the
+                # participant (e.g. whether a consent step or a skip button
+                # existed at all).
+                "allow_unlisted_participants": current_study.allow_unlisted_participants,
+                "require_consent": current_study.require_consent,
+                "is_paused": current_study.is_paused,
+                "allow_skip_timeuse": current_study.allow_skip_timeuse,
+                "require_diary_before_external_tasks": (
+                    current_study.require_diary_before_external_tasks
+                ),
+                "hide_server_wide_links": current_study.hide_server_wide_links,
+                "save_browser_identification": current_study.save_browser_identification,
+                "inactivity_timeout_minutes": current_study.inactivity_timeout_minutes,
+                "inactivity_timeout_stress_time_left": (
+                    current_study.inactivity_timeout_stress_time_left
+                ),
+                "owner_usernames": current_study.owner_usernames,
+                "footer_links": current_study.footer_links,
+                "study_texts": {
+                    "intro": current_study.study_text_intro,
+                    "instructions": current_study.study_text_instructions,
+                    "instructions_title": current_study.study_text_instructions_title,
+                    "consent": current_study.study_text_consent,
+                    "end_completed": current_study.study_text_end_completed,
+                    "end_skipped": current_study.study_text_end_skipped,
+                    "end_noconsent": current_study.study_text_end_noconsent,
+                    "inactivity_page_custom_text": (
+                        current_study.inactivity_page_custom_text
+                    ),
+                },
+                "day_labels": [
+                    {
+                        "name": day_label.name,
+                        "display_order": day_label.display_order,
+                        "display_name": day_label.display_name,
+                        "display_names": day_label.display_names,
+                    }
+                    for day_label in day_labels
+                ],
+                "timelines": [
+                    {
+                        "name": timeline.name,
+                        "display_name": timeline.display_name,
+                        "description": timeline.description,
+                        "mode": timeline.mode,
+                        "min_coverage": timeline.min_coverage,
+                    }
+                    for timeline in timelines
+                ],
+                "activity_configs": [
+                    {
+                        "language": config.language,
+                        "content_hash": config.content_hash,
+                        "updated_at": config.updated_at.isoformat(),
+                        "activities_json_data": config.activities_json_data,
+                    }
+                    for config in activity_configs
+                ],
+            }
+        )
+
+    timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
+    audit_admin_action(
+        identity.username,
+        (
+            "downloaded admin study reference extract "
+            f"(studies={[s.name_short for s in studies]}, records={len(records)})"
+        ),
+    )
+
+    return export_json(records, f"admin_studies_{timestamp}", allow_empty=True)
+
+
+@app.get("/api/admin/participants")
+async def admin_extract_participants(
+    study: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Short name of a study to include; repeat the parameter to select "
+            "several. Omit to include every study."
+        ),
+    ),
+    submitted: Optional[bool] = Query(
+        None,
+        description=(
+            "Filter by submission status: true = only submitted participants, "
+            "false = only participants who have not submitted. Omit for all."
+        ),
+    ),
+    submitted_after: Optional[datetime] = Query(
+        None,
+        description=(
+            "Only participants whose submission happened at or after this "
+            "ISO 8601 timestamp. Useful for incremental polling."
+        ),
+    ),
+    format: str = Query("json", description="Output format: 'json' or 'csv'"),
+    identity: AdminIdentity = Depends(require_super_admin),
+    session: Session = Depends(get_session),
+):
+    """Export one row per participant-per-study, including their completion status.
+
+    ``submitted`` mirrors ``study_submitted_at``: the participant pressed
+    "Finish", which the backend only allows once every day label meets its
+    timeline's ``min_coverage``. **Submission is the definition of "done"** -
+    external task confirmations are deliberately ignored here. From that moment
+    the diary is immutable (see the post-submission guards on the participant
+    write endpoints), so a submitted participant can be pulled exactly once and
+    the copy stays valid.
+
+    ``submitted_after`` makes the endpoint usable as a poll target: a script can
+    remember the newest ``study_submitted_at`` it has already copied and ask only
+    for what came after it.
+
+    Participants who never logged an activity are included (they are the
+    drop-outs); their day statuses are reported as ``empty``. An empty result is
+    a normal 200 with no records, not a 404.
+
+    @param study Optional repeated ``name_short`` filter.
+    @param submitted Optional submission-status filter.
+    @param submitted_after Optional lower bound on ``study_submitted_at``.
+    @param format Output format, ``json`` (default) or ``csv``.
+    @param identity Authenticated super admin identity, used for audit logging.
+    @param session Database session dependency.
+    @returns A file-download response with one record per participant-per-study.
+    """
+    normalized_format = _validate_extract_format(format)
+    studies = _resolve_extract_study_filter(session, study)
+
+    # Compare on normalized UTC wall time so the same code works on PostgreSQL
+    # (tz-aware column) and SQLite (naive column).
+    cutoff = (
+        _to_utc_naive(_coerce_utc_aware(submitted_after))
+        if submitted_after is not None
+        else None
+    )
+
+    records: List[Dict[str, Any]] = []
+    for current_study in studies:
+        day_label_orders = list(
+            session.exec(
+                select(DayLabel.display_order)
+                .where(DayLabel.study_id == current_study.id)
+                .order_by(DayLabel.display_order)
+            ).all()
+        )
+
+        query = select(StudyParticipant).where(
+            StudyParticipant.study_id == current_study.id
+        )
+        if submitted is True:
+            query = query.where(StudyParticipant.study_submitted_at.is_not(None))
+        elif submitted is False:
+            query = query.where(StudyParticipant.study_submitted_at.is_(None))
+
+        study_participants = session.exec(
+            query.order_by(StudyParticipant.participant_id)
+        ).all()
+
+        completion_map = _build_participant_completion_map(session, current_study)
+
+        for study_participant in study_participants:
+            submitted_at = study_participant.study_submitted_at
+
+            if cutoff is not None and (
+                submitted_at is None or _to_utc_naive(submitted_at) < cutoff
+            ):
+                continue
+
+            completion = completion_map.get(study_participant.participant_id) or {}
+            day_status = completion.get("day_status") or {}
+
+            record: Dict[str, Any] = {
+                "study_id": current_study.id,
+                "study_name": current_study.name,
+                "study_name_short": current_study.name_short,
+                "participant_id": study_participant.participant_id,
+                "participant_study_created_at": study_participant.created_at.isoformat(),
+                "submitted": submitted_at is not None,
+                "study_submitted_at": (
+                    submitted_at.isoformat() if submitted_at else None
+                ),
+                "total_days": len(day_label_orders),
+                "days_with_data": completion.get("days_with_data", 0),
+                "days_meeting_min_coverage": completion.get(
+                    "days_meeting_min_coverage", 0
+                ),
+                "all_days_meet_min_coverage": completion.get(
+                    "all_days_meet_min_coverage", False
+                ),
+            }
+
+            # Flat per-day columns so the row survives a CSV round-trip. Every
+            # day label of the study gets a column, defaulting to "empty" for
+            # participants the completion map does not know about (no data yet).
+            for day_order in day_label_orders:
+                record[f"day_{day_order}_status"] = day_status.get(day_order, "empty")
+
+            records.append(record)
+
+    timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
+    audit_admin_action(
+        identity.username,
+        (
+            "downloaded admin participant extract "
+            f"(studies={[s.name_short for s in studies]}, submitted={submitted}, "
+            f"submitted_after={submitted_after.isoformat() if submitted_after else None}, "
+            f"format={normalized_format}, records={len(records)})"
+        ),
+    )
+
+    return _extract_response(records, f"admin_participants_{timestamp}", normalized_format)
+
+
+@app.get("/api/admin/activities")
+async def admin_extract_activities(
+    study: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Short name of a study to include; repeat the parameter to select "
+            "several. Omit to include every study."
+        ),
+    ),
+    participant: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Participant id to include; repeat the parameter to select several. "
+            "Omit to include every participant."
+        ),
+    ),
+    format: str = Query("json", description="Output format: 'json' or 'csv'"),
+    identity: AdminIdentity = Depends(require_super_admin),
+    session: Session = Depends(get_session),
+):
+    """Export one row per reported activity, across all studies or a subset.
+
+    This is the flat time-use diary data. It deliberately carries **no**
+    participant-level columns (consent, browser identification, completion
+    timestamps): those live in ``/api/admin/participants`` and would otherwise
+    be duplicated on every row. Join the two on ``(study_id, participant_id)``.
+
+    The usual flow is to first ask ``/api/admin/participants?submitted=true``
+    which participants are done, then request exactly their rows here via
+    ``participant``. Because a submitted diary is immutable, that pull only has
+    to happen once.
+
+    Note ``activity_id`` is a database id that changes whenever a day is
+    re-saved, so it is not a stable key; use the ``(study_id, participant_id,
+    day_label, timeline_name, activity_code, start_minutes)`` tuple when the copy
+    needs to identify a row across pulls. It is stable for submitted data.
+
+    @param study Optional repeated ``name_short`` filter.
+    @param participant Optional repeated participant id filter.
+    @param format Output format, ``json`` (default) or ``csv``.
+    @param identity Authenticated super admin identity, used for audit logging.
+    @param session Database session dependency.
+    @returns A file-download response with one record per activity.
+    """
+    normalized_format = _validate_extract_format(format)
+    studies = _resolve_extract_study_filter(session, study)
+    study_by_id = {current_study.id: current_study for current_study in studies}
+
+    rows = []
+    if study_by_id:
+        query = (
+            select(Activity, DayLabel, Timeline)
+            .join(DayLabel, Activity.day_label_id == DayLabel.id)
+            .join(Timeline, Activity.timeline_id == Timeline.id)
+            .where(Activity.study_id.in_(list(study_by_id.keys())))
+        )
+        if participant:
+            query = query.where(Activity.participant_id.in_(participant))
+
+        rows = session.exec(
+            query.order_by(
+                Activity.study_id,
+                Activity.participant_id,
+                DayLabel.display_order,
+                Activity.start_minutes,
+            )
+        ).all()
+
+    records: List[Dict[str, Any]] = []
+    for activity, day_label, timeline in rows:
+        current_study = study_by_id.get(activity.study_id)
+
+        # Duration is the authoritative quantity; the wall-clock times are
+        # derived from start + duration and wrapped to a 24 h day, because the
+        # timeline runs 04:00 -> 04:00 (+1 day) and end_minutes can reach 1680.
+        duration_minutes = activity.end_minutes - activity.start_minutes
+        start_clock = activity.start_minutes % (24 * 60)
+        end_clock = (activity.start_minutes + duration_minutes) % (24 * 60)
+
+        records.append(
+            {
+                "activity_id": activity.id,
+                "study_id": activity.study_id,
+                "study_name": current_study.name if current_study else None,
+                "study_name_short": current_study.name_short if current_study else None,
+                "participant_id": activity.participant_id,
+                "day_label": day_label.name,
+                "day_label_index": day_label.display_order,
+                "timeline_name": timeline.name,
+                "timeline_display_name": timeline.display_name,
+                "timeline_mode": timeline.mode,
+                "activity_code": activity.activity_code,
+                "activity_name": activity.activity_name,
+                "category": activity.category,
+                "frequency": activity.frequency_key or "",
+                "parent_activity_code": activity.parent_activity_code,
+                "start_minutes": activity.start_minutes,
+                "end_minutes": activity.end_minutes,
+                "duration_minutes": duration_minutes,
+                "start_time": f"{start_clock // 60:02d}:{start_clock % 60:02d}",
+                "end_time": f"{end_clock // 60:02d}:{end_clock % 60:02d}",
+                "created_at": activity.created_at.isoformat(),
+            }
+        )
+
+    timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
+    audit_admin_action(
+        identity.username,
+        (
+            "downloaded admin activity extract "
+            f"(studies={[s.name_short for s in studies]}, "
+            f"participants={participant}, format={normalized_format}, "
+            f"records={len(records)})"
+        ),
+    )
+
+    return _extract_response(records, f"admin_activities_{timestamp}", normalized_format)
+
+
 def _client_info_lookup(blob: Any, *path: str) -> Any:
     """Safely read a nested value from a stored client-info blob.
 
@@ -8011,14 +8481,17 @@ def _client_info_export_columns(
     return columns
 
 
-def export_csv(data: list, filename: str) -> Response:
+def export_csv(data: list, filename: str, allow_empty: bool = False) -> Response:
     """
     Export data as CSV with proper headers. Used in admin interface.
     @param data: List of records to export
     @param filename: Base filename without extension (timestamp and extension will be added)
+    @param allow_empty: When true, an empty result is a valid outcome (an empty
+        file) instead of a 404. Used by the extraction endpoints, where "nothing
+        to copy yet" must not look like a request failure.
     @return A Response object containing the CSV data with appropriate headers for file download.
     """
-    if not data:
+    if not data and not allow_empty:
         raise HTTPException(status_code=404, detail="No data to export")
 
     # Collect all possible fieldnames from all records
@@ -8026,17 +8499,16 @@ def export_csv(data: list, filename: str) -> Response:
     for row in data:
         all_fieldnames.update(row.keys())
 
-    # Convert to list for consistent ordering (you might want to sort them)
-    fieldnames = sorted(all_fieldnames)
-
     # Create CSV in memory
     output = StringIO()
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer = csv.DictWriter(output, fieldnames=sorted(all_fieldnames))
 
-    # Write header and data
-    writer.writeheader()
-    for row in data:
-        writer.writerow(row)
+    # Write header and data. An empty result writes nothing at all (no stray
+    # blank line from a header with zero columns).
+    if data:
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)
 
     # Prepare response
     content = output.getvalue()
@@ -8047,15 +8519,19 @@ def export_csv(data: list, filename: str) -> Response:
     return response
 
 
-def export_json(data: list, filename: str) -> Response:
+def export_json(data: list, filename: str, allow_empty: bool = False) -> Response:
     """
     Export data as JSON with pretty formatting. Used in admin interface.
 
     @param data: List of records to export
     @param filename: Base filename without extension (timestamp and extension will be added)
+    @param allow_empty: When true, an empty result keeps the metadata envelope
+        with ``total_records: 0`` instead of raising a 404. Used by the
+        extraction endpoints so a script can distinguish "no new data" from a
+        failed request.
     @return A Response object containing the JSON data with appropriate headers for file download.
     """
-    if not data:
+    if not data and not allow_empty:
         raise HTTPException(status_code=404, detail="No data to export")
 
     # Create JSON response
@@ -8104,6 +8580,12 @@ def copy_day_activities(
     If the target day already has activities they are deleted first (overwrite).
     The source day must have activities. All activities are copied with new
     database IDs — the copy is a separate, independent set of rows.
+
+    Like the day-save endpoint, this write is refused once the participant has
+    submitted the study. ``study_submitted_at`` is the promise that a submitted
+    diary is immutable, and this endpoint rewrites a whole day, so without the
+    guard a copy would silently overwrite data a researcher may already have
+    exported.
     """
     study = session.exec(
         select(Study).where(Study.name_short == study_name_short)
@@ -8111,6 +8593,26 @@ def copy_day_activities(
     if not study:
         raise HTTPException(
             status_code=404, detail=f"Study '{study_name_short}' not found"
+        )
+
+    # Selected as a scalar so the guard costs one column read, not an ORM load.
+    submitted_at = session.exec(
+        select(StudyParticipant.study_submitted_at).where(
+            StudyParticipant.study_id == study.id,
+            StudyParticipant.participant_id == participant_id,
+        )
+    ).first()
+    if submitted_at is not None:
+        logger.info(
+            "Rejected day copy for participant '%s' in study '%s': "
+            "already submitted at %s",
+            participant_id,
+            study_name_short,
+            submitted_at.isoformat(),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Study '{study_name_short}' has already been submitted and can no longer be edited.",
         )
 
     target_label = session.exec(

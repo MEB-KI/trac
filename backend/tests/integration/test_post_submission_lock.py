@@ -291,3 +291,88 @@ async def test_unsubmitted_study_still_allows_activity_edits():
                 auth=ADMIN_AUTH,
             )
             assert delete_resp.status_code in {200, 404}
+
+
+def _two_day_payload(
+    study_name_short: str, participant_id: str, task_key: str, assigned_token: str
+) -> dict:
+    """Study variant with a second day label so day-to-day copying is possible."""
+    payload = _single_day_activities_payload(
+        study_name_short, participant_id, task_key, assigned_token
+    )
+    payload["studies"][0]["day_labels"].append(
+        {"name": "tuesday", "display_order": 1, "display_names": {"en": "Tuesday"}}
+    )
+    return payload
+
+
+async def _copy_day(
+    client: httpx.AsyncClient,
+    study: str,
+    participant: str,
+    target_day: str,
+    source_day: str,
+) -> httpx.Response:
+    return await client.post(
+        f"{BASE_URL}/api/studies/{study}/participants/{participant}"
+        f"/day_labels/{target_day}/copy-from/{source_day}",
+    )
+
+
+@pytest.mark.asyncio
+async def test_submitted_study_rejects_day_copy_overwrite():
+    """Copy-day rewrites a whole day, so it must honour the submission lock.
+
+    Regression guard: this endpoint used to bypass ``study_submitted_at`` and
+    would silently overwrite an already submitted diary - data a researcher may
+    already have exported.
+    """
+    study_name_short = f"it_copylock_{uuid.uuid4().hex[:8]}"
+    participant_id = "p1"
+
+    import_payload = _two_day_payload(
+        study_name_short, participant_id, "survey", "tok-copylock-1"
+    )
+
+    async with httpx.AsyncClient() as client:
+        import_resp = await client.post(
+            f"{BASE_URL}/api/admin/studies/import-config",
+            json=import_payload,
+            auth=ADMIN_AUTH,
+        )
+        assert import_resp.status_code == 200, import_resp.text
+
+        try:
+            await _submit_day(client, study_name_short, participant_id)
+
+            # Before submission the copy is allowed - it is how the second day
+            # gets filled in from the first.
+            pre_copy = await _copy_day(
+                client, study_name_short, participant_id, "tuesday", "monday"
+            )
+            assert pre_copy.status_code == 200, pre_copy.text
+            assert pre_copy.json()["copied_count"] == 1
+
+            await _submit_study(client, study_name_short, participant_id)
+
+            # The reverse direction overwrites the submitted day -> refused.
+            post_copy = await _copy_day(
+                client, study_name_short, participant_id, "monday", "tuesday"
+            )
+            assert post_copy.status_code == 403, post_copy.text
+
+            # ...and the submitted data is untouched by the rejected copy.
+            activities_resp = await client.get(
+                f"{BASE_URL}/api/studies/{study_name_short}/participants/{participant_id}/activities",
+                params={"day_label_index": 0},
+            )
+            assert activities_resp.status_code == 200
+            stored = activities_resp.json()["activities"]
+            assert len(stored) == 1
+            assert stored[0]["end_minutes"] == 10
+        finally:
+            delete_resp = await client.delete(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}",
+                auth=ADMIN_AUTH,
+            )
+            assert delete_resp.status_code in {200, 404}
