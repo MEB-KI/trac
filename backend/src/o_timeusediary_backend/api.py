@@ -87,6 +87,7 @@ from .api_deps.admin_auth import (
     AdminIdentity,
     ensure_can_access_study,
     require_admin_identity,
+    require_extraction_identity,
     require_super_admin,
     verify_admin,
 )
@@ -7928,8 +7929,10 @@ async def export_study_participants(
 # participant-level columns on every activity row, which makes them unusable as
 # a relational copy.
 #
-# All three endpoints are super-admin only: scientists manage their own studies,
-# running server backups is not their job.
+# All three are restricted to super admins and to read-only backup accounts
+# (TUD_API_BACKUP_USERS): scientists manage their own studies, running server
+# backups is not their job. Backup accounts are denied everywhere else by
+# require_admin_identity, so this dependency is the only way in for them.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -7991,7 +7994,7 @@ async def admin_extract_studies(
             "several. Omit to include every study."
         ),
     ),
-    identity: AdminIdentity = Depends(require_super_admin),
+    identity: AdminIdentity = Depends(require_extraction_identity),
     session: Session = Depends(get_session),
 ):
     """Export study configuration/reference data so an off-server copy is self-contained.
@@ -8006,7 +8009,7 @@ async def admin_extract_studies(
     blobs), which CSV cannot represent meaningfully.
 
     @param study Optional repeated ``name_short`` filter.
-    @param identity Authenticated super admin identity, used for audit logging.
+    @param identity Authenticated super admin or backup identity, used for audit logging.
     @param session Database session dependency.
     @returns A JSON document with one record per study.
     """
@@ -8138,7 +8141,7 @@ async def admin_extract_participants(
         ),
     ),
     format: str = Query("json", description="Output format: 'json' or 'csv'"),
-    identity: AdminIdentity = Depends(require_super_admin),
+    identity: AdminIdentity = Depends(require_extraction_identity),
     session: Session = Depends(get_session),
 ):
     """Export one row per participant-per-study, including their completion status.
@@ -8163,7 +8166,7 @@ async def admin_extract_participants(
     @param submitted Optional submission-status filter.
     @param submitted_after Optional lower bound on ``study_submitted_at``.
     @param format Output format, ``json`` (default) or ``csv``.
-    @param identity Authenticated super admin identity, used for audit logging.
+    @param identity Authenticated super admin or backup identity, used for audit logging.
     @param session Database session dependency.
     @returns A file-download response with one record per participant-per-study.
     """
@@ -8272,7 +8275,7 @@ async def admin_extract_activities(
         ),
     ),
     format: str = Query("json", description="Output format: 'json' or 'csv'"),
-    identity: AdminIdentity = Depends(require_super_admin),
+    identity: AdminIdentity = Depends(require_extraction_identity),
     session: Session = Depends(get_session),
 ):
     """Export one row per reported activity, across all studies or a subset.
@@ -8295,7 +8298,7 @@ async def admin_extract_activities(
     @param study Optional repeated ``name_short`` filter.
     @param participant Optional repeated participant id filter.
     @param format Output format, ``json`` (default) or ``csv``.
-    @param identity Authenticated super admin identity, used for audit logging.
+    @param identity Authenticated super admin or backup identity, used for audit logging.
     @param session Database session dependency.
     @returns A file-download response with one record per activity.
     """

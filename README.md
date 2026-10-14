@@ -220,10 +220,11 @@ Because the admin interface is part of the backend application, it must be expos
 
 #### 6.1 Study ownership and scientist accounts
 
-The admin interface knows two kinds of accounts:
+The admin interface knows three kinds of accounts:
 
 - **Super admins** (`TUD_API_ADMIN_USERNAME` / `TUD_API_ADMIN_PASSWORD`) can manage every study.
 - **Scientists** (`TUD_API_SCIENTISTS`) can fully manage the studies they own, plus any study that is explicitly granted to them.
+- **Backup accounts** (`TUD_API_BACKUP_USERS`) are read-only and server-wide: they may only call the three data-extraction endpoints, and nothing else.
 
 Scientist accounts are configured as a JSON list in the backend `.env` file:
 
@@ -257,6 +258,23 @@ Study ownership is an **accident-prevention feature for a trusted group of resea
 Removing a scientist from `TUD_API_SCIENTISTS` disables the account but leaves the owner entries of her studies in the database. Those studies stay unreachable for scientists until a super admin assigns new owners.
 
 
+#### 6.2 Read-only backup accounts
+
+For an automated job that pulls the data into a separate system, use a **backup account** instead of a super admin credential:
+
+```dotenv
+TUD_API_BACKUP_USERS='[{"name": "backup_bot", "password": "secret3"}]'
+```
+
+- A backup account may **only** call the three read-only extraction endpoints: `GET /api/admin/studies`, `GET /api/admin/participants` and `GET /api/admin/activities` (see section 7). Every other admin route - including the admin overview, the file-validation tools, study creation and the runtime-config export - answers HTTP 403.
+- It is **server-wide**: it can read every study and participant, and therefore accepts no `studies` list. Entries with unsupported fields are rejected at startup rather than silently ignored, so a `studies` list cannot create the illusion of a restriction.
+- It is **read-only**: no admin route it can reach writes anything. Every call is recorded in the admin audit log like any other admin action.
+- A username must not appear in `TUD_API_ADMIN_USERNAME` or `TUD_API_SCIENTISTS` (or twice in `TUD_API_BACKUP_USERS`); the backend refuses to start otherwise.
+- Removing an account from `TUD_API_BACKUP_USERS` disables it immediately.
+
+Because the extraction endpoints hold the whole server's research data, treat these credentials like the super-admin ones: long-lived HTTP Basic Auth, strong passwords, HTTPS only.
+
+
 ### 7. API and Automation
 
 The backend exposes a REST API and also serves FastAPI's live interactive API documentation. A convenient entry point is:
@@ -277,7 +295,7 @@ Some endpoints are especially useful for automation, monitoring, backup, and int
 - `POST` / `DELETE /api/admin/studies/{study_name_short}/owners/{username}` add or remove a single owner (both idempotent, so they are safe to retry and cannot overwrite a concurrent change by someone else). `DELETE` also removes owner entries whose account is no longer configured; scientists cannot delete themselves.
 - `GET /api/admin/export/{study_name_short}/activities` exports all recorded activities for one study in CSV or JSON, which is useful for data pipelines and integration with external systems.
 - `GET /api/admin/export/{study_name_short}/participants` exports one row per study participant (no activity data), so participants who never logged an activity are still covered. It carries the browser/device identification columns and can be joined to the activities export on `participant_id`. Pass `only_with_client_info=true` to export only participants with stored browser data.
-- `GET /api/admin/participants`, `GET /api/admin/activities` and `GET /api/admin/studies` form the **backup extraction API**: a join-free, non-duplicated copy of the data for an admin team that stores it in a separate system. `participants` has one row per participant-per-study and is the poll target for "who has finished?" (filter with `submitted=true` / `submitted_after=<ISO timestamp>`); `activities` has one row per reported activity and can be narrowed with `participant=<id>` and `study=<name_short>`; `studies` returns the study metadata, day labels, timelines and activity definitions that keep the copy interpretable off-server. A participant counts as done when `study_submitted_at` is set, which the backend only allows once every day met its timeline `min_coverage`; external tasks are ignored. A submitted diary is immutable, so each participant only has to be pulled once. All three are restricted to super admins; omit `study` to extract every study, and an empty result is a `200` with zero records, never a `404`.
+- `GET /api/admin/participants`, `GET /api/admin/activities` and `GET /api/admin/studies` form the **backup extraction API**: a join-free, non-duplicated copy of the data for an admin team that stores it in a separate system. `participants` has one row per participant-per-study and is the poll target for "who has finished?" (filter with `submitted=true` / `submitted_after=<ISO timestamp>`); `activities` has one row per reported activity and can be narrowed with `participant=<id>` and `study=<name_short>`; `studies` returns the study metadata, day labels, timelines and activity definitions that keep the copy interpretable off-server. A participant counts as done when `study_submitted_at` is set, which the backend only allows once every day met its timeline `min_coverage`; external tasks are ignored. A submitted diary is immutable, so each participant only has to be pulled once. All three are restricted to super admins and to read-only backup accounts (`TUD_API_BACKUP_USERS`); omit `study` to extract every study, and an empty result is a `200` with zero records, never a `404`.
 - `POST /api/admin/studies/{study_name_short}/assign-participants` assigns one or more participants to a study and can create participant records when needed, which is useful for automated invitation workflows.
 
 The `/api/admin/...` endpoints are protected with the same admin authentication as the admin interface.

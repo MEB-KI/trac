@@ -140,6 +140,110 @@ class TUDBackendSettings:
             )
         return list(zip(usernames, passwords))
 
+    def _parse_named_accounts_env_var(
+        self,
+        env_name: str,
+        account_label: str,
+        *,
+        allow_studies: bool,
+    ) -> list[dict]:
+        """Parse a JSON-list credential variable into account definitions.
+
+        Every entry is an object with a non-empty ``name`` and ``password``.
+        With ``allow_studies`` an optional ``studies`` list of study
+        ``name_short`` values is part of the schema as well.
+
+        Returns an empty list when the variable is unset or empty, so
+        deployments that do not use these accounts keep working unchanged.
+
+        @param env_name Name of the environment variable to read.
+        @param account_label Singular label used in the error messages.
+        @param allow_studies Whether entries may carry a "studies" list.
+        @returns The parsed account dictionaries in configuration order.
+        """
+        raw_value = os.getenv(env_name)
+        if not raw_value or not raw_value.strip():
+            return []
+
+        try:
+            parsed_value = json.loads(raw_value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"{env_name} must be a valid JSON list of {account_label} objects."
+            ) from exc
+
+        if not isinstance(parsed_value, list):
+            raise ValueError(
+                f"{env_name} must be a JSON list of {account_label} objects."
+            )
+
+        fields_hint = (
+            "'name', 'password' and an optional 'studies' list"
+            if allow_studies
+            else "'name' and 'password'"
+        )
+        allowed_keys = (
+            {"name", "password", "studies"} if allow_studies else {"name", "password"}
+        )
+
+        accounts: list[dict] = []
+        for index, entry in enumerate(parsed_value):
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    f"{env_name} entry #{index} must be an object with {fields_hint}."
+                )
+
+            # Reject unknown keys instead of ignoring them: a mistaken field
+            # (e.g. a 'studies' list on an account type that has no study scope)
+            # would otherwise silently leave the account with more access than
+            # the operator intended.
+            unknown_keys = sorted(set(entry) - allowed_keys)
+            if unknown_keys:
+                raise ValueError(
+                    f"{env_name} entry #{index} has unsupported field(s): "
+                    f"{', '.join(unknown_keys)}. Allowed: "
+                    f"{', '.join(sorted(allowed_keys))}."
+                )
+
+            name = entry.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(
+                    f"{env_name} entry #{index} must define a non-empty string 'name'."
+                )
+            name = name.strip()
+
+            password = entry.get("password")
+            if not isinstance(password, str) or not password.strip():
+                raise ValueError(
+                    f"{env_name} {account_label} '{name}' must define a non-empty string 'password'."
+                )
+
+            account = {"name": name, "password": password}
+
+            if allow_studies:
+                studies_value = entry.get("studies")
+                if studies_value is None:
+                    studies_value = []
+                if not isinstance(studies_value, list) or not all(
+                    isinstance(item, str) and item.strip() for item in studies_value
+                ):
+                    raise ValueError(
+                        f"{env_name} {account_label} '{name}' field 'studies' must be a "
+                        "JSON list of non-empty study name_short strings."
+                    )
+                account["studies"] = [item.strip() for item in studies_value]
+
+            accounts.append(account)
+
+        names = [account["name"] for account in accounts]
+        duplicate_names = sorted({name for name in names if names.count(name) > 1})
+        if duplicate_names:
+            raise ValueError(
+                f"{env_name} contains duplicate {account_label} names: {duplicate_names}"
+            )
+
+        return accounts
+
     def _parse_scientists_env_var(self) -> list[dict]:
         """Parse the optional ``TUD_API_SCIENTISTS`` variable into scientist definitions.
 
@@ -150,73 +254,27 @@ class TUDBackendSettings:
             [{"name": "alice", "password": "...", "studies": ["study_a"]}]
 
         Scientists may manage the studies they own (see ``Study.owner_usernames``)
-        plus the studies granted here. Returns an empty list when the variable is
-        unset or empty, so deployments without scientists keep working unchanged.
+        plus the studies granted here.
         """
-        raw_value = os.getenv("TUD_API_SCIENTISTS")
-        if not raw_value or not raw_value.strip():
-            return []
+        return self._parse_named_accounts_env_var(
+            "TUD_API_SCIENTISTS", "scientist", allow_studies=True
+        )
 
-        try:
-            parsed_value = json.loads(raw_value)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                "TUD_API_SCIENTISTS must be a valid JSON list of scientist objects."
-            ) from exc
+    def _parse_backup_users_env_var(self) -> list[dict]:
+        """Parse the optional ``TUD_API_BACKUP_USERS`` variable into backup accounts.
 
-        if not isinstance(parsed_value, list):
-            raise ValueError(
-                "TUD_API_SCIENTISTS must be a JSON list of scientist objects."
-            )
+        The variable holds a JSON list of objects with a ``name`` and a
+        ``password``::
 
-        scientists: list[dict] = []
-        for index, entry in enumerate(parsed_value):
-            if not isinstance(entry, dict):
-                raise ValueError(
-                    f"TUD_API_SCIENTISTS entry #{index} must be an object with 'name', "
-                    "'password' and an optional 'studies' list."
-                )
+            [{"name": "backup_bot", "password": "..."}]
 
-            name = entry.get("name")
-            if not isinstance(name, str) or not name.strip():
-                raise ValueError(
-                    f"TUD_API_SCIENTISTS entry #{index} must define a non-empty string 'name'."
-                )
-            name = name.strip()
-
-            password = entry.get("password")
-            if not isinstance(password, str) or not password.strip():
-                raise ValueError(
-                    f"TUD_API_SCIENTISTS scientist '{name}' must define a non-empty string 'password'."
-                )
-
-            studies_value = entry.get("studies")
-            if studies_value is None:
-                studies_value = []
-            if not isinstance(studies_value, list) or not all(
-                isinstance(item, str) and item.strip() for item in studies_value
-            ):
-                raise ValueError(
-                    f"TUD_API_SCIENTISTS scientist '{name}' field 'studies' must be a "
-                    "JSON list of non-empty study name_short strings."
-                )
-
-            scientists.append(
-                {
-                    "name": name,
-                    "password": password,
-                    "studies": [item.strip() for item in studies_value],
-                }
-            )
-
-        names = [scientist["name"] for scientist in scientists]
-        duplicate_names = sorted({name for name in names if names.count(name) > 1})
-        if duplicate_names:
-            raise ValueError(
-                f"TUD_API_SCIENTISTS contains duplicate scientist names: {duplicate_names}"
-            )
-
-        return scientists
+        Backup accounts are read-only and server-wide: they may only call the
+        data-extraction endpoints, so they have no study scope and their entries
+        carry no ``studies`` list.
+        """
+        return self._parse_named_accounts_env_var(
+            "TUD_API_BACKUP_USERS", "backup user", allow_studies=False
+        )
 
     @property
     def scientists(self) -> list[dict]:
@@ -243,8 +301,23 @@ class TUDBackendSettings:
             for scientist in self.scientists
         }
 
+    @property
+    def backup_users(self) -> list[dict]:
+        """Get the configured backup accounts from ``TUD_API_BACKUP_USERS``."""
+        return self._parse_backup_users_env_var()
+
+    @property
+    def backup_names(self) -> list[str]:
+        """Get the usernames of all configured backup accounts."""
+        return [user["name"] for user in self.backup_users]
+
+    @property
+    def backup_credentials(self) -> list[tuple[str, str]]:
+        """Get backup credentials as ``(username, password)`` pairs."""
+        return [(user["name"], user["password"]) for user in self.backup_users]
+
     def validate_auth_configuration(self) -> None:
-        """Fail fast on inconsistent admin/scientist configuration.
+        """Fail fast on inconsistent admin/scientist/backup configuration.
 
         Called during application startup so that a broken configuration shows
         up as a clear error instead of surprising authentication failures at
@@ -252,19 +325,49 @@ class TUDBackendSettings:
 
         Raises:
             ValueError: If admin credentials are inconsistent or if a username is
-                configured both as super admin and as scientist.
+                configured under more than one account type.
         """
         admin_credentials = self.admin_credentials
         scientist_credentials = self.scientist_credentials
+        backup_credentials = self.backup_credentials
 
-        overlapping_names = sorted(
-            {username for username, _ in admin_credentials}
-            & {username for username, _ in scientist_credentials}
+        def _overlapping_usernames(
+            left: list[tuple[str, str]], right: list[tuple[str, str]]
+        ) -> list[str]:
+            return sorted(
+                {username for username, _ in left}
+                & {username for username, _ in right}
+            )
+
+        overlapping_names = _overlapping_usernames(
+            admin_credentials, scientist_credentials
         )
         if overlapping_names:
             raise ValueError(
                 "Usernames must not be configured both as super admin "
                 "(TUD_API_ADMIN_USERNAME) and as scientist (TUD_API_SCIENTISTS): "
+                f"{overlapping_names}"
+            )
+
+        # A name configured under two account types would silently get whichever
+        # role the credential lookup happens to test first, so reject it here.
+        overlapping_names = _overlapping_usernames(
+            admin_credentials, backup_credentials
+        )
+        if overlapping_names:
+            raise ValueError(
+                "Usernames must not be configured both as super admin "
+                "(TUD_API_ADMIN_USERNAME) and as backup user (TUD_API_BACKUP_USERS): "
+                f"{overlapping_names}"
+            )
+
+        overlapping_names = _overlapping_usernames(
+            scientist_credentials, backup_credentials
+        )
+        if overlapping_names:
+            raise ValueError(
+                "Usernames must not be configured both as scientist "
+                "(TUD_API_SCIENTISTS) and as backup user (TUD_API_BACKUP_USERS): "
                 f"{overlapping_names}"
             )
 
