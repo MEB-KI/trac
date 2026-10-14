@@ -5,6 +5,14 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: timeusediary_SA_password_123!
       MSSQL_PID: Developer
+    # Published to the host, unlike the postgres/mariadb stacks which stay
+    # inside the compose network (the backend container and the test scripts
+    # reach those). This one is so a host-side tool - SSMS, Azure Data Studio,
+    # sqlcmd - can connect, which is what makes the stack usable to hand
+    # somebody a real MSSQL to inspect. Remove it if 1433 clashes with a local
+    # SQL Server.
+    ports:
+      - "1433:1433"
     volumes:
       - trac-dev-mssql-data:/var/opt/mssql
 
