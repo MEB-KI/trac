@@ -301,6 +301,13 @@ test('both timelines are visible as tabs, and one tap switches', async ({
 
   const tabs = page.locator('#timelineTabs .timeline-tab');
   await expect(tabs).toHaveCount(2);
+  // Tab semantics, asserted here because the axe sweep that also covers them
+  // needs @axe-core/playwright and therefore never runs locally: a plain
+  // button carrying aria-selected/aria-controls is an axe violation, so the
+  // roles are part of the contract, not decoration.
+  await expect(page.locator('#timelineTabs')).toHaveAttribute('role', 'tablist');
+  await expect(tabs.nth(0)).toHaveAttribute('role', 'tab');
+  await expect(tabs.nth(1)).toHaveAttribute('role', 'tab');
   // The study's names, without the "(1/2)" the picker label needed: with both
   // names on screen the pair itself says that there are two timelines. This is
   // the answer to the participants who never pressed the picker and therefore
