@@ -270,6 +270,35 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   (the day autosaves and comes back from the URL) but costs a page load, the
   scroll position and the selected activity, and mid-task error pages are what
   the pilot's "could not load" report was about.
+- FIX: a submitted study can no longer be overwritten through the copy-day
+  endpoint. `POST /api/studies/{study}/participants/{p}/day_labels/{target}/copy-from/{source}`
+  deletes the target day's rows and rewrites them, but it never checked
+  `study_submitted_at`, so the one write path that replaces a whole day was also
+  the one path that bypassed the immutability promise the other endpoints
+  enforce (day save and consent both return 403). That matters beyond the diary:
+  a researcher may already have exported a participant's submitted data, and a
+  silent overwrite afterwards would make the export disagree with the server
+  without any error. It now returns 403 for a submitted participant, in both
+  copy directions; `test_post_submission_lock.py` covers the pre-submission copy
+  (still allowed, it is how a second day is filled in) plus the refusal.
+- NEW: three read-only, super-admin-only endpoints for extracting data into a
+  separate backup system: `GET /api/admin/participants` (one row per
+  participant-per-study, with `submitted`/`study_submitted_at` and per-day
+  coverage status), `GET /api/admin/activities` (one row per reported activity)
+  and `GET /api/admin/studies` (study metadata, day labels, timelines and
+  activity definitions). The existing `/api/admin/export/{study}/...` pair is
+  built for scientists doing statistical analysis and repeats participant
+  columns on every activity row, which makes it unusable as a relational copy.
+  The intended loop is: poll `participants?submitted=true&submitted_after=<ts>`
+  for who finished, then pull exactly those participants' rows from
+  `activities?participant=...`. A participant counts as done when
+  `study_submitted_at` is set, which the backend only allows once every day met
+  its timeline `min_coverage`; external tasks are deliberately ignored. Because a
+  submitted diary is immutable (see the fix above), each participant only has to
+  be pulled once. `study` (repeatable) narrows both extracts, `format=csv|json`
+  picks the rendering, and an empty result is a `200` with zero records rather
+  than the 404 the scientific exports raise - "nobody has finished yet" must not
+  look like a failed request to the backup script.
 
 Version 0.22.0 -- Optional opt-in browser identification
 --------------------------------------------------------
