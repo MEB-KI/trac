@@ -70,8 +70,8 @@ def _minimal_activities_payload() -> dict:
     }
 
 
-def _study_payload(study_name_short: str, participant_id: str) -> dict:
-    """Single study, single day label, one pre-registered participant."""
+def _study_payload(study_name_short: str, participant_ids: list) -> dict:
+    """Single study, single day label, pre-registered participants."""
     return {
         "mode": "create_only",
         "transaction_mode": "all_or_nothing",
@@ -87,7 +87,7 @@ def _study_payload(study_name_short: str, participant_id: str) -> dict:
                         "display_names": {"en": "Monday"},
                     }
                 ],
-                "study_participant_ids": [participant_id],
+                "study_participant_ids": list(participant_ids),
                 "allow_unlisted_participants": False,
                 "default_language": "en",
                 "supported_languages": ["en"],
@@ -150,7 +150,7 @@ async def test_submitted_participant_can_be_found_and_extracted():
     async with httpx.AsyncClient() as client:
         import_resp = await client.post(
             f"{BASE_URL}/api/admin/studies/import-config",
-            json=_study_payload(study_name_short, participant_id),
+            json=_study_payload(study_name_short, [participant_id]),
             auth=ADMIN_AUTH,
         )
         assert import_resp.status_code == 200, import_resp.text
@@ -242,6 +242,79 @@ async def test_submitted_participant_can_be_found_and_extracted():
             assert [label["name"] for label in study["day_labels"]] == ["monday"]
             assert study["timelines"][0]["name"] == "primary"
             assert study["activity_configs"][0]["language"] == "en"
+        finally:
+            delete_resp = await client.delete(
+                f"{BASE_URL}/api/admin/studies/{study_name_short}",
+                auth=ADMIN_AUTH,
+            )
+            assert delete_resp.status_code in {200, 404}
+
+
+@pytest.mark.asyncio
+async def test_activities_paging_walks_every_participant_once():
+    """Three pages of one participant each: every row exactly once, cursor follows."""
+    study_name_short = f"it_page_{uuid.uuid4().hex[:8]}"
+    participant_ids = ["pg_a", "pg_b", "pg_c"]
+
+    async with httpx.AsyncClient() as client:
+        import_resp = await client.post(
+            f"{BASE_URL}/api/admin/studies/import-config",
+            json=_study_payload(study_name_short, participant_ids),
+            auth=ADMIN_AUTH,
+        )
+        assert import_resp.status_code == 200, import_resp.text
+
+        try:
+            for participant_id in participant_ids:
+                save_resp = await client.post(
+                    f"{BASE_URL}/api/studies/{study_name_short}/participants/{participant_id}"
+                    f"/day_labels/monday/activities",
+                    json={
+                        "activities": [
+                            {
+                                "timeline_key": "primary",
+                                "activity": "Activity 100",
+                                "category": "General",
+                                "start_minutes": 0,
+                                "end_minutes": 10,
+                                "mode": "single-choice",
+                                "code": 100,
+                            }
+                        ]
+                    },
+                )
+                assert save_resp.status_code == 200, save_resp.text
+
+            seen: list = []
+            cursor = None
+            pages = 0
+
+            while True:
+                params = {"study": study_name_short, "limit": 1}
+                if cursor:
+                    params["cursor"] = cursor
+
+                page = await client.get(
+                    f"{BASE_URL}/api/admin/activities", params=params, auth=ADMIN_AUTH
+                )
+                assert page.status_code == 200, page.text
+                payload = page.json()
+                seen.extend(row["participant_id"] for row in payload["data"])
+                pages += 1
+
+                if payload["metadata"]["has_more"]:
+                    cursor = payload["metadata"]["next_cursor"]
+                    # The CSV channel for the same state: response headers.
+                    assert page.headers["X-Has-More"] == "true"
+                    assert page.headers["X-Next-Cursor"] == cursor
+                    continue
+
+                assert payload["metadata"]["next_cursor"] is None
+                assert page.headers["X-Has-More"] == "false"
+                break
+
+            assert pages == len(participant_ids)
+            assert sorted(seen) == participant_ids
         finally:
             delete_resp = await client.delete(
                 f"{BASE_URL}/api/admin/studies/{study_name_short}",
