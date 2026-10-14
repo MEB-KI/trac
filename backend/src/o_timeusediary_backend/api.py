@@ -8434,6 +8434,13 @@ async def admin_extract_activities(
       deletes and re-inserts that day's rows, so row positions shift under a
       concurrent write. Participant keys only move when a participant is added,
       which cannot re-order or skip an already returned page.
+    * A page can legitimately contain **zero** rows: participants are paged by
+      registration order, so a page whose participants have not reported
+      anything yet is empty while ``has_more`` is still true. Keep following the
+      cursor until ``has_more`` is false; do not stop at the first empty page.
+      Filtering the roster first (``/api/admin/participants?submitted=true`` and
+      then pulling those ids with ``participant``) avoids empty pages entirely
+      and is the recommended flow.
 
     Note ``activity_id`` is a database id that changes whenever a day is
     re-saved, so it is not a stable key; use the ``(study_id, participant_id,
