@@ -382,26 +382,4 @@ Stability notes:
 `csv` responses are a file download (`Content-Disposition: attachment`); the
 paging state travels in the `X-*` headers, and an empty result is an empty file.
 
----
-
-## 10. What is *not* in these extracts
-
-Tell us if you need any of it and we will discuss:
-
-* **External tasks / survey confirmations** (the app can hand participants to an
-  external survey; out of scope here because completion is defined by the diary).
-* **Consent status and timestamps** (not included; consent studies exist in the
-  dataset).
-* **Browser/device identification** and user agents (personal data; excluded on
-  purpose).
-* **Deletions.** This is a per-participant snapshot, not a change feed. If a
-  participant's data or a whole study is deleted on the TRAC side, your copy
-  will simply keep the old rows. Note that the admin portal can delete an
-  individual participant's data on purpose; that also clears the submission, so
-  such a participant would drop out of `submitted=true` and keep their old rows
-  in your copy.
-* **Incremental "everything since X" for activities.** The supported
-  incremental pattern is participant-based (section 7).
-
-
 
