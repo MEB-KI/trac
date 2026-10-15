@@ -3,8 +3,11 @@
 # Script to set up PostgreSQL database and user based on .env file.
 #
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Based on the original database creation script, but adapted to be run as a Docker entrypoint script. It will create the database and database user.
 =======
+=======
+>>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
 # This script will create the database and database user, but the postgresql server must be
 # running and accessible.
 # Note that it does NOT create any tables or relations in the database. The backend application
@@ -21,7 +24,10 @@
 #    ./database/create_tud_db.sh .env
 #
 
+<<<<<<< HEAD
 >>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
+=======
+>>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
 echo "=== Database setup for TUD backend ==="
 echo " This script creates the database and database user with password as specified in the .env file."
 echo " It requires sudo access to the 'postgres' user on a local PostgreSQL server."
@@ -30,8 +36,11 @@ echo "not the superuser credentials that will be used by this script to connect 
 echo ""
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## use --env-file option to podman build/run to specify the .env file
 =======
+=======
+>>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
 ## use --env-file option to specify a custom .env
 # Default .env location
 # DEFAULT_ENV_PATH=".env"
@@ -49,7 +58,10 @@ echo ""
 # echo "Loading configuration from env file: '$ENV_PATH'"
 # source "$ENV_PATH"
 
+<<<<<<< HEAD
 >>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
+=======
+>>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
 
 TUD_DATABASE_HOST=${TUD_DATABASE_HOST:-localhost}
 TUD_DATABASE_PORT=${TUD_DATABASE_PORT:-5432}

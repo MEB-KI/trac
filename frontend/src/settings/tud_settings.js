@@ -3,6 +3,7 @@
 const TUD_SETTINGS = {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     API_BASE_URL: 'http://localhost:8001/tud_backend/api',
 =======
     // Same-origin API base: the page talks to whatever host it was loaded from,
@@ -13,6 +14,9 @@ const TUD_SETTINGS = {
     // interfaces (port 3000), so http://<your-lan-ip>:3000/report/ works.
     API_BASE_URL: '/tud_backend/api',
 >>>>>>> c9f5e97 (NEW: serve on public IP if it is proper one in local LAN)
+=======
+    API_BASE_URL: 'http://localhost:8001/tud_backend/api',
+>>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
     DEFAULT_STUDY_NAME: 'default',
     DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
 <<<<<<< HEAD
