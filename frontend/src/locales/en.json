@@ -152,7 +152,11 @@
     "copyDayHasData": "has data",
     "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
     "submitStudyIncomplete": "Incomplete days: {{days}}",
+<<<<<<< HEAD
     "submitStudyIncompleteHint": "Complete all days before submitting"
+=======
+    "submitStudySuccess": "Study submitted successfully!"
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Error loading activities configuration:",

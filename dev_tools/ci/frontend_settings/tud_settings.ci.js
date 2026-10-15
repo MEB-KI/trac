@@ -5,6 +5,7 @@ const TUD_SETTINGS = {
     ALLOW_NO_UID: true,
     DEFAULT_STUDY_NAME: 'default',
     DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
+<<<<<<< HEAD
     // Maintenance notice: set to true before short server maintenance to warn
     // participants on every page and ask them to save their current work.
     // MAINTENANCE_MESSAGE overrides the localised default (locales: maintenance.banner),
@@ -12,6 +13,9 @@ const TUD_SETTINGS = {
     IS_MAINTENANCE_MODE: false,
     MAINTENANCE_MESSAGE: null,
     TEMPLATE_ENABLED: false,            // Copy Days: enable/disable template feature
+=======
+    TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
     SHOW_COPY_FROM_BUTTON: false,       // Copy Days: show "Copy from..." button (default off)
     IMPRINT_URL: "https://www.aesthetics.mpg.de/en/imprint.html",
     PRIVACY_URL: "https://www.aesthetics.mpg.de/en/data-protection-information.html",

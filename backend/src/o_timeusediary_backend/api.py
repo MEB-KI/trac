@@ -7872,7 +7872,13 @@ def copy_day_activities(
     }
 
 
+<<<<<<< HEAD
 @app.post("/api/studies/{study_name_short}/participants/{participant_id}/submit")
+=======
+@app.post(
+    "/api/studies/{study_name_short}/participants/{participant_id}/submit"
+)
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
 def submit_study(
     study_name_short: str,
     participant_id: str,

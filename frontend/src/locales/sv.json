@@ -147,12 +147,21 @@
     "copyError": "Kunde inte kopiera: {{message}}",
     "copyEmptySource": "Källdagen har inga aktiviteter att kopiera.",
     "completeOtherDaysFirst": "Fyll först i {{days}} för att avsluta studien.",
+<<<<<<< HEAD
     "daySavedStayOnPage": "Dagen sparad.",
     "copyDayEmpty": "tom",
     "copyDayHasData": "har data",
     "copyOverwriteConfirm": "{{day}} har redan data. Skriva över?",
     "submitStudyIncomplete": "Ofullständiga dagar: {{days}}",
     "submitStudyIncompleteHint": "Slutför alla dagar innan du skickar in"
+=======
+    "daySavedStayOnPage": "Day saved.",
+    "copyDayEmpty": "empty",
+    "copyDayHasData": "has data",
+    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
+    "submitStudyIncomplete": "Incomplete days: {{days}}",
+    "submitStudySuccess": "Study submitted successfully!"
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Fel vid laddning av aktivitetskonfiguration:",

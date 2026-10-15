@@ -147,12 +147,21 @@
     "copyError": "Nie udało się skopiować: {{message}}",
     "copyEmptySource": "Dzień źródłowy nie ma aktywności do skopiowania.",
     "completeOtherDaysFirst": "Uzupełnij najpierw {{days}}, aby zakończyć badanie.",
+<<<<<<< HEAD
     "daySavedStayOnPage": "Dzień zapisany.",
     "copyDayEmpty": "pusty",
     "copyDayHasData": "ma dane",
     "copyOverwriteConfirm": "{{day}} ma już dane. Nadpisać?",
     "submitStudyIncomplete": "Niekompletne dni: {{days}}",
     "submitStudyIncompleteHint": "Ukończ wszystkie dni przed wysłaniem"
+=======
+    "daySavedStayOnPage": "Day saved.",
+    "copyDayEmpty": "empty",
+    "copyDayHasData": "has data",
+    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
+    "submitStudyIncomplete": "Incomplete days: {{days}}",
+    "submitStudySuccess": "Study submitted successfully!"
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Błąd przy ładowaniu konfiguracji aktywności:",

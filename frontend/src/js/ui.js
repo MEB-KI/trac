@@ -478,6 +478,170 @@ function createModal() {
     }
   });
 
+<<<<<<< HEAD
+=======
+  // Create confirmation modal
+  const confirmationModal = document.createElement('div');
+  confirmationModal.className = 'modal-overlay';
+  confirmationModal.id = 'confirmationModal';
+  confirmationModal.setAttribute('role', 'dialog');
+  confirmationModal.setAttribute('aria-modal', 'true');
+  confirmationModal.setAttribute('aria-labelledby', 'confirmationTitle');
+  const numStudyDaysCount = window.studyConfigManager?.getStudyDaysCount() || 1;
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentDayIndex = parseInt(urlParams.get('day_label_index')) || 0;
+  const dayLabel =
+    window.studyConfigManager?.getDayDisplayLabel(currentDayIndex) ||
+    window.studyConfigManager?.getDayLabel(currentDayIndex) ||
+    `day_${currentDayIndex + 1}`;
+
+  const i18n = window.i18n;
+  const _t = (key, params) =>
+    i18n && i18n.isReady() ? i18n.t(key, params) : key;
+
+  // Show the original "cannot change previous days" message only when
+  // previous-day switching buttons are disabled in settings.
+  const showPreviousDaysButtons = Boolean(
+    TUD_SETTINGS.SHOW_PREVIOUS_DAYS_BUTTONS
+  );
+  const showCannotChangeMessage = !showPreviousDaysButtons;
+  const messageText = showCannotChangeMessage
+    ? _t('modals.confirmSubmit.message', { dayLabel })
+    : '';
+
+  // Build a skeleton once; the info paragraph and OK-button text are filled
+  // dynamically by updateConfirmationModalContent(buttonMode) right before the
+  // modal is shown, based on the actual current button mode.  The OK click
+  // handler (below) already branches on button mode; only the visible label
+  // and info paragraph were stale when a user manually navigated to the last
+  // study day with previous days incomplete (mode="save-day" but modal said
+  // "Submit Day ... and Finish Study / This submission concludes the study").
+  confirmationModal.innerHTML = `
+        <div class="modal">
+            <div class="modal-content">
+                <h3 id="confirmationTitle">${_t('modals.confirmSubmit.title', {
+                  dayLabel,
+                  currentDay: currentDayIndex + 1,
+                  totalDays: numStudyDaysCount,
+                })}</h3>
+                ${
+                  showCannotChangeMessage
+                    ? `<p id="confirmationMessage">${messageText}</p>`
+                    : ''
+                }
+                <p id="confirmationInfo" style="display:none;"></p>
+                <div class="button-container">
+                    <button id="confirmCancel" class="btn btn-secondary" data-i18n="buttons.cancel">Cancel</button>
+                    <button id="confirmOk" class="btn save-btn"></button>
+                </div>
+            </div>
+        </div>
+    `;
+
+  // Update the modal's visible content for the given button mode.  Modes are
+  // set on #navSubmitBtn / #nextBtn by updateButtonStates():
+  //   - "submit-day"   : non-last study day — save and advance.
+  //   - "finish-study" : last study day AND all previous days complete —
+  //                      save and go to thank-you page.
+  //   - "save-day"      : last study day but previous days incomplete —
+  // Copy Days: only save-day mode exists — save and stay on this day.
+  function updateConfirmationModalContent(buttonMode) {
+    const h3 = confirmationModal.querySelector('#confirmationTitle');
+    const messageP = confirmationModal.querySelector('#confirmationMessage');
+    const infoP = confirmationModal.querySelector('#confirmationInfo');
+    const okBtn = confirmationModal.querySelector('#confirmOk');
+
+    if (h3) {
+      h3.textContent = _t('modals.confirmSubmit.title', {
+        dayLabel,
+        currentDay: currentDayIndex + 1,
+        totalDays: numStudyDaysCount,
+      });
+    }
+    if (messageP) {
+      messageP.textContent = _t('modals.confirmSubmit.message', { dayLabel });
+    }
+
+    // Always save-day: no info paragraph, OK says "Save Day"
+    if (infoP) {
+      infoP.innerHTML = '';
+      infoP.removeAttribute('data-i18n-html');
+      infoP.style.display = 'none';
+    }
+    if (okBtn) {
+      okBtn.textContent = _t('modals.confirmSubmit.submitDayNoDay');
+    }
+
+    confirmationModal.dataset.currentMode = 'save-day';
+  }
+
+  // Initialize with save-day as the only mode
+  updateConfirmationModalContent('save-day');
+  window.updateConfirmationModalContent = updateConfirmationModalContent;
+
+  // Update modal text when the user switches language mid-session, using the
+  // mode that was active when the modal was last configured.
+  window.addEventListener('i18n:languageChanged', () => {
+    updateConfirmationModalContent(
+      confirmationModal.dataset.currentMode || 'submit-day'
+    );
+  });
+
+  confirmationModal
+    .querySelector('#confirmCancel')
+    .addEventListener('click', () => {
+      confirmationModal.style.cssText = 'display: none !important';
+    });
+
+  confirmationModal
+    .querySelector('#confirmOk')
+    .addEventListener('click', async () => {
+      confirmationModal.style.cssText = 'display: none !important';
+      showLoadingModal();
+
+      const nextButton = document.getElementById('nextBtn');
+      const navSubmitButton = document.getElementById('navSubmitBtn');
+
+      if (nextButton) {
+        nextButton.disabled = true;
+      }
+      if (navSubmitButton) {
+        navSubmitButton.disabled = true;
+      }
+
+      // Get current day index
+      const urlParams = new URLSearchParams(window.location.search);
+      const currentDayIndex = parseInt(urlParams.get('day_label_index')) || 0;
+      const totalDays = window.studyConfigManager?.getStudyDaysCount() || 1;
+
+      // Copy Days: always save-day mode — save and reload current day.
+      // No auto-advance, no redirect. Submit Study is a separate button.
+      const result = await sendData({
+        shouldRedirect: false,
+        isLastDay: false,
+        currentDayIndex: currentDayIndex,
+      });
+
+      if (result?.success) {
+        const daySavedMsg = window.i18n
+          ? window.i18n.t('messages.daySavedStayOnPage')
+          : 'Day saved.';
+        showToast(daySavedMsg, 'success', 3000);
+        // Reload to refresh day button states from backend
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        const submitErrorMessage = window.i18n
+          ? window.i18n.t('messages.submitError')
+          : 'Error saving diary';
+        const errorDetails = result?.error ? `: ${result.error}` : '';
+        showToast(`${submitErrorMessage}${errorDetails}`, 'error', 5000);
+        updateButtonStates();
+      }
+    });
+
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   const skipConfirmationModal = document.createElement('div');
   skipConfirmationModal.className = 'modal-overlay';
   skipConfirmationModal.id = 'skipConfirmationModal';
@@ -756,6 +920,7 @@ function addCopyDayLink(timelineTitle, dayIndex) {
     }
   });
   timelineTitle.appendChild(link);
+<<<<<<< HEAD
 
   // Copy Days: optional "Copy from..." button (pull direction, configurable)
   if (TUD_SETTINGS.SHOW_COPY_FROM_BUTTON && getTargetDayCount() > 0) {
@@ -776,6 +941,8 @@ function addCopyDayLink(timelineTitle, dayIndex) {
     });
     timelineTitle.appendChild(fromLink);
   }
+=======
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
 }
 
 window.addCopyDayLink = addCopyDayLink;
@@ -800,7 +967,11 @@ function getTargetDayCount() {
 }
 
 window.getTargetDayCount = getTargetDayCount;
+<<<<<<< HEAD
 window.getEmptyTargetDayCount = getTargetDayCount; // backward compat alias
+=======
+window.getEmptyTargetDayCount = getTargetDayCount;  // backward compat alias
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
 
 // Add this function to update the day display
 export function updateCurrentDayDisplay() {
@@ -1009,6 +1180,18 @@ function updateButtonStates() {
   //console.log('Total timelines:', totalTimelines);
   //console.log('Is last timeline:', isLastTimeline);
 
+<<<<<<< HEAD
+=======
+  const allTimelinesMeetMinCoverage = window.timelineManager.keys.every(
+    (timelineKey) => {
+      const timelineMetadata = window.timelineManager.metadata[timelineKey];
+      const timelineMinCoverage = parseInt(timelineMetadata?.minCoverage) || 0;
+      const timelineCoverage = getCoverageForTimelineKey(timelineKey);
+      return timelineCoverage >= timelineMinCoverage;
+    }
+  );
+
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   // Copy Days feature: Save is always available regardless of min_coverage.
   // The green/gray day buttons show completion status; the Submit Study
   // button enforces the final gate.
@@ -1021,6 +1204,7 @@ function updateButtonStates() {
   const totalStudyDays = window.studyConfigManager?.getStudyDaysCount() || 1;
   const isLastStudyDay = currentDayIndex >= totalStudyDays - 1;
 
+<<<<<<< HEAD
   // Copy Days: all timelines are always visible.  The save button always
   // says "Save Day" and always triggers the save flow.
   updateTimelineCoverageIndicators();
@@ -1040,12 +1224,50 @@ function updateButtonStates() {
   // the same primary colour as the button in the top bar. No submit-mode class
   // here: the separate "Submit Study" button in the toolbar is the one that
   // turns green when every day is complete.
+=======
+  // Copy Days: canFinishStudy() is now only used by the separate Submit Study
+  // button.  The save/submit buttons always show "Save Day" on the last
+  // timeline and "Next Timeline" otherwise.
+  updateTimelineCoverageIndicators();
+
+  // Get text values for buttons
+  const nextTextTopBarButton = window.i18n
+    ? window.i18n.t('buttons.next')
+    : 'Next Timeline';
+  const nextTextLowerSubmitButton = window.i18n
+    ? window.i18n.t('buttons.next')
+    : 'Next Timeline';
+  const saveDayText = window.i18n
+    ? window.i18n.t('buttons.saveDay')
+    : 'Save Day';
+
+  //console.log('Button texts - Next:', nextTextTopBarButton, 'Submit:', submitText);
+
+  if (nextButtonInTopBar) {
+    // Copy Days: save is always available (canProceed is always true).
+    // On last timeline → "Save Day", otherwise → "Next Timeline".
+    nextButtonInTopBar.disabled = !canProceed;
+
+    if (isLastTimeline) {
+      nextButtonInTopBar.innerHTML = `<i class="fas fa-save"></i> ${saveDayText}`;
+      nextButtonInTopBar.setAttribute('data-mode', 'save-day');
+      nextButtonInTopBar.title = '';
+    } else {
+      nextButtonInTopBar.innerHTML = `${nextTextTopBarButton} <i class="fas fa-arrow-right"></i>`;
+      nextButtonInTopBar.setAttribute('data-mode', 'next');
+      nextButtonInTopBar.title = '';
+    }
+  }
+
+  // Update navSubmitBtn to mirror nextButton — Copy Days: always shows "Save Day"
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   if (lowerNavSubmitBtn) {
     lowerNavSubmitBtn.disabled = !canProceed;
 
     const navSubmitIcon = lowerNavSubmitBtn.querySelector('i');
     const navSubmitSpan = lowerNavSubmitBtn.querySelector('span');
 
+<<<<<<< HEAD
     if (navSubmitSpan) {
       navSubmitSpan.textContent = saveDayText;
     }
@@ -1054,6 +1276,30 @@ function updateButtonStates() {
     }
     lowerNavSubmitBtn.setAttribute('data-mode', 'save-day');
     lowerNavSubmitBtn.title = '';
+=======
+    if (isLastTimeline) {
+      if (navSubmitSpan) {
+        navSubmitSpan.textContent = saveDayText;
+      }
+      if (navSubmitIcon) {
+        navSubmitIcon.className = 'fas fa-save';
+      }
+      lowerNavSubmitBtn.classList.add('submit-mode');
+      lowerNavSubmitBtn.setAttribute('data-mode', 'save-day');
+      lowerNavSubmitBtn.title = '';
+    } else {
+      if (navSubmitSpan) {
+        navSubmitSpan.textContent = nextTextLowerSubmitButton;
+      }
+      if (navSubmitIcon) {
+        navSubmitIcon.className = 'fas fa-arrow-right';
+      }
+      lowerNavSubmitBtn.classList.remove('submit-mode');
+      lowerNavSubmitBtn.setAttribute('data-mode', 'next');
+      lowerNavSubmitBtn.title = '';
+    }
+  }
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   }
 
   // The day-switch buttons in #previousDaysSwitchRow are gated on the same
@@ -1078,6 +1324,50 @@ function updateButtonStates() {
 
   // Copy Days: update the Submit Study button state
   updateSubmitStudyButton();
+<<<<<<< HEAD
+=======
+}
+
+/**
+ * Copy Days: Enable the Submit Study button only when ALL days meet
+ * min_coverage in the database.  Shows a tooltip listing incomplete days.
+ */
+function updateSubmitStudyButton() {
+  const btn = document.getElementById('submitStudyBtn');
+  if (!btn) return;
+
+  const dayIndicesMeetMinCoverage = Array.isArray(
+    window.timelineManager?.dayIndicesMeetMinCoverage
+  )
+    ? window.timelineManager.dayIndicesMeetMinCoverage
+    : [];
+
+  const totalDays =
+    window.studyConfigManager?.getStudyDaysCount() ||
+    window.timelineManager?.studyDaysCount ||
+    0;
+
+  const allComplete = dayIndicesMeetMinCoverage.length >= totalDays;
+
+  if (allComplete) {
+    btn.disabled = false;
+    btn.classList.add('submit-ready');
+    btn.title = '';
+  } else {
+    btn.disabled = true;
+    btn.classList.remove('submit-ready');
+    const incomplete = [];
+    for (let i = 0; i < totalDays; i++) {
+      if (!dayIndicesMeetMinCoverage.includes(i)) {
+        incomplete.push(i + 1);
+      }
+    }
+    const t = window.i18n && window.i18n.isReady()
+      ? window.i18n.t.bind(window.i18n)
+      : function(k) { return k; };
+    btn.title = t('messages.submitStudyIncomplete', { days: incomplete.join(', ') });
+  }
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
 }
 
 /**
@@ -1263,6 +1553,7 @@ const handleNextButtonAction = async () => {
   const nextButton = document.getElementById('nextBtn');
   const navSubmitButton = document.getElementById('navSubmitBtn');
 
+<<<<<<< HEAD
   if (nextButton) nextButton.disabled = true;
   if (navSubmitButton) navSubmitButton.disabled = true;
 
@@ -1286,6 +1577,12 @@ const handleNextButtonAction = async () => {
       new URLSearchParams(window.location.search).get('pid');
     if (studyName && pid && typeof window.markDaySaved === 'function') {
       window.markDaySaved(studyName, pid, currentDayIndex);
+=======
+  if (isLastTimeline) {
+    // Copy Days: always save-day mode. Refresh confirmation modal content.
+    if (typeof window.updateConfirmationModalContent === 'function') {
+      window.updateConfirmationModalContent('save-day');
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
     }
 
     const daySavedMsg = window.i18n
@@ -1413,6 +1710,10 @@ function initButtons() {
   if (navSubmitBtn) {
     navSubmitBtn.addEventListener('click', () => {
       handleNextButtonAction();
+<<<<<<< HEAD
+=======
+    });
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
     });
   }
 
@@ -1512,11 +1813,15 @@ function initButtons() {
     backButton.addEventListener('click', handleBackButtonAction);
   }
 
+<<<<<<< HEAD
   // Copy Days: Submit Study button — save the current day first, then POST to
   // the submit endpoint and redirect to thank-you.  Saving first guarantees
   // that the state the participant sees is what gets submitted (the backend
   // validates all days meet min_coverage against the DB on submit), so unsaved
   // edits are never silently discarded.
+=======
+  // Copy Days: Submit Study button — POST to submit endpoint, redirect to thank-you
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   const submitStudyBtn = document.getElementById('submitStudyBtn');
   if (submitStudyBtn) {
     submitStudyBtn.addEventListener('click', async function () {
@@ -1540,6 +1845,7 @@ function initButtons() {
         return;
       }
 
+<<<<<<< HEAD
       const reenableAfterFailure = () => {
         submitStudyBtn.disabled = false;
         updateButtonStates();
@@ -1576,10 +1882,19 @@ function initButtons() {
             '/participants/' +
             encodeURIComponent(participantId) +
             '/submit',
+=======
+      try {
+        const apiUrl = TUD_SETTINGS.API_BASE_URL;
+        const response = await fetch(
+          apiUrl + '/studies/' + encodeURIComponent(studyName) +
+          '/participants/' + encodeURIComponent(participantId) +
+          '/submit',
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
           { method: 'POST' }
         );
 
         if (!response.ok) {
+<<<<<<< HEAD
           const err = await response.json().catch(function () {
             return { detail: 'Unknown error' };
           });
@@ -1588,11 +1903,21 @@ function initButtons() {
               (err.detail && err.detail.message) ||
                 err.detail ||
                 'Failed to submit study',
+=======
+          const err = await response.json().catch(function () { return { detail: 'Unknown error' }; });
+          if (window.showToast) {
+            window.showToast(
+              (err.detail && err.detail.message) || err.detail || 'Failed to submit study',
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
               'error',
               5000
             );
           }
+<<<<<<< HEAD
           reenableAfterFailure();
+=======
+          submitStudyBtn.disabled = false;
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
           return;
         }
 
@@ -1601,14 +1926,22 @@ function initButtons() {
         const currentParams = new URLSearchParams(window.location.search);
         currentParams.set('completion_status', 'completed');
         const sep = redirectUrl.includes('?') ? '&' : '?';
+<<<<<<< HEAD
         window.location.href =
           redirectUrl +
           (currentParams.toString() ? sep + currentParams.toString() : '');
+=======
+        window.location.href = redirectUrl + (currentParams.toString() ? sep + currentParams.toString() : '');
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
       } catch (err) {
         if (window.showToast) {
           window.showToast('Network error submitting study', 'error', 5000);
         }
+<<<<<<< HEAD
         reenableAfterFailure();
+=======
+        submitStudyBtn.disabled = false;
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
       }
     });
   }

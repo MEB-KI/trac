@@ -147,12 +147,21 @@
     "copyError": "Kopiointi epäonnistui: {{message}}",
     "copyEmptySource": "Lähdepäivällä ei ole toimintoja kopioitavaksi.",
     "completeOtherDaysFirst": "Täytä ensin {{days}} päättääksesi tutkimuksen.",
+<<<<<<< HEAD
     "daySavedStayOnPage": "Päivä tallennettu.",
     "copyDayEmpty": "tyhjä",
     "copyDayHasData": "sisältää dataa",
     "copyOverwriteConfirm": "{{day}} sisältää jo dataa. Ylikirjoitetaanko?",
     "submitStudyIncomplete": "Puutteelliset päivät: {{days}}",
     "submitStudyIncompleteHint": "Täytä kaikki päivät ennen lähettämistä"
+=======
+    "daySavedStayOnPage": "Day saved.",
+    "copyDayEmpty": "empty",
+    "copyDayHasData": "has data",
+    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
+    "submitStudyIncomplete": "Incomplete days: {{days}}",
+    "submitStudySuccess": "Study submitted successfully!"
+>>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Virhe toimintojen konfiguraation latauksessa:",
