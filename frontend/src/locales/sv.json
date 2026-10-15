@@ -34,11 +34,16 @@
       "imageAltVertical": "Kopiera en dags aktiviteter till en annan dag i vertikal vy"
     },
     "step4": {
+<<<<<<< HEAD
 =======
 >>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Spara och skicka in din dagbok",
       "description": "När du har registrerat dina aktiviteter för en dag, klicka på knappen \"Spara dagen\" för att spara dem. Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta, klicka på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
       "saveHelp": "Klicka för att spara aktiviteterna för dagen du arbetar med",
+=======
+      "title": "Spara automatiskt och skicka in din dagbok",
+      "description": "Du behöver inte spara dagen själv: dina uppgifter sparas automatiskt en stund efter att du gjort dem, och statusen medan du redigerar visar om dagen är sparad. Om ett problem rapporteras använder du \"Försök igen\". Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta klickar du på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
       "submitStudyHelp": "Klicka för att skicka in din dagbok när alla dagar är kompletta"
     },
     "helpfulTools": "Användbara verktyg",
@@ -73,7 +78,6 @@
     "error": "Fel"
   },
   "buttons": {
-    "saveDay": "Spara dagen",
     "submitStudy": "Skicka studien",
     "start": "Starta",
     "undo": "Ångra",
@@ -126,6 +130,7 @@
   },
   "messages": {
     "activityRemoved": "Aktivitet borttagen",
+    "timelineCleared": "Tidslinjen rensad",
     "selectStudy": "Välj en studie för att fortsätta",
     "noStudiesAvailable": "Inga studier finns på servern.",
     "studyNotFound": "Den begärda studien finns inte.",
@@ -139,7 +144,6 @@
     "timelineCoverageMetAria": "Minsta täckning uppfylld",
     "dayCompleteAria": "Dagen är klar (uppfyller minsta täckningen)",
     "timelineCoverageMissing": "{{covered}} av {{required}} obligatoriska minuter täckta",
-    "timelineMissing": "Det saknas information på den här tidslinjen. Vill du lägga till något?",
     "timelineHoverInactive": "Klicka för att byta till den här tidslinjen",
     "timelineHoverActiveNoSelection": "Välj en aktivitet nedan och placera den sedan här.",
     "timelineHoverActiveWithSelection": "Klicka för att placera den valda aktiviteten här.",
@@ -160,7 +164,10 @@
     "copyEmptySource": "Källdagen har inga aktiviteter att kopiera.",
     "completeOtherDaysFirst": "Fyll först i {{days}} för att avsluta studien.",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "daySavedStayOnPage": "Dagen sparad.",
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
     "copyDayEmpty": "tom",
     "copyDayHasData": "har data",
     "copyOverwriteTitle": "Skriva över dagen?",

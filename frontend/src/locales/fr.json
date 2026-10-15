@@ -34,11 +34,16 @@
       "imageAltVertical": "Copier les activités d'un jour vers un autre en affichage vertical"
     },
     "step4": {
+<<<<<<< HEAD
 =======
 >>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Enregistrer et soumettre votre journal",
       "description": "Une fois vos activités d'une journée enregistrées, cliquez sur le bouton \"Enregistrer le jour\" pour les sauvegarder. Vous pourrez encore modifier cette journée plus tard. Lorsque tous les jours de l'étude sont complets, cliquez sur \"Soumettre l'étude\" pour envoyer votre journal et terminer l'étude.",
       "saveHelp": "Cliquez pour enregistrer les activités du jour en cours",
+=======
+      "title": "Enregistrement automatique et envoi de votre journal",
+      "description": "Vous n'avez plus besoin d'enregistrer votre journée : vos saisies sont enregistrées automatiquement peu de temps après, et l'état affiché pendant votre saisie indique si la journée est enregistrée. Si un problème est signalé, utilisez \"Réessayer\". Vous pourrez encore modifier cette journée plus tard. Lorsque tous les jours de l'étude sont complets, cliquez sur \"Soumettre l'étude\" pour envoyer votre journal et terminer l'étude.",
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
       "submitStudyHelp": "Cliquez pour soumettre votre journal lorsque tous les jours sont complets"
     },
     "helpfulTools": "Outils utiles",
@@ -73,7 +78,6 @@
     "error": "Erreur"
   },
   "buttons": {
-    "saveDay": "Enregistrer le jour",
     "submitStudy": "Soumettre l'étude",
     "start": "Commencer",
     "undo": "Annuler",
@@ -126,6 +130,7 @@
   },
   "messages": {
     "activityRemoved": "Activité supprimée",
+    "timelineCleared": "Chronologie effacée",
     "selectStudy": "Veuillez sélectionner une étude pour continuer",
     "noStudiesAvailable": "Aucune étude disponible sur le serveur.",
     "studyNotFound": "L'étude demandée n'existe pas.",
@@ -139,7 +144,6 @@
     "timelineCoverageMetAria": "Couverture minimale atteinte",
     "dayCompleteAria": "Journée complète (couverture minimale atteinte)",
     "timelineCoverageMissing": "{{covered}} sur {{required}} minutes requises couvertes",
-    "timelineMissing": "Il manque des informations dans cette chronologie. Souhaitez-vous ajouter quelque chose ?",
     "timelineHoverInactive": "Cliquez pour passer à cette chronologie",
     "timelineHoverActiveNoSelection": "Sélectionnez une activité ci-dessous, puis placez-la ici.",
     "timelineHoverActiveWithSelection": "Cliquez pour placer l'activité sélectionnée ici.",
@@ -160,7 +164,10 @@
     "copyEmptySource": "Le jour source n'a aucune activité à copier.",
     "completeOtherDaysFirst": "Complétez d'abord {{days}} pour terminer l'étude.",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "daySavedStayOnPage": "Journée enregistrée.",
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
     "copyDayEmpty": "vide",
     "copyDayHasData": "contient des données",
     "copyOverwriteTitle": "Écraser le jour ?",

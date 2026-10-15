@@ -34,11 +34,16 @@
       "imageAltVertical": "Kopiowanie aktywności z jednego dnia na inny w widoku pionowym"
     },
     "step4": {
+<<<<<<< HEAD
 =======
 >>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Zapisz i wyślij dziennik",
       "description": "Po zapisaniu aktywności z danego dnia kliknij przycisk \"Zapisz dzień\", aby je zapisać. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
       "saveHelp": "Kliknij, aby zapisać aktywności z dnia, nad którym pracujesz",
+=======
+      "title": "Zapisywanie automatyczne i wysyłanie dziennika",
+      "description": "Nie musisz samodzielnie zapisywać dnia: Twoje wpisy są zapisywane automatycznie chwilę po ich wprowadzeniu, a status widoczny podczas edycji informuje, czy dzień został zapisany. Jeśli zgłoszono problem, wybierz \"Ponów próbę\". Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
       "submitStudyHelp": "Kliknij, aby wysłać dziennik, gdy wszystkie dni będą kompletne"
     },
     "helpfulTools": "Pomocne narzędzia",
@@ -73,7 +78,6 @@
     "error": "Błąd"
   },
   "buttons": {
-    "saveDay": "Zapisz dzień",
     "submitStudy": "Wyślij badanie",
     "start": "Rozpocznij",
     "undo": "Cofnij",
@@ -126,6 +130,7 @@
   },
   "messages": {
     "activityRemoved": "Aktywność usunięta",
+    "timelineCleared": "Oś czasu wyczyszczona",
     "selectStudy": "Wybierz badanie, aby kontynuować",
     "noStudiesAvailable": "Brak dostępnych badań na serwerze.",
     "studyNotFound": "Żądane badanie nie istnieje.",
@@ -139,7 +144,6 @@
     "timelineCoverageMetAria": "Minimalne pokrycie spełnione",
     "dayCompleteAria": "Dzień ukończony (spełniono minimalne pokrycie)",
     "timelineCoverageMissing": "Pokryto {{covered}} z {{required}} wymaganych minut",
-    "timelineMissing": "Brakuje informacji na tej osi czasu. Chcesz dodać coś?",
     "timelineHoverInactive": "Kliknij, aby przełączyć się na tę oś czasu",
     "timelineHoverActiveNoSelection": "Wybierz aktywność poniżej, a następnie umieść ją tutaj.",
     "timelineHoverActiveWithSelection": "Kliknij, aby umieścić tutaj wybraną aktywność.",
@@ -160,7 +164,10 @@
     "copyEmptySource": "Dzień źródłowy nie ma aktywności do skopiowania.",
     "completeOtherDaysFirst": "Uzupełnij najpierw {{days}}, aby zakończyć badanie.",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "daySavedStayOnPage": "Dzień zapisany.",
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
     "copyDayEmpty": "pusty",
     "copyDayHasData": "ma dane",
     "copyOverwriteTitle": "Nadpisać dzień?",

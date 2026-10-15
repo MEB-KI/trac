@@ -34,11 +34,16 @@
       "imageAltVertical": "Aktivitäten eines Tages in der vertikalen Ansicht auf einen anderen Tag kopieren"
     },
     "step4": {
+<<<<<<< HEAD
 =======
 >>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Tagebuch speichern und absenden",
       "description": "Nachdem Sie Ihre Aktivitäten für einen Tag erfasst haben, klicken Sie auf die Schaltfläche \"Tag speichern\", um sie zu speichern. Sie können diesen Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
       "saveHelp": "Klicken Sie, um die Aktivitäten des Tages zu speichern, an dem Sie gerade arbeiten",
+=======
+      "title": "Tagebuch automatisch speichern und absenden",
+      "description": "Sie müssen Ihren Tag nicht mehr speichern: Ihre Einträge werden kurz nach der Eingabe automatisch gespeichert, und der Status während der Bearbeitung zeigt an, ob der Tag gespeichert ist. Wird ein Problem gemeldet, verwenden Sie \"Erneut versuchen\". Sie können den Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
       "submitStudyHelp": "Klicken Sie, um Ihr Tagebuch abzusenden, sobald alle Tage vollständig sind"
     },
     "helpfulTools": "Hilfreiche Werkzeuge",
@@ -73,7 +78,6 @@
     "error": "Fehler"
   },
   "buttons": {
-    "saveDay": "Tag speichern",
     "submitStudy": "Studie absenden",
     "start": "Start",
     "undo": "Rückgängig machen",
@@ -126,6 +130,7 @@
   },
   "messages": {
     "activityRemoved": "Aktivität entfernt",
+    "timelineCleared": "Zeitleiste geleert",
     "selectStudy": "Bitte wählen Sie eine Studie, um fortzufahren",
     "noStudiesAvailable": "Keine Studien auf dem Server verfügbar.",
     "studyNotFound": "Die angeforderte Studie existiert nicht.",
@@ -139,7 +144,6 @@
     "timelineCoverageMetAria": "Mindestabdeckung erreicht",
     "dayCompleteAria": "Tag abgeschlossen (Mindestabdeckung erfüllt)",
     "timelineCoverageMissing": "{{covered}} von {{required}} erforderlichen Minuten abgedeckt",
-    "timelineMissing": "In dieser Zeitleiste fehlen noch Angaben. Möchten Sie etwas hinzufügen?",
     "timelineHoverInactive": "Klicken Sie, um zu dieser Zeitleiste zu wechseln",
     "timelineHoverActiveNoSelection": "Wählen Sie unten eine Aktivität und platzieren Sie sie dann hier.",
     "timelineHoverActiveWithSelection": "Klicken Sie, um die ausgewählte Aktivität hier zu platzieren.",
@@ -160,7 +164,10 @@
     "copyEmptySource": "Der Quell-Tag hat keine Aktivitäten zum Kopieren.",
     "completeOtherDaysFirst": "Vervollständigen Sie zuerst {{days}}, um die Studie abzuschließen.",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "daySavedStayOnPage": "Tag gespeichert.",
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
     "copyDayEmpty": "leer",
     "copyDayHasData": "hat Daten",
     "copyOverwriteTitle": "Tag überschreiben?",

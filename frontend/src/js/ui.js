@@ -77,14 +77,14 @@ window.showToast = showToast;
 // ---------------------------------------------------------------------------
 // Autosave status chip
 //
-// Save Day is no longer the only way a day reaches the backend, so the diary has
-// to say what happened to the day by itself: "Saving..." while an edit is on its
-// way, "Saved" briefly afterwards, and - the part that matters - a persistent
-// "Not saved" with a Retry that does not wait for the engine's own backoff.
+// The diary saves itself now, so the toolbar has to say what happened to the
+// day by itself: "Saving..." while an edit is on its way, "Saved" briefly
+// afterwards, and - the part that matters - a persistent "Not saved" with a
+// Retry that does not wait for the engine's own backoff.
 // Silent autosave failure would be worse than a failed explicit save.
 //
-// The chip sits next to Save Day because that is where "is my day stored?" is
-// looked for; sync_status.js owns the state -> label mapping.
+// The chip sits in the toolbar, where "is my day stored?" is looked for;
+// sync_status.js owns the state -> label mapping.
 // ---------------------------------------------------------------------------
 let syncStatusHideTimer = null;
 
@@ -92,17 +92,13 @@ function uiText(key, fallback) {
   return window.i18n && window.i18n.isReady() ? window.i18n.t(key) : fallback;
 }
 
-/** Build the chip on first use, next to Save Day. */
+/** Build the chip on first use, as the last item of the diary toolbar. */
 function ensureSyncStatusChip() {
   const existing = document.getElementById('syncStatus');
   if (existing) return existing;
 
-  // Falls back to the toolbar itself, so removing Save Day does not take the
-  // status with it.
-  const anchor =
-    document.getElementById('saveDayBtn') ||
-    document.querySelector('.header-section .controls');
-  if (!anchor || !anchor.parentElement) return null;
+  const toolbar = document.querySelector('.header-section .controls');
+  if (!toolbar) return null;
 
   const chip = document.createElement('span');
   chip.id = 'syncStatus';
@@ -131,7 +127,9 @@ function ensureSyncStatusChip() {
   });
 
   chip.append(icon, text, retry);
-  anchor.insertAdjacentElement('afterend', chip);
+  // Inside the toolbar, not next to it: as a sibling of .controls the chip gets
+  // a line of its own and moves the timeline while the participant is editing.
+  toolbar.appendChild(chip);
   return chip;
 }
 
@@ -186,133 +184,6 @@ function renderSyncStatus(state) {
 }
 
 window.renderSyncStatus = renderSyncStatus;
-
-// Create invisible overlays for disabled buttons to capture real mouse/touch events
-function createDisabledButtonOverlay(buttonId) {
-  const button = document.getElementById(buttonId);
-  if (!button) return;
-
-  // Remove existing overlay if any
-  const existingOverlay = document.getElementById(`${buttonId}-overlay`);
-  if (existingOverlay) {
-    existingOverlay.remove();
-  }
-
-  const overlay = document.createElement('div');
-  overlay.id = `${buttonId}-overlay`;
-  overlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: transparent;
-        cursor: not-allowed;
-        z-index: 10;
-        display: none;
-    `;
-
-  // Add click handler to overlay
-  overlay.addEventListener('click', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    console.log('Disabled button overlay clicked:', buttonId);
-
-    const message = window.i18n
-      ? window.i18n.t('messages.timelineMissing')
-      : 'There is information missing from this timeline. Would you like to add anything?';
-    showToast(message, 'warning', 4000);
-  });
-
-  // Add touch handler for mobile
-  overlay.addEventListener('touchend', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    console.log('Disabled button overlay touched:', buttonId);
-
-    const message = window.i18n
-      ? window.i18n.t('messages.timelineMissing')
-      : 'There is information missing from this timeline. Would you like to add anything?';
-    showToast(message, 'warning', 4000);
-  });
-
-  // Position overlay directly over the button
-  button.style.position = 'relative';
-  button.appendChild(overlay);
-  return overlay;
-}
-
-// Function to update overlay visibility based on button state
-function updateDisabledButtonOverlays() {
-  const button = document.getElementById('saveDayBtn');
-  if (!button) return;
-
-  const overlay = document.getElementById(`${button.id}-overlay`);
-  if (!overlay) return;
-
-  overlay.style.display = button.disabled ? 'block' : 'none';
-}
-
-// Initialize overlays immediately and with intervals
-let overlaysInitialized = false;
-function initializeOverlays() {
-  if (overlaysInitialized) return;
-  overlaysInitialized = true;
-  console.log('Initializing overlays...');
-
-  // Create overlay for the disabled button
-  createDisabledButtonOverlay('saveDayBtn');
-
-  // Update overlay visibility initially
-  updateDisabledButtonOverlays();
-
-  // Watch for button state changes using MutationObserver
-  const observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-      if (
-        mutation.type === 'attributes' &&
-        mutation.attributeName === 'disabled'
-      ) {
-        updateDisabledButtonOverlays();
-      }
-    });
-  });
-
-  // Observe the button for disabled attribute changes
-  const saveDayButton = document.getElementById('saveDayBtn');
-
-  if (saveDayButton) {
-    observer.observe(saveDayButton, {
-      attributes: true,
-      attributeFilter: ['disabled'],
-    });
-  }
-}
-
-// Try to initialize immediately
-setTimeout(initializeOverlays, 100);
-
-// Also try when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeOverlays);
-} else {
-  initializeOverlays();
-}
-
-// Also update overlays periodically as a fallback
-setInterval(() => {
-  updateDisabledButtonOverlays();
-
-  // Re-create the overlay if it does not exist
-  if (!document.getElementById('saveDayBtn-overlay')) {
-    createDisabledButtonOverlay('saveDayBtn');
-  }
-}, 2000);
-
-// Make the update function globally available for manual calls
-window.updateDisabledButtonOverlays = updateDisabledButtonOverlays;
 
 // ── Modal focus management (Tier 2 accessibility) ─────────────────────────
 // All dialogs carry role="dialog" (see createModal / ensureActivityInfoModal /
@@ -1372,7 +1243,6 @@ function updateButtonStates() {
   updateCurrentDayDisplay();
 
   const clearTimelineButton = document.getElementById('clearTimelineBtn');
-  const saveDayButtonInTopBar = document.getElementById('saveDayBtn');
 
   const currentData = getCurrentTimelineData();
   const isEmpty = currentData.length === 0;
@@ -1414,6 +1284,7 @@ function updateButtonStates() {
 
   console.log('Min coverage:', minCoverage, 'Meets min:', meetsMinCoverage);
 
+<<<<<<< HEAD
   // Check if we're on the last timeline
   const totalTimelines = window.timelineManager.keys.length;
   const isLastTimeline =
@@ -1439,13 +1310,14 @@ function updateButtonStates() {
   // button enforces the final gate.
   const canProceed = true;
 
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
   const currentDayIndex =
     parseInt(
       new URLSearchParams(window.location.search).get('day_label_index')
     ) || 0;
-  const totalStudyDays = window.studyConfigManager?.getStudyDaysCount() || 1;
-  const isLastStudyDay = currentDayIndex >= totalStudyDays - 1;
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   // Copy Days: all timelines are always visible.  The save button always
   // says "Save Day" and always triggers the save flow.
@@ -1547,6 +1419,11 @@ function updateButtonStates() {
 
 =======
 >>>>>>> 961607d (CHG: remove duplicate submit day button in footer)
+=======
+  // Copy Days: all timelines are always visible.
+  updateTimelineCoverageIndicators();
+
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
   // The day-switch buttons in #previousDaysSwitchRow are gated on the same
   // min_coverage check as the Next/Submit buttons above.  Every activity
   // mutation (create, delete, move, resize, arrow-key time edit, clear-timeline,
@@ -1868,14 +1745,11 @@ function updateFooterVisibility() {
   updateFooterHeight();
 }
 
-// Shared debounce variables for both Next button and navigation submit button
-let nextButtonLastClick = 0;
-const NEXT_BUTTON_COOLDOWN = 500; // 1 second cooldown
-
 // Debounce variables for the timeline switch button
 let switchTimelineLastClick = 0;
 const SWITCH_TIMELINE_COOLDOWN = 500;
 
+<<<<<<< HEAD
 // Shared function to handle save button logic with debounce.
 // Copy Days: saving is a routine operation — no confirmation modal needed.
 const handleSaveDayAction = async () => {
@@ -1948,6 +1822,8 @@ const handleSaveDayAction = async () => {
   }
 };
 
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 /**
  * Bring the day status in line with what a save just persisted - without
  * reloading the page.
@@ -2041,8 +1917,8 @@ const handleSwitchTimelineAction = async () => {
 let buttonsInitialized = false;
 
 // ── Phone ⋮ menu ──────────────────────────────────────────────────────────
-// On phones the toolbar only has room for Save Day and Submit Study. Skip time
-// reporting and the language picker move in here instead of taking rows of
+// On phones the toolbar only has room for Clear timeline and Submit Study. Skip
+// time reporting and the language picker move in here instead of taking rows of
 // their own. (Deleting an activity no longer needs an entry: the long-press
 // menu deletes and offers an undo toast, so there is no "remove last" button
 // on any platform.)
@@ -2640,6 +2516,11 @@ function initButtons() {
     const currentKey = getCurrentTimelineKey();
     const currentData = getCurrentTimelineData();
     if (currentData.length > 0) {
+      // Keep what is about to be deleted. The day is written by autosave a second
+      // later, so undo is the participant's only way back - the button used to be
+      // safe because nothing was stored until Save Day was pressed.
+      const clearedActivities = [...currentData];
+
       // Get the activities container of the active timeline
       const activeTimeline = window.timelineManager.activeTimeline;
       const activitiesContainer = activeTimeline.querySelector('.activities');
@@ -2668,6 +2549,8 @@ function initButtons() {
       }
 
       updateButtonStates();
+
+      window.showUndoClearTimelineToast?.(currentKey, clearedActivities);
 
       if (DEBUG_MODE) {
         console.log(
@@ -2700,6 +2583,7 @@ function initButtons() {
     confirmClearTimelineOk.addEventListener('click', performClearTimeline);
   }
 
+<<<<<<< HEAD
   // Add click handler for the Save Day button
   const saveDayBtn = document.getElementById('saveDayBtn');
 
@@ -2735,6 +2619,8 @@ function initButtons() {
 =======
   // Timeline switcher: cycles through the study's timelines (narrow layouts).
 =======
+=======
+>>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
   // Timeline switcher: cycles through the study's timelines.
 >>>>>>> 13b378e (CHG: Also replace previous timeline button with timeline switcher on desktop)
   const switchTimelineButton = document.getElementById('switchTimelineBtn');
