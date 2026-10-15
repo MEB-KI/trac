@@ -5,8 +5,13 @@ const TUD_SETTINGS = {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> c367698 (rebased)
+=======
+=======
+>>>>>>> 07c1cc7 (Working in podman rootless setup, but still needs cleanup)
+>>>>>>> dcb10da (rebasing ...)
     API_BASE_URL: 'http://localhost:8001/tud_backend/api',
 =======
     // Same-origin API base: the page talks to whatever host it was loaded from,
