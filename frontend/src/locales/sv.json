@@ -175,9 +175,12 @@
     "completeOtherDaysFirst": "Fyll först i {{days}} för att avsluta studien.",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     "daySavedStayOnPage": "Dagen sparad.",
 =======
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+>>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     "copyDayEmpty": "tom",
     "copyDayHasData": "har data",
     "copyOverwriteTitle": "Skriva över dagen?",
@@ -192,7 +195,11 @@
     "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
     "submitStudyIncomplete": "Incomplete days: {{days}}",
     "submitStudySuccess": "Study submitted successfully!"
+<<<<<<< HEAD
 >>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
+=======
+>>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
+>>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Fel vid laddning av aktivitetskonfiguration:",

@@ -175,9 +175,12 @@
     "completeOtherDaysFirst": "Vervollständigen Sie zuerst {{days}}, um die Studie abzuschließen.",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     "daySavedStayOnPage": "Tag gespeichert.",
 =======
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+>>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     "copyDayEmpty": "leer",
     "copyDayHasData": "hat Daten",
     "copyOverwriteTitle": "Tag überschreiben?",
@@ -192,7 +195,11 @@
     "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
     "submitStudyIncomplete": "Incomplete days: {{days}}",
     "submitStudySuccess": "Study submitted successfully!"
+<<<<<<< HEAD
 >>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
+=======
+>>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
+>>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Fehler beim Laden der Aktivitätskonfiguration:",

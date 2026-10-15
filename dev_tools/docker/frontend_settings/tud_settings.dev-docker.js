@@ -27,7 +27,11 @@ const TUD_SETTINGS = {
 =======
     TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
     SHOW_COPY_FROM_BUTTON: false        // Copy Days: show "Copy from..." button (default off)
+<<<<<<< HEAD
 >>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
+=======
+>>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
+>>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
 };
 
 window.TUD_SETTINGS = TUD_SETTINGS;
