@@ -583,7 +583,11 @@ Version 0.20.0 -- New user type Scientist
 - DEV: fix brittle E2E tests that made the CI red: the copy-day picker is anchored at the cursor and covers the page below it, so "click outside to close" now clicks a point that is provably outside the picker (new helper closeCopyDayPicker) instead of the day header, which the picker intercepted. The skip-reporting-button spec now waits for the diary UI to be loaded before asserting, so it can no longer pass by racing a redirect or fail as a flake on WebKit. Reset integration test now really submits the study first and asserts that the submission is cleared.
 - FIX: frontend instructions page (section 3) described the old flow: it still talked about a "Submit" button to complete the diary. It now explains the current Save Day / Submit Study flow, shows both buttons (Save Day with the disk icon, Submit Study) and uses the real button labels from the locale files (all 7 locales updated).
 - CHG: remove the stale button labels that still named the removed "Submit Day"/"Next Timeline" concept from all locale files: buttons.submit, buttons.next and buttons.finishStudy. index.html and instructions.html now label the save buttons (top bar, footer, submit demo) via buttons.saveDay, and the locale consistency test no longer requires buttons.finishStudy.
+<<<<<<< HEAD
 >>>>>>> ca424ca (FIX: update instructions page for changed UI)
+=======
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
 
 
 Version 0.19.0 -- Copy Days

@@ -47,7 +47,15 @@
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 =======
       "description": "Sinun ei tarvitse tallentaa päivää: merkintäsi tallennetaan automaattisesti muokkauksen aikana. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
+<<<<<<< HEAD
 >>>>>>> 449e334 (FIX: improve wording on instructions page)
+=======
+=======
+      "title": "Tallenna ja lähetä päiväkirja",
+      "description": "Kun olet kirjannut päivän toiminnot, klikkaa \"Tallenna päivä\" -painiketta tallentaaksesi ne. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
+      "saveHelp": "Klikkaa tallentaaksesi sen päivän toiminnot, jota parhaillaan muokkaat",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
       "submitStudyHelp": "Klikkaa lähettääksesi päiväkirjasi, kun kaikki päivät ovat valmiit"
     },
     "helpfulTools": "Hyödylliset työkalut",
@@ -85,11 +93,19 @@
     "error": "Virhe"
   },
   "buttons": {
+<<<<<<< HEAD
     "submitStudy": "Lähetä tutkimus",
     "start": "Aloita",
     "undo": "Kumoa",
     "clearTimeline": "Tyhjennä aikajana",
     "moreActions": "Lisää toimintoja",
+=======
+    "saveDay": "Tallenna päivä",
+    "submitStudy": "Lähetä tutkimus",
+    "start": "Aloita",
+    "removeLast": "Poista viimeisin",
+    "cleanRow": "Tyhjennä rivi",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Ohita ajankäytön raportointi",
     "switchTimeline": "Vaihda aikajanaa",
     "giveConsent": "Annan suostumukseni ja jatkan",

@@ -47,7 +47,15 @@
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 =======
       "description": "You do not need to save your day: your entries are saved automatically while you edit. You can still edit a day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
+<<<<<<< HEAD
 >>>>>>> 449e334 (FIX: improve wording on instructions page)
+=======
+=======
+      "title": "Save and Submit Your Diary",
+      "description": "Once you have recorded your activities for a day, click the \"Save Day\" button to store them. You can still edit that day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
+      "saveHelp": "Click to save the activities of the day you are working on",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
       "submitStudyHelp": "Click to submit your diary when every day is complete"
     },
     "helpfulTools": "Helpful tools",
@@ -85,11 +93,19 @@
     "error": "Error"
   },
   "buttons": {
+<<<<<<< HEAD
     "submitStudy": "Submit Study",
     "start": "Start",
     "undo": "Undo",
     "clearTimeline": "Clear timeline",
     "moreActions": "More actions",
+=======
+    "saveDay": "Save Day",
+    "submitStudy": "Submit Study",
+    "start": "Start",
+    "removeLast": "Remove Last",
+    "cleanRow": "Clean Row",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Skip time reporting",
     "switchTimeline": "Switch timeline",
     "giveConsent": "Give consent and continue",

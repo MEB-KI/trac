@@ -47,7 +47,15 @@
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 =======
       "description": "Vous n'avez pas besoin d'enregistrer votre journée : vos saisies sont enregistrées automatiquement au fur et à mesure. Vous pourrez encore modifier cette journée plus tard. Lorsque tous les jours de l'étude sont complets, cliquez sur \"Soumettre l'étude\" pour envoyer votre journal et terminer l'étude.",
+<<<<<<< HEAD
 >>>>>>> 449e334 (FIX: improve wording on instructions page)
+=======
+=======
+      "title": "Enregistrer et soumettre votre journal",
+      "description": "Une fois vos activités d'une journée enregistrées, cliquez sur le bouton \"Enregistrer le jour\" pour les sauvegarder. Vous pourrez encore modifier cette journée plus tard. Lorsque tous les jours de l'étude sont complets, cliquez sur \"Soumettre l'étude\" pour envoyer votre journal et terminer l'étude.",
+      "saveHelp": "Cliquez pour enregistrer les activités du jour en cours",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
       "submitStudyHelp": "Cliquez pour soumettre votre journal lorsque tous les jours sont complets"
     },
     "helpfulTools": "Outils utiles",
@@ -85,11 +93,19 @@
     "error": "Erreur"
   },
   "buttons": {
+<<<<<<< HEAD
     "submitStudy": "Soumettre l'étude",
     "start": "Commencer",
     "undo": "Annuler",
     "clearTimeline": "Effacer la chronologie",
     "moreActions": "Autres actions",
+=======
+    "saveDay": "Enregistrer le jour",
+    "submitStudy": "Soumettre l'étude",
+    "start": "Commencer",
+    "removeLast": "Supprimer dernière",
+    "cleanRow": "Nettoyer la Ligne",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Ignorer le rapport de temps",
     "switchTimeline": "Changer de ligne de temps",
     "giveConsent": "Je consens et je continue",

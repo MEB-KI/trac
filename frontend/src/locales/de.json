@@ -47,7 +47,15 @@
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 =======
       "description": "Sie müssen Ihren Tag nicht speichern: Ihre Einträge werden während der Bearbeitung automatisch gespeichert. Sie können den Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
+<<<<<<< HEAD
 >>>>>>> 449e334 (FIX: improve wording on instructions page)
+=======
+=======
+      "title": "Tagebuch speichern und absenden",
+      "description": "Nachdem Sie Ihre Aktivitäten für einen Tag erfasst haben, klicken Sie auf die Schaltfläche \"Tag speichern\", um sie zu speichern. Sie können diesen Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
+      "saveHelp": "Klicken Sie, um die Aktivitäten des Tages zu speichern, an dem Sie gerade arbeiten",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
       "submitStudyHelp": "Klicken Sie, um Ihr Tagebuch abzusenden, sobald alle Tage vollständig sind"
     },
     "helpfulTools": "Hilfreiche Werkzeuge",
@@ -85,11 +93,19 @@
     "error": "Fehler"
   },
   "buttons": {
+<<<<<<< HEAD
     "submitStudy": "Studie absenden",
     "start": "Start",
     "undo": "Rückgängig machen",
     "clearTimeline": "Zeitleiste leeren",
     "moreActions": "Weitere Aktionen",
+=======
+    "saveDay": "Tag speichern",
+    "submitStudy": "Studie absenden",
+    "start": "Start",
+    "removeLast": "Letzte entfernen",
+    "cleanRow": "Zeile leeren",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Zeiterfassung überspringen",
     "switchTimeline": "Zeitleiste wechseln",
     "giveConsent": "Einwilligen und fortfahren",

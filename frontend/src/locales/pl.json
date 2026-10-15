@@ -47,7 +47,15 @@
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 =======
       "description": "Nie musisz zapisywać dnia: Twoje wpisy są zapisywane automatycznie podczas edycji. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
+<<<<<<< HEAD
 >>>>>>> 449e334 (FIX: improve wording on instructions page)
+=======
+=======
+      "title": "Zapisz i wyślij dziennik",
+      "description": "Po zapisaniu aktywności z danego dnia kliknij przycisk \"Zapisz dzień\", aby je zapisać. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
+      "saveHelp": "Kliknij, aby zapisać aktywności z dnia, nad którym pracujesz",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
       "submitStudyHelp": "Kliknij, aby wysłać dziennik, gdy wszystkie dni będą kompletne"
     },
     "helpfulTools": "Pomocne narzędzia",
@@ -85,11 +93,19 @@
     "error": "Błąd"
   },
   "buttons": {
+<<<<<<< HEAD
     "submitStudy": "Wyślij badanie",
     "start": "Rozpocznij",
     "undo": "Cofnij",
     "clearTimeline": "Wyczyść oś czasu",
     "moreActions": "Więcej działań",
+=======
+    "saveDay": "Zapisz dzień",
+    "submitStudy": "Wyślij badanie",
+    "start": "Rozpocznij",
+    "removeLast": "Usuń ostatnią",
+    "cleanRow": "Wyczyść rząd",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Pomiń raportowanie czasu",
     "switchTimeline": "Zmień oś czasu",
     "giveConsent": "Wyrażam zgodę i kontynuuję",

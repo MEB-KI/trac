@@ -47,7 +47,15 @@
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
 =======
       "description": "No necesitas guardar tu día: tus entradas se guardan automáticamente mientras editas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
+<<<<<<< HEAD
 >>>>>>> 449e334 (FIX: improve wording on instructions page)
+=======
+=======
+      "title": "Guardar y enviar tu diario",
+      "description": "Una vez que hayas registrado tus actividades de un día, haz clic en el botón \"Guardar día\" para guardarlas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
+      "saveHelp": "Haz clic para guardar las actividades del día en el que estás trabajando",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
       "submitStudyHelp": "Haz clic para enviar tu diario cuando todos los días estén completos"
     },
     "helpfulTools": "Herramientas útiles",
@@ -85,11 +93,19 @@
     "error": "Error"
   },
   "buttons": {
+<<<<<<< HEAD
     "submitStudy": "Enviar estudio",
     "start": "Comenzar",
     "undo": "Deshacer",
     "clearTimeline": "Vaciar línea de tiempo",
     "moreActions": "Más acciones",
+=======
+    "saveDay": "Guardar día",
+    "submitStudy": "Enviar estudio",
+    "start": "Comenzar",
+    "removeLast": "Eliminar última",
+    "cleanRow": "Limpiar Fila",
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Omitir reporte de tiempo",
     "switchTimeline": "Cambiar línea de tiempo",
     "giveConsent": "Doy mi consentimiento y continúo",

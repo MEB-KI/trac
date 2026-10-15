@@ -4,6 +4,9 @@ const TUD_SETTINGS = {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> c367698 (rebased)
     API_BASE_URL: 'http://localhost:8001/tud_backend/api',
 =======
     // Same-origin API base: the page talks to whatever host it was loaded from,
@@ -71,7 +74,11 @@ const TUD_SETTINGS = {
     pl: { imprint: 'Impressum', privacy: 'Ochrona danych' },
     sv: { imprint: 'Impressum', privacy: 'Integritet' },
   },
+<<<<<<< HEAD
 >>>>>>> ca424ca (FIX: update instructions page for changed UI)
+=======
+>>>>>>> bea4097 (FIX: update instructions page for changed UI)
+>>>>>>> c367698 (rebased)
 };
 
 window.TUD_SETTINGS = TUD_SETTINGS;
