@@ -42,8 +42,12 @@
       "saveHelp": "Klicka för att spara aktiviteterna för dagen du arbetar med",
 =======
       "title": "Spara automatiskt och skicka in din dagbok",
+<<<<<<< HEAD
       "description": "Du behöver inte spara dagen själv: dina uppgifter sparas automatiskt en stund efter att du gjort dem, och statusen medan du redigerar visar om dagen är sparad. Om ett problem rapporteras använder du \"Försök igen\". Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta klickar du på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+      "description": "Du behöver inte spara dagen: dina uppgifter sparas automatiskt medan du redigerar. Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta klickar du på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
+>>>>>>> 449e334 (FIX: improve wording on instructions page)
       "submitStudyHelp": "Klicka för att skicka in din dagbok när alla dagar är kompletta"
     },
     "helpfulTools": "Användbara verktyg",

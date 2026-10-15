@@ -42,8 +42,12 @@
       "saveHelp": "Kliknij, aby zapisać aktywności z dnia, nad którym pracujesz",
 =======
       "title": "Zapisywanie automatyczne i wysyłanie dziennika",
+<<<<<<< HEAD
       "description": "Nie musisz samodzielnie zapisywać dnia: Twoje wpisy są zapisywane automatycznie chwilę po ich wprowadzeniu, a status widoczny podczas edycji informuje, czy dzień został zapisany. Jeśli zgłoszono problem, wybierz \"Ponów próbę\". Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+      "description": "Nie musisz zapisywać dnia: Twoje wpisy są zapisywane automatycznie podczas edycji. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
+>>>>>>> 449e334 (FIX: improve wording on instructions page)
       "submitStudyHelp": "Kliknij, aby wysłać dziennik, gdy wszystkie dni będą kompletne"
     },
     "helpfulTools": "Pomocne narzędzia",

@@ -42,8 +42,12 @@
       "saveHelp": "Klicken Sie, um die Aktivitäten des Tages zu speichern, an dem Sie gerade arbeiten",
 =======
       "title": "Tagebuch automatisch speichern und absenden",
+<<<<<<< HEAD
       "description": "Sie müssen Ihren Tag nicht mehr speichern: Ihre Einträge werden kurz nach der Eingabe automatisch gespeichert, und der Status während der Bearbeitung zeigt an, ob der Tag gespeichert ist. Wird ein Problem gemeldet, verwenden Sie \"Erneut versuchen\". Sie können den Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+      "description": "Sie müssen Ihren Tag nicht speichern: Ihre Einträge werden während der Bearbeitung automatisch gespeichert. Sie können den Tag später weiterhin bearbeiten. Wenn alle Tage der Studie vollständig sind, klicken Sie auf \"Studie absenden\", um Ihr Tagebuch zu senden und die Studie abzuschließen.",
+>>>>>>> 449e334 (FIX: improve wording on instructions page)
       "submitStudyHelp": "Klicken Sie, um Ihr Tagebuch abzusenden, sobald alle Tage vollständig sind"
     },
     "helpfulTools": "Hilfreiche Werkzeuge",

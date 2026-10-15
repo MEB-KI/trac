@@ -42,8 +42,12 @@
       "saveHelp": "Klikkaa tallentaaksesi sen päivän toiminnot, jota parhaillaan muokkaat",
 =======
       "title": "Tallenna automaattisesti ja lähetä päiväkirja",
+<<<<<<< HEAD
       "description": "Sinun ei tarvitse tallentaa päivää itse: merkintäsi tallennetaan automaattisesti hetken kuluttua, ja muokkauksen aikana näkyvä tila kertoo, onko päivä tallennettu. Jos ongelmasta ilmoitetaan, valitse \"Yritä uudelleen\". Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+      "description": "Sinun ei tarvitse tallentaa päivää: merkintäsi tallennetaan automaattisesti muokkauksen aikana. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
+>>>>>>> 449e334 (FIX: improve wording on instructions page)
       "submitStudyHelp": "Klikkaa lähettääksesi päiväkirjasi, kun kaikki päivät ovat valmiit"
     },
     "helpfulTools": "Hyödylliset työkalut",

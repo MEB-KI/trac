@@ -42,8 +42,12 @@
       "saveHelp": "Haz clic para guardar las actividades del día en el que estás trabajando",
 =======
       "title": "Guardar automáticamente y enviar tu diario",
+<<<<<<< HEAD
       "description": "Ya no necesitas guardar tu día: tus entradas se almacenan automáticamente poco después de que las hagas, y el estado que se muestra mientras editas indica si el día está guardado. Si se informa de un problema, usa \"Reintentar\". Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
 >>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
+=======
+      "description": "No necesitas guardar tu día: tus entradas se guardan automáticamente mientras editas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
+>>>>>>> 449e334 (FIX: improve wording on instructions page)
       "submitStudyHelp": "Haz clic para enviar tu diario cuando todos los días estén completos"
     },
     "helpfulTools": "Herramientas útiles",
