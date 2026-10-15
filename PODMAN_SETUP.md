@@ -22,21 +22,7 @@ podman run -d --name db --network trac-net \
   --health-interval 5s \
   --health-timeout 5s \
   --health-retries 10 \
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> dcb10da (rebasing ...)
   --env-file ../.env
-=======
-  --env-file ../backend.env
->>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
-<<<<<<< HEAD
-=======
-  --env-file ../backend.env
->>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
-=======
->>>>>>> dcb10da (rebasing ...)
   -e POSTGRES_PASSWORD=systemuserpassword \
   -v ./initscript:/docker-entrypoint-initdb.d \
   -v trac-postgres-data:/var/lib/postgresql \
@@ -64,19 +50,8 @@ podman run -d --name backend --network trac-net \
 cd ..
 
 # Run the web (Nginx) container on the same network
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 # make sure to edit frontend/src/settings/tud_settings.js before!
-=======
->>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
-=======
->>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
-=======
-# make sure to edit frontend/src/settings/tud_settings.js before!
-=======
->>>>>>> e3c798f (Working in podman rootless setup, but still needs cleanup)
->>>>>>> dcb10da (rebasing ...)
+
 podman run -d --name web --network trac-net \
   -v ./frontend/src:/usr/share/nginx/html/report:ro \
   -v ./frontend/src/settings/tud_settings.js:/usr/share/nginx/html/report/settings/tud_settings.js:ro \
