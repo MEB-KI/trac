@@ -1,33 +1,16 @@
 // Application settings for Time Used Diary (TUD) frontend.
 
 const TUD_SETTINGS = {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> c367698 (rebased)
-=======
-=======
->>>>>>> 07c1cc7 (Working in podman rootless setup, but still needs cleanup)
->>>>>>> dcb10da (rebasing ...)
-    API_BASE_URL: 'http://localhost:8001/tud_backend/api',
-=======
     // Same-origin API base: the page talks to whatever host it was loaded from,
     // and nginx proxies /tud_backend/ to 127.0.0.1:8000. This is what production
     // looks like, and it is what makes the app work from a phone on the same
     // wifi - an absolute 'http://localhost:8000/...' would point the phone at
     // the phone itself. For the same reason the dev nginx listens on all
     // interfaces (port 3000), so http://<your-lan-ip>:3000/report/ works.
-    API_BASE_URL: '/tud_backend/api',
->>>>>>> c9f5e97 (NEW: serve on public IP if it is proper one in local LAN)
-=======
-    API_BASE_URL: 'http://localhost:8001/tud_backend/api',
->>>>>>> 595656d (Working in podman rootless setup, but still needs cleanup)
+    // API_BASE_URL: '/tud_backend/api',
+    API_BASE_URL: 'https://tidsanvandning.str.ki.se/tud_backend/api',
     DEFAULT_STUDY_NAME: 'default',
     DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
-<<<<<<< HEAD
     // Maintenance notice: set to true before short server maintenance to warn
     // participants on every page and ask them to save their current work.
     // MAINTENANCE_MESSAGE overrides the localised default (locales: maintenance.banner),
@@ -35,20 +18,6 @@ const TUD_SETTINGS = {
     IS_MAINTENANCE_MODE: false,
     MAINTENANCE_MESSAGE: null,
     TEMPLATE_ENABLED: false,            // Copy Days: enable/disable template feature
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-    SHOW_COPY_FROM_BUTTON: false,       // Copy Days: show "Copy from..." button (default off)
-=======
->>>>>>> fb5f146 (NEW: allow switching days in toast after copy, remove outdated copy pull path (its push only), make copy day button inactive if current day is empty)
-=======
-=======
-    TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
-    SHOW_COPY_FROM_BUTTON: false,       // Copy Days: show "Copy from..." button (default off)
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     IMPRINT_URL: "https://www.aesthetics.mpg.de/en/imprint.html", // e.g. 'https://example.org/imprint', set to null to hide
     PRIVACY_URL: "https://www.aesthetics.mpg.de/en/data-protection-information.html", // e.g. 'https://example.org/privacy', set to null to hide
     FOOTER_LINK_LABELS: {
@@ -60,30 +29,6 @@ const TUD_SETTINGS = {
         pl: { imprint: 'Impressum', privacy: 'Ochrona danych' },
         sv: { imprint: 'Impressum', privacy: 'Integritet' }
     }
-=======
-  API_BASE_URL: 'http://localhost:8000/tud_backend/api',
-  DEFAULT_STUDY_NAME: 'default',
-  DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
-  TEMPLATE_ENABLED: false, // Copy Days: enable/disable template feature
-  SHOW_COPY_FROM_BUTTON: false, // Copy Days: show "Copy from..." button (default off)
-  IMPRINT_URL: 'https://www.aesthetics.mpg.de/en/imprint.html', // e.g. 'https://example.org/imprint', set to null to hide
-  PRIVACY_URL:
-    'https://www.aesthetics.mpg.de/en/data-protection-information.html', // e.g. 'https://example.org/privacy', set to null to hide
-  OPEN_LEGAL_LINKS_IN_NEW_TAB: true,
-  FOOTER_LINK_LABELS: {
-    de: { imprint: 'Impressum', privacy: 'Datenschutz' },
-    en: { imprint: 'Imprint', privacy: 'Data Protection Information' },
-    es: { imprint: 'Aviso legal', privacy: 'Protección de datos' },
-    fi: { imprint: 'Juridinen ilmoitus', privacy: 'Tietosuoja' },
-    fr: { imprint: 'Mentions légales', privacy: 'Protection des données' },
-    pl: { imprint: 'Impressum', privacy: 'Ochrona danych' },
-    sv: { imprint: 'Impressum', privacy: 'Integritet' },
-  },
-<<<<<<< HEAD
->>>>>>> ca424ca (FIX: update instructions page for changed UI)
-=======
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
->>>>>>> c367698 (rebased)
 };
 
 window.TUD_SETTINGS = TUD_SETTINGS;
