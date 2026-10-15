@@ -200,11 +200,7 @@ class I18n {
 
   /**
    * Get a translated string by key path
-<<<<<<< HEAD
    * @param {string} keyPath - Dot-separated path to translation key (e.g., 'buttons.submitStudy')
-=======
-   * @param {string} keyPath - Dot-separated path to translation key (e.g., 'buttons.saveDay')
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
    * @param {Object} params - Optional parameters for string interpolation
    * @returns {string} - Translated string or key if not found
    */

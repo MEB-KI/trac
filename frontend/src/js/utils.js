@@ -1016,7 +1016,6 @@ export function getPostDiaryRedirectPath(completionStatus = 'completed') {
   );
 }
 
-<<<<<<< HEAD
 /**
  * Restart the inactivity timer after a save.
  *
@@ -1039,15 +1038,6 @@ function restartIdleTimerForStudy() {
       study.inactivity_timeout_stress_time_left ?? 5,
     inactivity_page_custom_text: study.inactivity_page_custom_text ?? null,
   });
-=======
-// New function to handle day navigation
-async function handleDayNavigation(isLastDay, currentDayIndex) {
-  // Copy Days: after saving, always reload the current day to refresh
-  // day button states (green/gray) from the backend.  No auto-advance,
-  // no redirect to thank-you.  Submit Study is a separate action.
-  console.log('handleDayNavigation: reloading current day');
-  window.location.reload();
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
 }
 
 export function checkAndRequestPID() {

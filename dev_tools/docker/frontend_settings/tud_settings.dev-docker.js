@@ -5,7 +5,6 @@ const TUD_SETTINGS = {
     ALLOW_NO_UID: true,
     DEFAULT_STUDY_NAME: 'default',
     DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
-<<<<<<< HEAD
     // Maintenance notice: set to true before short server maintenance to warn
     // participants on every page and ask them to save their current work.
     // MAINTENANCE_MESSAGE overrides the localised default (locales: maintenance.banner),
@@ -24,14 +23,6 @@ const TUD_SETTINGS = {
         pl: { imprint: 'Impressum', privacy: 'Ochrona danych' },
         sv: { imprint: 'Impressum', privacy: 'Integritet' }
     }
-=======
-    TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
-    SHOW_COPY_FROM_BUTTON: false        // Copy Days: show "Copy from..." button (default off)
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
 };
 
 window.TUD_SETTINGS = TUD_SETTINGS;

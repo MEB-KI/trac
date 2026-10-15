@@ -72,12 +72,8 @@ test('all locales contain the banner and recently added keys', () => {
     'banner.instructionsMobile',
     'banner.instructionsDesktop',
     'messages.templateCopiedBanner',
-<<<<<<< HEAD
     'buttons.submitStudy',
     'messages.timelineCleared',
-=======
-    'buttons.saveDay',
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
     'messages.completeOtherDaysFirst',
     'messages.copyDayToAnother',
     'messages.goToCopiedDay',

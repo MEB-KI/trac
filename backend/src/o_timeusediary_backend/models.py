@@ -425,7 +425,6 @@ class StudyParticipant(SQLModel, table=True):
     study_submitted_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-<<<<<<< HEAD
     # Browser/device identification captured once per participant (see the
     # study's `save_browser_identification` flag). The raw user agent string is
     # kept verbatim so it can be re-parsed later when parsing rules improve;
@@ -442,8 +441,6 @@ class StudyParticipant(SQLModel, table=True):
     client_info_captured_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
     created_at: datetime = Field(
         default_factory=utc_now,
         sa_column=Column(DateTime(timezone=True), nullable=False),

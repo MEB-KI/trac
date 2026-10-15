@@ -26,7 +26,6 @@
       "imageAltVertical": "Aktiviteetin sijoittaminen ja keston säätäminen pystysuunnassa"
     },
     "step3": {
-<<<<<<< HEAD
       "title": "Kopioi päivä",
       "horizontal": "Jos jokin toinen päivä on samankaltainen, voit kopioida tämän päivän toiminnot: klikkaa päivän otsikon vieressä \"Kopioi tämä päivä\" ja valitse kohdepäivä. Voit silti muokata kopioituja merkintöjä jälkeenpäin.",
       "imageAltHorizontal": "Päivän aktiviteettien kopioiminen toiselle päivälle vaaka-asettelussa",
@@ -34,28 +33,8 @@
       "imageAltVertical": "Päivän aktiviteettien kopioiminen toiselle päivälle pystyasettelussa"
     },
     "step4": {
-<<<<<<< HEAD
-=======
->>>>>>> ca424ca (FIX: update instructions page for changed UI)
-      "title": "Tallenna ja lähetä päiväkirja",
-      "description": "Kun olet kirjannut päivän toiminnot, klikkaa \"Tallenna päivä\" -painiketta tallentaaksesi ne. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
-      "saveHelp": "Klikkaa tallentaaksesi sen päivän toiminnot, jota parhaillaan muokkaat",
-=======
       "title": "Tallenna automaattisesti ja lähetä päiväkirja",
-<<<<<<< HEAD
-      "description": "Sinun ei tarvitse tallentaa päivää itse: merkintäsi tallennetaan automaattisesti hetken kuluttua, ja muokkauksen aikana näkyvä tila kertoo, onko päivä tallennettu. Jos ongelmasta ilmoitetaan, valitse \"Yritä uudelleen\". Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
       "description": "Sinun ei tarvitse tallentaa päivää: merkintäsi tallennetaan automaattisesti muokkauksen aikana. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
-<<<<<<< HEAD
->>>>>>> 449e334 (FIX: improve wording on instructions page)
-=======
-=======
-      "title": "Tallenna ja lähetä päiväkirja",
-      "description": "Kun olet kirjannut päivän toiminnot, klikkaa \"Tallenna päivä\" -painiketta tallentaaksesi ne. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
-      "saveHelp": "Klikkaa tallentaaksesi sen päivän toiminnot, jota parhaillaan muokkaat",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
->>>>>>> c367698 (rebased)
       "submitStudyHelp": "Klikkaa lähettääksesi päiväkirjasi, kun kaikki päivät ovat valmiit"
     },
     "helpfulTools": "Hyödylliset työkalut",
@@ -93,19 +72,11 @@
     "error": "Virhe"
   },
   "buttons": {
-<<<<<<< HEAD
     "submitStudy": "Lähetä tutkimus",
     "start": "Aloita",
     "undo": "Kumoa",
     "clearTimeline": "Tyhjennä aikajana",
     "moreActions": "Lisää toimintoja",
-=======
-    "saveDay": "Tallenna päivä",
-    "submitStudy": "Lähetä tutkimus",
-    "start": "Aloita",
-    "removeLast": "Poista viimeisin",
-    "cleanRow": "Tyhjennä rivi",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Ohita ajankäytön raportointi",
     "switchTimeline": "Vaihda aikajanaa",
     "giveConsent": "Annan suostumukseni ja jatkan",
@@ -189,14 +160,6 @@
     "copyError": "Kopiointi epäonnistui: {{message}}",
     "copyEmptySource": "Lähdepäivällä ei ole toimintoja kopioitavaksi.",
     "completeOtherDaysFirst": "Täytä ensin {{days}} päättääksesi tutkimuksen.",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "daySavedStayOnPage": "Päivä tallennettu.",
-=======
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     "copyDayEmpty": "tyhjä",
     "copyDayHasData": "sisältää dataa",
     "copyOverwriteTitle": "Korvataanko päivä?",
@@ -204,18 +167,6 @@
     "copyOverwriteConfirm": "{{day}} sisältää jo dataa. Ylikirjoitetaanko?",
     "submitStudyIncomplete": "Puutteelliset päivät: {{days}}",
     "submitStudyIncompleteHint": "Täytä kaikki päivät ennen lähettämistä"
-=======
-    "daySavedStayOnPage": "Day saved.",
-    "copyDayEmpty": "empty",
-    "copyDayHasData": "has data",
-    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
-    "submitStudyIncomplete": "Incomplete days: {{days}}",
-    "submitStudySuccess": "Study submitted successfully!"
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Virhe toimintojen konfiguraation latauksessa:",

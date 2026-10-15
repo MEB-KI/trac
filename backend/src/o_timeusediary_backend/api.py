@@ -8845,9 +8845,15 @@ def copy_day_activities(
 ):
     """Copy all activities from one day to another for a participant within a study.
 
-    The target day must be empty (no existing activities). The source day must
-    have activities. All activities are copied with new database IDs — the copy
-    is a separate, independent set of rows.
+    If the target day already has activities they are deleted first (overwrite).
+    The source day must have activities. All activities are copied with new
+    database IDs — the copy is a separate, independent set of rows.
+
+    Like the day-save endpoint, this write is refused once the participant has
+    submitted the study. ``study_submitted_at`` is the promise that a submitted
+    diary is immutable, and this endpoint rewrites a whole day, so without the
+    guard a copy would silently overwrite data a researcher may already have
+    exported.
     """
     study = session.exec(
         select(Study).where(Study.name_short == study_name_short)
@@ -8969,18 +8975,11 @@ def copy_day_activities(
         "copied_count": copied_count,
         "source_day": source_day_label_name,
         "target_day": day_label_name,
-<<<<<<< HEAD
         "overwrite": is_overwrite,
     }
 
 
-<<<<<<< HEAD
 @app.post("/api/studies/{study_name_short}/participants/{participant_id}/submit")
-=======
-@app.post(
-    "/api/studies/{study_name_short}/participants/{participant_id}/submit"
-)
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
 def submit_study(
     study_name_short: str,
     participant_id: str,
@@ -9066,8 +9065,6 @@ def submit_study(
     return {
         "study_submitted_at": now.isoformat(),
         "already_submitted": False,
-=======
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     }
 
 

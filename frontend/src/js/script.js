@@ -6709,14 +6709,7 @@ async function init() {
           } else if (
             !loadedActivitiesFromBackend &&
             TUD_SETTINGS.TEMPLATE_ENABLED !== false &&
-<<<<<<< HEAD
             !wasDaySaved(studyName, participantId, dayIndex) &&
-=======
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
             transformedData.template_activities &&
             transformedData.template_activities.length > 0
           ) {
@@ -7032,7 +7025,6 @@ window.addEventListener('beforeunload', () => {
 });
 
 /**
-<<<<<<< HEAD
  * Copy Days: return all day indices (excluding `excludeIndex`) as potential
  * copy targets.  Defaults to excluding the current viewing day — the "Copy
  * this day" button uses this.  Right-click on a day button passes that day's
@@ -7043,17 +7035,6 @@ function getAllTargetDayIndices(excludeIndex) {
     excludeIndex = getCurrentDayIndex();
   }
 
-=======
- * Copy Days: return all other day indices (excluding current) as potential
- * copy targets.  Each entry includes whether the day has data so the picker
- * can show empty vs. populated status.
- */
-function getAllTargetDayIndices() {
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   const studyDaysCount =
     window.timelineManager?.studyDaysCount ||
     window.studyConfigManager?.getStudyDaysCount() ||
@@ -7066,7 +7047,6 @@ function getAllTargetDayIndices() {
     : [];
 
   const currentDayIndex = getCurrentDayIndex();
-<<<<<<< HEAD
 
   const targets = [];
   for (let i = 0; i < studyDaysCount; i++) {
@@ -7079,25 +7059,11 @@ function getAllTargetDayIndices() {
       const hasData = isCurrent ? hasFrontendActivities() : inDb;
 
       targets.push({ index: i, hasData });
-=======
-  const targets = [];
-  for (let i = 0; i < studyDaysCount; i++) {
-    if (i !== currentDayIndex) {
-      targets.push({
-        index: i,
-        hasData: dayIndicesWithData.includes(i),
-      });
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     }
   }
   return targets;
 }
 
-<<<<<<< HEAD
 /** True when the current viewing day has any activity blocks rendered. */
 function hasFrontendActivities() {
   return (window.timelineManager?.keys || []).some(function (key) {
@@ -7114,17 +7080,6 @@ function getEmptyTargetDayIndices() {
     .map(function (t) {
       return t.index;
     });
-=======
-// Keep old name as alias for backward compatibility with any remaining callers.
-function getEmptyTargetDayIndices() {
-  return getAllTargetDayIndices()
-    .filter(function (t) { return !t.hasData; })
-    .map(function (t) { return t.index; });
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
 }
 
 function removeCopyDayContextMenu() {
@@ -7137,18 +7092,6 @@ function removeCopyDayContextMenu() {
 function showCopyTargetPicker(sourceDayIndex, event) {
   removeCopyDayContextMenu();
 
-<<<<<<< HEAD
-=======
-  const targets = getAllTargetDayIndices();
-  if (!targets.length) {
-    return;
-  }
-
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   const t =
     window.i18n && window.i18n.isReady()
       ? window.i18n.t.bind(window.i18n)
@@ -7265,41 +7208,24 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
     return;
   }
 
-<<<<<<< HEAD
   // Copy Days: if target day already has data, ask for confirmation first.
   // For the current viewing day, check in-memory state (same logic as the
   // picker) so the confirmation matches what the user sees.
-=======
-  // Copy Days: if target day already has data, ask for confirmation first
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   const dayIndicesWithData = Array.isArray(
     window.timelineManager?.dayIndicesWithData
   )
     ? window.timelineManager.dayIndicesWithData
     : [];
-<<<<<<< HEAD
   const currentDayIndex = getCurrentDayIndex();
   const targetHasData =
     targetDayIndex === currentDayIndex
       ? hasFrontendActivities()
       : dayIndicesWithData.includes(targetDayIndex);
-=======
-  const targetHasData = dayIndicesWithData.includes(targetDayIndex);
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
 
   if (targetHasData) {
     const targetDayName =
       window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
       t('common.day') + ' ' + (targetDayIndex + 1);
-<<<<<<< HEAD
     // Styled dialog, not window.confirm() - the native prompt is unstyled and
     // has to be intercepted in tests. See showConfirmDialog in ui.js.
     const confirmed = await window.showConfirmDialog({
@@ -7310,11 +7236,6 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
       message: t('messages.copyOverwriteConfirm', { day: targetDayName }),
       confirmLabel: t('messages.copyOverwriteYes'),
     });
-=======
-    const confirmed = window.confirm(
-      t('messages.copyOverwriteConfirm', { day: targetDayName })
-    );
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
     if (!confirmed) {
       return;
     }

@@ -5,7 +5,6 @@ const TUD_SETTINGS = {
     ALLOW_NO_UID: true,
     DEFAULT_STUDY_NAME: 'default',
     DEFAULT_STUDIES_FILE: 'settings/studies_config.json',
-<<<<<<< HEAD
     // Maintenance notice: set to true before short server maintenance to warn
     // participants on every page and ask them to save their current work.
     // MAINTENANCE_MESSAGE overrides the localised default (locales: maintenance.banner),
@@ -13,20 +12,6 @@ const TUD_SETTINGS = {
     IS_MAINTENANCE_MODE: false,
     MAINTENANCE_MESSAGE: null,
     TEMPLATE_ENABLED: false,            // Copy Days: enable/disable template feature
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-    SHOW_COPY_FROM_BUTTON: false,       // Copy Days: show "Copy from..." button (default off)
-=======
->>>>>>> fb5f146 (NEW: allow switching days in toast after copy, remove outdated copy pull path (its push only), make copy day button inactive if current day is empty)
-=======
-=======
-    TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
-    SHOW_COPY_FROM_BUTTON: false,       // Copy Days: show "Copy from..." button (default off)
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     IMPRINT_URL: "https://www.aesthetics.mpg.de/en/imprint.html",
     PRIVACY_URL: "https://www.aesthetics.mpg.de/en/data-protection-information.html",
     FOOTER_LINK_LABELS: {

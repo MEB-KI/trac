@@ -26,7 +26,6 @@
       "imageAltVertical": "Colocar y ajustar la duración de la actividad en vertical"
     },
     "step3": {
-<<<<<<< HEAD
       "title": "Copiar un día",
       "horizontal": "Si otro día es similar, puedes copiar las actividades de este día: haz clic en \"Copiar este día\" junto al título del día y elige el día de destino. Después podrás ajustar los registros copiados.",
       "imageAltHorizontal": "Copiar las actividades de un día a otro en vista horizontal",
@@ -34,28 +33,8 @@
       "imageAltVertical": "Copiar las actividades de un día a otro en vista vertical"
     },
     "step4": {
-<<<<<<< HEAD
-=======
->>>>>>> ca424ca (FIX: update instructions page for changed UI)
-      "title": "Guardar y enviar tu diario",
-      "description": "Una vez que hayas registrado tus actividades de un día, haz clic en el botón \"Guardar día\" para guardarlas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
-      "saveHelp": "Haz clic para guardar las actividades del día en el que estás trabajando",
-=======
       "title": "Guardar automáticamente y enviar tu diario",
-<<<<<<< HEAD
-      "description": "Ya no necesitas guardar tu día: tus entradas se almacenan automáticamente poco después de que las hagas, y el estado que se muestra mientras editas indica si el día está guardado. Si se informa de un problema, usa \"Reintentar\". Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
       "description": "No necesitas guardar tu día: tus entradas se guardan automáticamente mientras editas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
-<<<<<<< HEAD
->>>>>>> 449e334 (FIX: improve wording on instructions page)
-=======
-=======
-      "title": "Guardar y enviar tu diario",
-      "description": "Una vez que hayas registrado tus actividades de un día, haz clic en el botón \"Guardar día\" para guardarlas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
-      "saveHelp": "Haz clic para guardar las actividades del día en el que estás trabajando",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
->>>>>>> c367698 (rebased)
       "submitStudyHelp": "Haz clic para enviar tu diario cuando todos los días estén completos"
     },
     "helpfulTools": "Herramientas útiles",
@@ -93,19 +72,11 @@
     "error": "Error"
   },
   "buttons": {
-<<<<<<< HEAD
     "submitStudy": "Enviar estudio",
     "start": "Comenzar",
     "undo": "Deshacer",
     "clearTimeline": "Vaciar línea de tiempo",
     "moreActions": "Más acciones",
-=======
-    "saveDay": "Guardar día",
-    "submitStudy": "Enviar estudio",
-    "start": "Comenzar",
-    "removeLast": "Eliminar última",
-    "cleanRow": "Limpiar Fila",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Omitir reporte de tiempo",
     "switchTimeline": "Cambiar línea de tiempo",
     "giveConsent": "Doy mi consentimiento y continúo",
@@ -189,14 +160,6 @@
     "copyError": "Error al copiar: {{message}}",
     "copyEmptySource": "El día de origen no tiene actividades para copiar.",
     "completeOtherDaysFirst": "Completa primero {{days}} para finalizar el estudio.",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "daySavedStayOnPage": "Día guardado.",
-=======
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     "copyDayEmpty": "vacío",
     "copyDayHasData": "tiene datos",
     "copyOverwriteTitle": "¿Sobrescribir el día?",
@@ -204,18 +167,6 @@
     "copyOverwriteConfirm": "{{day}} ya tiene datos. ¿Sobrescribir?",
     "submitStudyIncomplete": "Días incompletos: {{days}}",
     "submitStudyIncompleteHint": "Completa todos los días antes de enviar"
-=======
-    "daySavedStayOnPage": "Day saved.",
-    "copyDayEmpty": "empty",
-    "copyDayHasData": "has data",
-    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
-    "submitStudyIncomplete": "Incomplete days: {{days}}",
-    "submitStudySuccess": "Study submitted successfully!"
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Error al cargar la configuración de actividades:",

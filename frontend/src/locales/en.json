@@ -26,7 +26,6 @@
       "imageAltVertical": "Placing and adjusting activity duration vertically"
     },
     "step3": {
-<<<<<<< HEAD
       "title": "Copy a Day",
       "horizontal": "If another day looks similar, you can copy this day's activities: click \"Copy this day\" next to the day title and choose the day you want to copy it to. You can still adjust the copied entries afterwards.",
       "imageAltHorizontal": "Copying the activities of a day to another day in horizontal layout",
@@ -34,28 +33,8 @@
       "imageAltVertical": "Copying the activities of a day to another day in vertical layout"
     },
     "step4": {
-<<<<<<< HEAD
-=======
->>>>>>> ca424ca (FIX: update instructions page for changed UI)
-      "title": "Save and Submit Your Diary",
-      "description": "Once you have recorded your activities for a day, click the \"Save Day\" button to store them. You can still edit that day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
-      "saveHelp": "Click to save the activities of the day you are working on",
-=======
       "title": "Saving and Submitting Your Diary",
-<<<<<<< HEAD
-      "description": "You do not need to save your day: your entries are stored automatically a moment after you make them, and the status shown while you edit tells you whether the day is stored. If it reports a problem, use Retry. You can still edit a day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
       "description": "You do not need to save your day: your entries are saved automatically while you edit. You can still edit a day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
-<<<<<<< HEAD
->>>>>>> 449e334 (FIX: improve wording on instructions page)
-=======
-=======
-      "title": "Save and Submit Your Diary",
-      "description": "Once you have recorded your activities for a day, click the \"Save Day\" button to store them. You can still edit that day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
-      "saveHelp": "Click to save the activities of the day you are working on",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
->>>>>>> c367698 (rebased)
       "submitStudyHelp": "Click to submit your diary when every day is complete"
     },
     "helpfulTools": "Helpful tools",
@@ -93,19 +72,11 @@
     "error": "Error"
   },
   "buttons": {
-<<<<<<< HEAD
     "submitStudy": "Submit Study",
     "start": "Start",
     "undo": "Undo",
     "clearTimeline": "Clear timeline",
     "moreActions": "More actions",
-=======
-    "saveDay": "Save Day",
-    "submitStudy": "Submit Study",
-    "start": "Start",
-    "removeLast": "Remove Last",
-    "cleanRow": "Clean Row",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Skip time reporting",
     "switchTimeline": "Switch timeline",
     "giveConsent": "Give consent and continue",
@@ -189,28 +160,13 @@
     "copyError": "Failed to copy: {{message}}",
     "copyEmptySource": "Source day has no activities to copy.",
     "completeOtherDaysFirst": "Complete {{days}} first to finish the study.",
-<<<<<<< HEAD
     "copyDayEmpty": "empty",
     "copyDayHasData": "has data",
     "copyOverwriteTitle": "Overwrite day?",
     "copyOverwriteYes": "Overwrite",
     "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
     "submitStudyIncomplete": "Incomplete days: {{days}}",
-<<<<<<< HEAD
     "submitStudyIncompleteHint": "Complete all days before submitting"
-=======
-<<<<<<< HEAD
-    "submitStudySuccess": "Study submitted successfully!"
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
-    "daySavedStayOnPage": "Day saved.",
-    "copyDayEmpty": "empty",
-    "copyDayHasData": "has data",
-    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
-    "submitStudyIncomplete": "Incomplete days: {{days}}",
-    "submitStudySuccess": "Study submitted successfully!"
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Error loading activities configuration:",

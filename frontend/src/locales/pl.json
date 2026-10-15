@@ -26,7 +26,6 @@
       "imageAltVertical": "Umieszczanie i dostosowywanie czasu trwania aktywności w pionie"
     },
     "step3": {
-<<<<<<< HEAD
       "title": "Kopiuj dzień",
       "horizontal": "Jeśli inny dzień jest podobny, możesz skopiować aktywności z tego dnia: kliknij \"Skopiuj ten dzień\" obok tytułu dnia i wybierz dzień docelowy. Skopiowane wpisy możesz później poprawić.",
       "imageAltHorizontal": "Kopiowanie aktywności z jednego dnia na inny w widoku poziomym",
@@ -34,28 +33,8 @@
       "imageAltVertical": "Kopiowanie aktywności z jednego dnia na inny w widoku pionowym"
     },
     "step4": {
-<<<<<<< HEAD
-=======
->>>>>>> ca424ca (FIX: update instructions page for changed UI)
-      "title": "Zapisz i wyślij dziennik",
-      "description": "Po zapisaniu aktywności z danego dnia kliknij przycisk \"Zapisz dzień\", aby je zapisać. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
-      "saveHelp": "Kliknij, aby zapisać aktywności z dnia, nad którym pracujesz",
-=======
       "title": "Zapisywanie automatyczne i wysyłanie dziennika",
-<<<<<<< HEAD
-      "description": "Nie musisz samodzielnie zapisywać dnia: Twoje wpisy są zapisywane automatycznie chwilę po ich wprowadzeniu, a status widoczny podczas edycji informuje, czy dzień został zapisany. Jeśli zgłoszono problem, wybierz \"Ponów próbę\". Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
       "description": "Nie musisz zapisywać dnia: Twoje wpisy są zapisywane automatycznie podczas edycji. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
-<<<<<<< HEAD
->>>>>>> 449e334 (FIX: improve wording on instructions page)
-=======
-=======
-      "title": "Zapisz i wyślij dziennik",
-      "description": "Po zapisaniu aktywności z danego dnia kliknij przycisk \"Zapisz dzień\", aby je zapisać. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
-      "saveHelp": "Kliknij, aby zapisać aktywności z dnia, nad którym pracujesz",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
->>>>>>> c367698 (rebased)
       "submitStudyHelp": "Kliknij, aby wysłać dziennik, gdy wszystkie dni będą kompletne"
     },
     "helpfulTools": "Pomocne narzędzia",
@@ -93,19 +72,11 @@
     "error": "Błąd"
   },
   "buttons": {
-<<<<<<< HEAD
     "submitStudy": "Wyślij badanie",
     "start": "Rozpocznij",
     "undo": "Cofnij",
     "clearTimeline": "Wyczyść oś czasu",
     "moreActions": "Więcej działań",
-=======
-    "saveDay": "Zapisz dzień",
-    "submitStudy": "Wyślij badanie",
-    "start": "Rozpocznij",
-    "removeLast": "Usuń ostatnią",
-    "cleanRow": "Wyczyść rząd",
->>>>>>> bea4097 (FIX: update instructions page for changed UI)
     "skipReporting": "Pomiń raportowanie czasu",
     "switchTimeline": "Zmień oś czasu",
     "giveConsent": "Wyrażam zgodę i kontynuuję",
@@ -189,14 +160,6 @@
     "copyError": "Nie udało się skopiować: {{message}}",
     "copyEmptySource": "Dzień źródłowy nie ma aktywności do skopiowania.",
     "completeOtherDaysFirst": "Uzupełnij najpierw {{days}}, aby zakończyć badanie.",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "daySavedStayOnPage": "Dzień zapisany.",
-=======
->>>>>>> 3ab2961 (CHG: remove save buttons, show auto-save msg, adapt docs)
-=======
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
     "copyDayEmpty": "pusty",
     "copyDayHasData": "ma dane",
     "copyOverwriteTitle": "Nadpisać dzień?",
@@ -204,18 +167,6 @@
     "copyOverwriteConfirm": "{{day}} ma już dane. Nadpisać?",
     "submitStudyIncomplete": "Niekompletne dni: {{days}}",
     "submitStudyIncompleteHint": "Ukończ wszystkie dni przed wysłaniem"
-=======
-    "daySavedStayOnPage": "Day saved.",
-    "copyDayEmpty": "empty",
-    "copyDayHasData": "has data",
-    "copyOverwriteConfirm": "{{day}} already has data. Overwrite it?",
-    "submitStudyIncomplete": "Incomplete days: {{days}}",
-    "submitStudySuccess": "Study submitted successfully!"
-<<<<<<< HEAD
->>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
-=======
->>>>>>> 5dff7b0 (WIP: work towards copy feature and all its implications according to the plan files)
->>>>>>> 68705a2 (WIP: work towards copy feature and all its implications according to the plan files)
   },
   "errors": {
     "loadingActivitiesConfigurationTitle": "Błąd przy ładowaniu konfiguracji aktywności:",
