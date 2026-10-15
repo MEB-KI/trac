@@ -26,6 +26,7 @@
       "imageAltVertical": "Placera och justera aktivitetens varaktighet vertikalt"
     },
     "step3": {
+<<<<<<< HEAD
       "title": "Kopiera en dag",
       "horizontal": "Om en annan dag ser likadan ut kan du kopiera den här dagens aktiviteter: klicka på \"Kopiera denna dag\" bredvid dagens rubrik och välj måldagen. Du kan fortfarande justera de kopierade posterna efteråt.",
       "imageAltHorizontal": "Kopiera en dags aktiviteter till en annan dag i horisontell vy",
@@ -33,6 +34,8 @@
       "imageAltVertical": "Kopiera en dags aktiviteter till en annan dag i vertikal vy"
     },
     "step4": {
+=======
+>>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Spara och skicka in din dagbok",
       "description": "När du har registrerat dina aktiviteter för en dag, klicka på knappen \"Spara dagen\" för att spara dem. Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta, klicka på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
       "saveHelp": "Klicka för att spara aktiviteterna för dagen du arbetar med",

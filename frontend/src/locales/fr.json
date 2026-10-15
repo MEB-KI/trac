@@ -26,6 +26,7 @@
       "imageAltVertical": "Placer et ajuster la durée de l'activité à la verticale"
     },
     "step3": {
+<<<<<<< HEAD
       "title": "Copier un jour",
       "horizontal": "Si un autre jour est similaire, vous pouvez copier les activités de ce jour : cliquez sur \"Copier ce jour\" à côté du titre du jour et choisissez le jour de destination. Vous pourrez encore ajuster les entrées copiées ensuite.",
       "imageAltHorizontal": "Copier les activités d'un jour vers un autre en affichage horizontal",
@@ -33,6 +34,8 @@
       "imageAltVertical": "Copier les activités d'un jour vers un autre en affichage vertical"
     },
     "step4": {
+=======
+>>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Enregistrer et soumettre votre journal",
       "description": "Une fois vos activités d'une journée enregistrées, cliquez sur le bouton \"Enregistrer le jour\" pour les sauvegarder. Vous pourrez encore modifier cette journée plus tard. Lorsque tous les jours de l'étude sont complets, cliquez sur \"Soumettre l'étude\" pour envoyer votre journal et terminer l'étude.",
       "saveHelp": "Cliquez pour enregistrer les activités du jour en cours",

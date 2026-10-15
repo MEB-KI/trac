@@ -26,6 +26,7 @@
       "imageAltVertical": "Placing and adjusting activity duration vertically"
     },
     "step3": {
+<<<<<<< HEAD
       "title": "Copy a Day",
       "horizontal": "If another day looks similar, you can copy this day's activities: click \"Copy this day\" next to the day title and choose the day you want to copy it to. You can still adjust the copied entries afterwards.",
       "imageAltHorizontal": "Copying the activities of a day to another day in horizontal layout",
@@ -33,6 +34,8 @@
       "imageAltVertical": "Copying the activities of a day to another day in vertical layout"
     },
     "step4": {
+=======
+>>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Save and Submit Your Diary",
       "description": "Once you have recorded your activities for a day, click the \"Save Day\" button to store them. You can still edit that day later. When all days of the study are complete, click the \"Submit Study\" button to send your diary and finish the study.",
       "saveHelp": "Click to save the activities of the day you are working on",

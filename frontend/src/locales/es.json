@@ -26,6 +26,7 @@
       "imageAltVertical": "Colocar y ajustar la duración de la actividad en vertical"
     },
     "step3": {
+<<<<<<< HEAD
       "title": "Copiar un día",
       "horizontal": "Si otro día es similar, puedes copiar las actividades de este día: haz clic en \"Copiar este día\" junto al título del día y elige el día de destino. Después podrás ajustar los registros copiados.",
       "imageAltHorizontal": "Copiar las actividades de un día a otro en vista horizontal",
@@ -33,6 +34,8 @@
       "imageAltVertical": "Copiar las actividades de un día a otro en vista vertical"
     },
     "step4": {
+=======
+>>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Guardar y enviar tu diario",
       "description": "Una vez que hayas registrado tus actividades de un día, haz clic en el botón \"Guardar día\" para guardarlas. Aún podrás editar ese día más tarde. Cuando todos los días del estudio estén completos, haz clic en \"Enviar estudio\" para enviar tu diario y finalizar el estudio.",
       "saveHelp": "Haz clic para guardar las actividades del día en el que estás trabajando",

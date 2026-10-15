@@ -26,6 +26,7 @@
       "imageAltVertical": "Aktiviteetin sijoittaminen ja keston säätäminen pystysuunnassa"
     },
     "step3": {
+<<<<<<< HEAD
       "title": "Kopioi päivä",
       "horizontal": "Jos jokin toinen päivä on samankaltainen, voit kopioida tämän päivän toiminnot: klikkaa päivän otsikon vieressä \"Kopioi tämä päivä\" ja valitse kohdepäivä. Voit silti muokata kopioituja merkintöjä jälkeenpäin.",
       "imageAltHorizontal": "Päivän aktiviteettien kopioiminen toiselle päivälle vaaka-asettelussa",
@@ -33,6 +34,8 @@
       "imageAltVertical": "Päivän aktiviteettien kopioiminen toiselle päivälle pystyasettelussa"
     },
     "step4": {
+=======
+>>>>>>> ca424ca (FIX: update instructions page for changed UI)
       "title": "Tallenna ja lähetä päiväkirja",
       "description": "Kun olet kirjannut päivän toiminnot, klikkaa \"Tallenna päivä\" -painiketta tallentaaksesi ne. Voit muokata päivää vielä myöhemmin. Kun kaikki tutkimuksen päivät ovat valmiit, klikkaa \"Lähetä tutkimus\" -painiketta lähettääksesi päiväkirjasi ja päättääksesi tutkimuksen.",
       "saveHelp": "Klikkaa tallentaaksesi sen päivän toiminnot, jota parhaillaan muokkaat",

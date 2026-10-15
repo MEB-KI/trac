@@ -172,6 +172,7 @@ revalidation/repair/optional-lookup behaviour.
 
 Version 0.20.0 -- New user type Scientist
 ------------------------------------------
+<<<<<<< HEAD
 - NEW: scoped admin accounts ("scientists") via TUD_API_SCIENTISTS. A scientist fully manages the studies she owns or was granted; super admins (TUD_API_ADMIN_USERNAME) keep unrestricted access.
 - NEW: studies can have several owners, shown on the admin overview and managed as chips in the "Study Owners" section of the study detail page (editable after "Enable Editing").
 - NEW: per-owner endpoints POST/DELETE /api/admin/studies/{study_name_short}/owners/{username} (idempotent, one audit entry each); PATCH stays as the batch/unowned path.
@@ -193,6 +194,20 @@ Version 0.20.0 -- New user type Scientist
 - NEW: instructions page gained step 3 "Copy a Day" (hidden for single-day studies); the Save/Submit step moved to step 4.
 - DEV: copy-day texts live under instructions.step3.*; visibility is decided in applyCopyDayStepVisibility() from study_days_count.
 - FIX: frontend type checking failed on CI because package.json depended on the placeholder package `tsc`, which shadowed the real compiler; that dependency is removed.
+=======
+- NEW: scoped admin accounts ("scientists") via TUD_API_SCIENTISTS: each scientist fully manages the studies she owns (or that are granted to her), so routine study work (tokens, participants, study changes, delete + re-create) no longer needs a super admin. Super admins (TUD_API_ADMIN_USERNAME) keep unrestricted access.
+- NEW: studies can have several owners; ownership is shown on the admin overview and managed in the "Study Owners" section of the study detail page (bottom, in the danger zone, only editable after clicking "Enable Editing"). Owners are managed as chips: add from the list of configured scientists, remove with one click, and "Make unowned" for super admins. Scientists can add/remove co-owners but not themselves; only configured scientists can be added, and removing an owner revokes access immediately.
+- NEW: per-owner endpoints POST/DELETE /api/admin/studies/{study_name_short}/owners/{username} (idempotent, one audit log entry per change, so administrator actions no longer overwrite each other). PATCH /api/admin/studies/{study_name_short}/owners remains as the batch/unowned path.
+- NEW: a study created by a scientist is owned by that scientist. Studies created by a super admin or imported via CLI/import-config stay unowned (super-admin-only).
+- CHG: POST /api/admin/studies/import-config and the all-studies export GET /api/admin/export/studies-runtime-config are now restricted to super admins. Exporting a single study (study_name param) stays available to its owners.
+- DEV: migration 0009 adds studies.owner_usernames (JSON list). All admin authentication and study-scope enforcement now lives in api_deps/admin_auth.py and is applied centrally for every admin route; see README.md, section "Study ownership and scientist accounts", for behaviour and non-goals. New unit tests (settings/identity) and integration tests (exhaustive study-scoped endpoint matrix) for the scoping.
+- DEV: scientist tests now also cover the positive paths: creating a study through the file-validation flow (owned by the creator, invisible to the other scientist), assigning and removing participants in her own study, deleting a study she owns, accessing an env-granted study, and that a single-study runtime config export contains no data of other studies. The dev/CI env files grant the "default" study to test_scientist_alpha so the TUD_API_SCIENTISTS "studies" path is exercised too.
+- DEV: new Playwright spec frontend/tests/e2e/admin_study_owners.spec.js covers the owners UI in a real browser (locked until "Enable Editing", add/remove chips, "Make unowned" only for super admins, scientist self-removal locked even after unlocking).
+- FIX: resetting the data of a single participant (DELETE /api/admin/studies/{study_name_short}/participants/{participant_id}/data) now also clears the study submission ("submission_reset" in the response). Before, a participant who had submitted the study stayed submitted, so the frontend kept redirecting them away from the diary (to the external tasks or thank-you page) and they could not record anything after a reset.
+- DEV: fix brittle E2E tests that made the CI red: the copy-day picker is anchored at the cursor and covers the page below it, so "click outside to close" now clicks a point that is provably outside the picker (new helper closeCopyDayPicker) instead of the day header, which the picker intercepted. The skip-reporting-button spec now waits for the diary UI to be loaded before asserting, so it can no longer pass by racing a redirect or fail as a flake on WebKit. Reset integration test now really submits the study first and asserts that the submission is cleared.
+- FIX: frontend instructions page (section 3) described the old flow: it still talked about a "Submit" button to complete the diary. It now explains the current Save Day / Submit Study flow, shows both buttons (Save Day with the disk icon, Submit Study) and uses the real button labels from the locale files (all 7 locales updated).
+- CHG: remove the stale button labels that still named the removed "Submit Day"/"Next Timeline" concept from all locale files: buttons.submit, buttons.next and buttons.finishStudy. index.html and instructions.html now label the save buttons (top bar, footer, submit demo) via buttons.saveDay, and the locale consistency test no longer requires buttons.finishStudy.
+>>>>>>> ca424ca (FIX: update instructions page for changed UI)
 
 
 Version 0.19.0 -- Copy Days
