@@ -13,10 +13,13 @@ const TUD_SETTINGS = {
     IS_MAINTENANCE_MODE: false,
     MAINTENANCE_MESSAGE: null,
     TEMPLATE_ENABLED: false,            // Copy Days: enable/disable template feature
+<<<<<<< HEAD
 =======
     TEMPLATE_ENABLED: true,             // Copy Days: enable/disable template feature
 >>>>>>> 01acb51 (WIP: work towards copy feature and all its implications according to the plan files)
     SHOW_COPY_FROM_BUTTON: false,       // Copy Days: show "Copy from..." button (default off)
+=======
+>>>>>>> fb5f146 (NEW: allow switching days in toast after copy, remove outdated copy pull path (its push only), make copy day button inactive if current day is empty)
     IMPRINT_URL: "https://www.aesthetics.mpg.de/en/imprint.html",
     PRIVACY_URL: "https://www.aesthetics.mpg.de/en/data-protection-information.html",
     OPEN_LEGAL_LINKS_IN_NEW_TAB: true,
