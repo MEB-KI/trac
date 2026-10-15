@@ -17,6 +17,10 @@ declare var TUD_SETTINGS: {
 
 declare var interact: any;
 
+// Vendored library loaded as a classic script: assets/ua-parser-js/ua-parser.min.js
+// (see js/client_info.js). Optional because a CSP or script failure may prevent it.
+declare var UAParser: any;
+
 interface Window {
   // modules that assign themselves onto window
   i18n: any;
@@ -27,6 +31,7 @@ interface Window {
   tudIdleTimeout: any;
   TUDRefreshFooter: any;
   // shared state / caches
+  autosave: any;
   activitiesConfigCache: any;
   activitiesConfigCacheByKey: any;
   selectedActivity: any;
@@ -40,7 +45,9 @@ interface Window {
   __TRAC_PERSIST_DRAFT_TIMER?: any;
   // functions exposed for cross-module use
   addCopyDayLink?: (...args: any[]) => any;
+  setStudyPageTitle?: (...args: any[]) => any;
   getIsMobile?: () => boolean;
+  hasFrontendActivities?: () => boolean;
   getCurrentTimelineData?: (...args: any[]) => any;
   getEmptyTargetDayCount?: (...args: any[]) => any;
   getEmptyTargetDayIndices?: (...args: any[]) => any;
@@ -48,11 +55,14 @@ interface Window {
   handleCustomActivityModalClose?: (...args: any[]) => any;
   initModalFocusManagement?: (...args: any[]) => any;
   renderPreviousDaysSwitchRow?: (...args: any[]) => any;
+  renderSyncStatus?: (state: string) => void;
+  showActivityContextMenu?: (...args: any[]) => any;
+  showConfirmDialog?: (...args: any[]) => any;
   showCopyTargetPicker?: (...args: any[]) => any;
   showToast?: (...args: any[]) => any;
+  showUndoClearTimelineToast?: (...args: any[]) => any;
   toggleDebugOverlay?: (...args: any[]) => any;
   tudClearCustomActivityText?: (...args: any[]) => any;
-  updateDisabledButtonOverlays?: (...args: any[]) => any;
   deleteActivityBlock?: (...args: any[]) => any;
   // legacy hacky globals
   i?: any;

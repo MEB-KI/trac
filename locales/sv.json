@@ -3,14 +3,14 @@
     "banner": "Observera: vi utför snart ett kort underhåll. Spara ditt aktuella arbete."
   },
   "instructions": {
-    "pageTitle": "Instruktioner | Tidsdagbok",
+    "pageTitle": "Instruktioner",
     "title": "Instruktioner",
     "welcomeTitle": "Välkommen till din veckovisa tidsdagbok. Tack för att du deltar!",
     "generalInfoTitle": "Allmän information om studien",
     "studyIntroDefault": "Detta är vår tidsanvändningsstudie.<br><br>Vi ber dig att <b>återskapa en typisk vecka</b> av dina dagliga aktiviteter med hjälp av vårt tidsanvändningsverktyg.<br><br>Vilken vecka ska jag välja? Tänk på din senaste vecka (de senaste 7 dagarna).<br>Undantag: Om du var sjuk eller på semester förra veckan, välj en annan nylig vecka som bättre representerar din vanliga rutin.",
-    "instructionsDefault": "#### Så fyller du i dagboken\n\nDu ser en lista med aktiviteter längst ner på skärmen. Klicka på en aktivitet för att välja den, och klicka sedan på tidslinjen för att visa vad du gjorde under dagen.\n\n- **Justera varaktighet:** Dra i vänster eller höger kant av en placerad aktivitet för att ställa in hur länge den varade.\n- **Ta bort en aktivitet:** Högerklicka på en aktivitet på datorn, eller tryck länge på den på mobilen, och välj \"Ta bort\".\n\nBeroende på studien kan det finnas mer än en tidslinje för varje dag. Dessa fångar olika aspekter av din dag eller låter dig registrera aktiviteter du gjorde parallellt.\n\n**Tidsbesparande funktion:** Du behöver inte börja från början varje dag. Efter att du har slutfört den första dagen kopieras ditt schema automatiskt till nästa dag som en mall. Anpassa gärna mallen så att den speglar förändringar i dina aktiviteter den dagen.",
+    "instructionsDefault": "## Så fyller du i dagboken\n\nDu ser en lista med aktiviteter längst ner på skärmen. Klicka på en aktivitet för att välja den, och klicka sedan på tidslinjen för att visa vad du gjorde under dagen.\n\n- **Justera varaktighet:** Dra i vänster eller höger kant av en placerad aktivitet för att ställa in hur länge den varade.\n- **Ta bort en aktivitet:** Högerklicka på en aktivitet på datorn, eller tryck länge på den på mobilen, och välj \"Ta bort\".\n\nBeroende på studien kan det finnas mer än en tidslinje för varje dag. Dessa fångar olika aspekter av din dag eller låter dig registrera aktiviteter du gjorde parallellt.\n\n**Tidsbesparande funktion:** Du behöver inte börja från början varje dag. Efter att du har slutfört den första dagen kopieras ditt schema automatiskt till nästa dag som en mall. Anpassa gärna mallen så att den speglar förändringar i dina aktiviteter den dagen.",
     "visualGuideTitle": "Visuella illustrationer av hur du använder gränssnittet",
-    "startPrompt": "Klicka på den blå Starta-knappen för att börja din dagboksregistrering.",
+    "howToSummary": "Hur fyller jag i dagboken?",
     "step1": {
       "title": "Välj och placera en aktivitet",
       "horizontal": "Välj en aktivitet från menyn längst ner på skärmen och placera den på tidslinjen.",
@@ -33,20 +33,17 @@
       "imageAltVertical": "Kopiera en dags aktiviteter till en annan dag i vertikal vy"
     },
     "step4": {
-      "title": "Spara och skicka in din dagbok",
-      "description": "När du har registrerat dina aktiviteter för en dag, klicka på knappen \"Spara dagen\" för att spara dem. Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta, klicka på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
-      "saveHelp": "Klicka för att spara aktiviteterna för dagen du arbetar med",
+      "title": "Spara automatiskt och skicka in din dagbok",
+      "description": "Du behöver inte spara dagen: dina uppgifter sparas automatiskt medan du redigerar. Du kan fortfarande redigera dagen senare. När alla dagar i studien är kompletta klickar du på \"Skicka studien\" för att skicka in din dagbok och avsluta studien.",
       "submitStudyHelp": "Klicka för att skicka in din dagbok när alla dagar är kompletta"
     },
     "helpfulTools": "Användbara verktyg",
-    "removeLastHelp": "Ta bort den senast placerade aktiviteten",
-    "cleanRowHelp": "Vill du börja om? Rensa raden",
+    "clearTimelineHelp": "Vill du börja om? Rensa tidslinjen",
     "customActivityHelp": "Aktiviteten finns inte med? Lägg till en egen aktivitet",
     "customActivityName": "Annat som inte finns med (ange)"
   },
   "consent": {
-    "pageTitle": "Samtycke | Tidsdagbok",
-    "pageTitleWithStudy": "{{study}} - Samtycke | Tidsdagbok",
+    "pageTitle": "Samtycke",
     "title": "Samtycke",
     "eyebrow": "Samtycke till studien",
     "subtitle": "Läs samtyckesinformationen nedan innan du börjar studien.",
@@ -60,27 +57,34 @@
     "saveError": "Kunde inte spara samtycket. Försök igen.",
     "loadError": "Kunde inte läsa in samtyckesinformationen.",
     "loadErrorReload": "Kunde inte ladda samtyckesinformationen. Ladda om sidan.",
-    "studyNotFound": "Den begärda studien finns inte."
+    "studyNotFound": "Den begärda studien finns inte.",
+    "accessDenied": "Den här länken är inte giltig för den här studien. Öppna din personliga studielänk igen eller kontakta studieteamet.",
+    "studyUnavailable": "Den här studien är inte tillgänglig just nu. Försök igen senare.",
+    "saveDenied": "Samtycket kunde inte sparas: länken är inte giltig för den här studien eller så har studien redan skickats in. Kontakta studieteamet."
   },
   "common": {
     "language": "Språk",
     "chooseLanguage": "Välj språk",
     "day": "Dag",
-    "loading": "Laddar ..."
+    "loading": "Laddar ...",
+    "pageTitle": "Tidsdagbok",
+    "pageTitleWithStudy": "{{study}} - {{page}}",
+    "error": "Fel"
   },
   "buttons": {
-    "saveDay": "Spara dagen",
     "submitStudy": "Skicka studien",
     "start": "Starta",
-    "removeLast": "Ta bort senaste",
-    "cleanRow": "Rensa rad",
+    "undo": "Ångra",
+    "clearTimeline": "Rensa tidslinjen",
+    "moreActions": "Fler åtgärder",
     "skipReporting": "Hoppa över tidsrapportering",
-    "previousTimeline": "Föregående tidslinje",
+    "switchTimeline": "Byt tidslinje",
     "giveConsent": "Jag samtycker och fortsätter",
     "declineConsent": "Jag samtycker inte",
     "ok": "OK",
     "cancel": "Avbryt",
-    "close": "Stäng"
+    "close": "Stäng",
+    "help": "Så fungerar dagboken"
   },
   "modals": {
     "customActivity": {
@@ -101,13 +105,15 @@
       "title": "Vill du verkligen hoppa över all tidsrapportering?",
       "message": "Du kommer att skickas direkt till tack-sidan."
     },
-    "confirmCleanRow": {
-      "title": "Rensa aktuell tidslinjerad?",
-      "message": "Är du säker på att du vill ta bort alla aktiviteter i den aktuella tidslinjeraden?"
+    "confirmClearTimeline": {
+      "title": "Rensa denna tidslinje?",
+      "message": "Är du säker på att du vill ta bort alla aktiviteter i denna tidslinje?"
     },
     "activityContext": {
       "copy": "Kopiera",
       "showInfo": "Visa info",
+      "moveEarlier": "Flytta tidigare",
+      "moveLater": "Flytta senare",
       "delete": "Ta bort",
       "infoTitle": "Aktivitetsdetaljer",
       "start": "Start",
@@ -120,36 +126,44 @@
     }
   },
   "messages": {
+    "activityRemoved": "Aktivitet borttagen",
+    "timelineCleared": "Tidslinjen rensad",
     "selectStudy": "Välj en studie för att fortsätta",
     "noStudiesAvailable": "Inga studier finns på servern.",
     "studyNotFound": "Den begärda studien finns inte.",
     "submitError": "Fel vid inskickning av dagbok",
     "sending_retry": "Nytt försök att spara dagboken (försök {{attempt}}/{{maxRetries}})...",
+    "syncNotSaved": "Inte sparat",
+    "syncRetry": "Försök igen",
     "timelineCoverageMet": "✓",
     "timelineCoverageMetAria": "Minsta täckning uppfylld",
     "dayCompleteAria": "Dagen är klar (uppfyller minsta täckningen)",
     "timelineCoverageMissing": "{{covered}} av {{required}} obligatoriska minuter täckta",
-    "timelineMissing": "Det saknas information på den här tidslinjen. Vill du lägga till något?",
+    "timelineNothingEntered": "inget ifyllt ännu",
+    "timelineSwitchHintAria": "{{timeline}}: {{state}}. Byt till denna tidslinje.",
     "timelineHoverInactive": "Klicka för att byta till den här tidslinjen",
     "timelineHoverActiveNoSelection": "Välj en aktivitet nedan och placera den sedan här.",
     "timelineHoverActiveWithSelection": "Klicka för att placera den valda aktiviteten här.",
     "invalidPlacement": "Kan inte placera aktiviteten här på grund av ogiltig position.",
     "timelineValidationError": "Valideringsfel i tidslinje: {{message}}",
-    "templateLoadedBanner": "Vi har laddat dina aktiviteter från <strong>{{day}}</strong> som utgångspunkt. Klicka på <strong>'Rensa rad'</strong> för att börja om eller redigera aktiviteterna nedan. På mobil tar du bort en enskild aktivitet genom att hålla länge på den. På dator högerklickar du på en aktivitet och väljer <strong>'Ta bort'</strong> (eller håller muspekaren över den och trycker på DEL eller 'd').",
-    "templateCopiedBanner": "Vi har fyllt i din dagbok med aktiviteter från en malldeltagare. Klicka på <strong>'Rensa rad'</strong> för att börja om eller redigera aktiviteterna nedan.",
+    "templateLoadedBannerMobile": "Vi har laddat dina aktiviteter från <strong>{{day}}</strong> som utgångspunkt. Tryck på <strong>'Rensa tidslinjen'</strong> för att börja om eller redigera dina aktiviteter. För att ta bort en aktivitet, håll den intryckt och välj <strong>'Ta bort'</strong>.",
+    "templateLoadedBannerDesktop": "Vi har laddat dina aktiviteter från <strong>{{day}}</strong> som utgångspunkt. Klicka på <strong>'Rensa tidslinjen'</strong> för att börja om eller redigera aktiviteterna nedan. För att ta bort en aktivitet, högerklicka på den och välj <strong>'Ta bort'</strong>.",
+    "templateCopiedBanner": "Vi har fyllt i din dagbok med aktiviteter från en malldeltagare. Klicka på <strong>'Rensa tidslinjen'</strong> för att börja om eller redigera aktiviteterna nedan.",
     "studyDayOf": "Dag {{current}} av {{total}}",
     "currentDayTooltip": "{{dayName}} (Dag {{current}} av {{total}})",
     "goBackToEditPreviousDays": "Byt till dag:",
     "copyDayLink": "Kopiera denna dag",
+    "copyDayToAnother": "Kopiera {{day}} till en annan dag",
+    "goToCopiedDay": "Gå till {{day}}",
     "copyToDay": "Kopiera till en annan dag",
-    "copyFromDay": "Kopiera från en annan dag",
     "copySuccess": "Kopierade {{sourceDay}} till {{targetDay}}",
     "copyError": "Kunde inte kopiera: {{message}}",
     "copyEmptySource": "Källdagen har inga aktiviteter att kopiera.",
     "completeOtherDaysFirst": "Fyll först i {{days}} för att avsluta studien.",
-    "daySavedStayOnPage": "Dagen sparad.",
     "copyDayEmpty": "tom",
     "copyDayHasData": "har data",
+    "copyOverwriteTitle": "Skriva över dagen?",
+    "copyOverwriteYes": "Skriv över",
     "copyOverwriteConfirm": "{{day}} har redan data. Skriva över?",
     "submitStudyIncomplete": "Ofullständiga dagar: {{days}}",
     "submitStudyIncompleteHint": "Slutför alla dagar innan du skickar in"
@@ -160,17 +174,18 @@
     "loadingActivitiesShort": "Fel vid laddning av aktiviteter. Uppdatera sidan och försök igen. Fel:"
   },
   "banner": {
-    "dayOneInstructions": "Instruktioner: Välj en aktivitet nedan, klicka sedan på tidslinjen för att placera den och dra i kanterna för att justera längden. För att ta bort en aktivitet, håll den nedtryckt på mobil eller använd högerklicksmenyn på dator."
+    "instructionsMobile": "Instruktioner: tryck på +-knappen längst ned till höger för att välja en aktivitet och tryck sedan på tidslinjen för att placera den. Dra i kanterna för att förlänga den. För att ta bort en aktivitet, håll den intryckt och välj Ta bort.",
+    "instructionsDesktop": "Instruktioner: välj en aktivitet nedan och klicka sedan på tidslinjen för att placera den. Dra i kanterna för att förlänga den. För att ta bort en aktivitet, högerklicka på den och välj Ta bort."
   },
   "thankYou": {
-    "title": "Tack - TRAC",
+    "title": "Tack",
     "heading": "Tack!",
     "subtitle": "Din inskickning har slutförts framgångsrikt.",
     "defaultMessage": "Tack för att du deltar i vår studie. Dina svar har registrerats och kommer att bidra till värdefull forskning.",
     "continueLink": "Klicka här för att fortsätta."
   },
   "taskPage": {
-    "title": "TRAC Uppgifter",
+    "title": "Uppgifter",
     "heading": "Slutliga uppgifter",
     "subtitle": "Vänligen genomför följande uppgifter innan du avslutar studien.",
     "continueLink": "Fortsätt till slutsidan",
@@ -183,22 +198,19 @@
     "diaryTaskStatusNotCompleted": "Inte slutförd"
   },
   "timeout": {
-    "title": "Sessionen har gått ut - Tidsdagbok",
-    "heading": "TRAC tidsanvändningsstudie - sessionen har gått ut",
+    "title": "Sessionen har gått ut",
+    "heading": "Sessionen har gått ut",
     "message": "Din session avslutades på grund av inaktivitet. Använd din inbjudningslänk för att återgå till dagboken och fortsätta."
   },
   "footer": {
-    "title": "TRAC",
-    "backend_status_connecting": "Ansluter till backend...",
-    "backend_status_connected": "Ansluten till backend",
-    "backend_status_error": "Fel vid anslutning till backend"
+    "opensInNewTab": "öppnas i en ny flik"
   },
   "idleTimeout": {
     "tooltip": "Inaktivitetstimeout. Klicka för att bekräfta att du fortfarande är här och återställ timern."
   },
   "openStudies": {
-    "pageTitle": "Öppna studier | TRAC",
-    "heading": "TRAC -- Öppna studier",
+    "pageTitle": "Öppna studier",
+    "heading": "Öppna studier",
     "noStudies": "Inga öppna studier tillgängliga.",
     "loadError": "Kunde inte ladda öppna studier: {{message}}",
     "accessStudy": "Öppna studien '{{study}}'"

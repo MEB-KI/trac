@@ -3,14 +3,14 @@
     "banner": "Uwaga: wkrótce odbędzie się krótka przerwa techniczna. Zapisz swoją bieżącą pracę."
   },
   "instructions": {
-    "pageTitle": "Instrukcje | Dziennik Czasu Użycia",
+    "pageTitle": "Instrukcje",
     "title": "Instrukcje",
     "welcomeTitle": "Witaj w Twoim cotygodniowym dzienniku czasu. Dziękujemy za udział!",
     "generalInfoTitle": "Ogólne informacje o badaniu",
     "studyIntroDefault": "To jest nasze badanie dotyczące wykorzystania czasu.<br><br>Prosimy, abyś <b>odtworzył typowy tydzień</b> swoich codziennych aktywności przy użyciu naszego narzędzia do rejestrowania czasu.<br><br>Który tydzień powinienem wybrać? Proszę pomyśleć o minionym tygodniu (ostatnie 7 dni).<br>Wyjątek: Jeśli byłeś chory lub na urlopie w zeszłym tygodniu, wybierz inny, niedawny tydzień, który lepiej odzwierciedla Twój normalny plan dnia.",
-    "instructionsDefault": "#### Jak wypełnić dziennik\n\nNa dole ekranu zobaczysz listę aktywności. Kliknij aktywność, aby ją wybrać, a następnie kliknij na osi czasu, aby wskazać, co robiłeś przez cały dzień.\n\n- **Dostosuj czas trwania:** Przeciągnij lewą lub prawą krawędź umieszczonej aktywności, aby ustawić jej czas trwania.\n- **Usuń aktywność:** Kliknij prawym przyciskiem myszy na aktywność na komputerze lub przytrzymaj ją dłużej na urządzeniu mobilnym i wybierz „Usuń\".\n\nW zależności od badania, na każdy dzień może przypadać więcej niż jedna oś czasu. Umożliwiają one rejestrowanie różnych aspektów dnia lub aktywności wykonywanych równolegle.\n\n**Funkcja oszczędzania czasu:** Nie musisz zaczynać od zera każdego dnia. Po ukończeniu pierwszego dnia, Twój plan dnia automatycznie skopiuje się na następny dzień jako szablon. Proszę dostosować ten szablon do zmian w Twoich aktywnościach w danym dniu.",
+    "instructionsDefault": "## Jak wypełnić dziennik\n\nNa dole ekranu zobaczysz listę aktywności. Kliknij aktywność, aby ją wybrać, a następnie kliknij na osi czasu, aby wskazać, co robiłeś przez cały dzień.\n\n- **Dostosuj czas trwania:** Przeciągnij lewą lub prawą krawędź umieszczonej aktywności, aby ustawić jej czas trwania.\n- **Usuń aktywność:** Kliknij prawym przyciskiem myszy na aktywność na komputerze lub przytrzymaj ją dłużej na urządzeniu mobilnym i wybierz „Usuń\".\n\nW zależności od badania, na każdy dzień może przypadać więcej niż jedna oś czasu. Umożliwiają one rejestrowanie różnych aspektów dnia lub aktywności wykonywanych równolegle.\n\n**Funkcja oszczędzania czasu:** Nie musisz zaczynać od zera każdego dnia. Po ukończeniu pierwszego dnia, Twój plan dnia automatycznie skopiuje się na następny dzień jako szablon. Proszę dostosować ten szablon do zmian w Twoich aktywnościach w danym dniu.",
     "visualGuideTitle": "Wizualne instrukcje korzystania z interfejsu",
-    "startPrompt": "Kliknij niebieski przycisk 'Rozpocznij', aby rozpocząć wypełnianie dziennika.",
+    "howToSummary": "Jak wypełnić dziennik?",
     "step1": {
       "title": "Wybierz i umieść aktywność",
       "horizontal": "Wybierz aktywność z menu na dole ekranu, a następnie umieść ją na osi czasu.",
@@ -33,20 +33,17 @@
       "imageAltVertical": "Kopiowanie aktywności z jednego dnia na inny w widoku pionowym"
     },
     "step4": {
-      "title": "Zapisz i wyślij dziennik",
-      "description": "Po zapisaniu aktywności z danego dnia kliknij przycisk \"Zapisz dzień\", aby je zapisać. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
-      "saveHelp": "Kliknij, aby zapisać aktywności z dnia, nad którym pracujesz",
+      "title": "Zapisywanie automatyczne i wysyłanie dziennika",
+      "description": "Nie musisz zapisywać dnia: Twoje wpisy są zapisywane automatycznie podczas edycji. Nadal możesz później edytować ten dzień. Gdy wszystkie dni badania będą kompletne, kliknij \"Wyślij badanie\", aby wysłać dziennik i zakończyć badanie.",
       "submitStudyHelp": "Kliknij, aby wysłać dziennik, gdy wszystkie dni będą kompletne"
     },
     "helpfulTools": "Pomocne narzędzia",
-    "removeLastHelp": "Usuń ostatnio umieszczoną aktywność",
-    "cleanRowHelp": "Chcesz zacząć od nowa? Wyczyść rząd",
+    "clearTimelineHelp": "Chcesz zacząć od nowa? Wyczyść oś czasu",
     "customActivityHelp": "Brak aktywności na liście? Dodaj własną aktywność",
     "customActivityName": "Inne (wpisz)"
   },
   "consent": {
-    "pageTitle": "Zgoda | Dziennik użycia czasu",
-    "pageTitleWithStudy": "{{study}} - Zgoda | Dziennik użycia czasu",
+    "pageTitle": "Zgoda",
     "title": "Zgoda",
     "eyebrow": "Zgoda na udział w badaniu",
     "subtitle": "Przeczytaj poniższe informacje o zgodzie, zanim rozpoczniesz badanie.",
@@ -60,27 +57,34 @@
     "saveError": "Nie udało się zapisać zgody. Spróbuj ponownie.",
     "loadError": "Nie udało się wczytać informacji o zgodzie.",
     "loadErrorReload": "Nie udało się załadować informacji o zgodzie. Odśwież stronę.",
-    "studyNotFound": "Żądane badanie nie istnieje."
+    "studyNotFound": "Żądane badanie nie istnieje.",
+    "accessDenied": "Ten link nie jest ważny dla tego badania. Otwórz ponownie swój osobisty link do badania lub skontaktuj się z zespołem badawczym.",
+    "studyUnavailable": "To badanie jest obecnie niedostępne. Spróbuj ponownie później.",
+    "saveDenied": "Nie udało się zapisać zgody: ten link nie jest ważny dla tego badania lub badanie zostało już wysłane. Skontaktuj się z zespołem badawczym."
   },
   "common": {
     "language": "Język",
     "chooseLanguage": "Wybierz język",
     "day": "Dzień",
-    "loading": "Ładowanie ..."
+    "loading": "Ładowanie ...",
+    "pageTitle": "Dziennik użycia czasu",
+    "pageTitleWithStudy": "{{study}} - {{page}}",
+    "error": "Błąd"
   },
   "buttons": {
-    "saveDay": "Zapisz dzień",
     "submitStudy": "Wyślij badanie",
     "start": "Rozpocznij",
-    "removeLast": "Usuń ostatnią",
-    "cleanRow": "Wyczyść rząd",
+    "undo": "Cofnij",
+    "clearTimeline": "Wyczyść oś czasu",
+    "moreActions": "Więcej działań",
     "skipReporting": "Pomiń raportowanie czasu",
-    "previousTimeline": "Poprzednia oś czasu",
+    "switchTimeline": "Zmień oś czasu",
     "giveConsent": "Wyrażam zgodę i kontynuuję",
     "declineConsent": "Nie wyrażam zgody",
     "ok": "OK",
     "cancel": "Anuluj",
-    "close": "Zamknij"
+    "close": "Zamknij",
+    "help": "Jak korzystać z dziennika"
   },
   "modals": {
     "customActivity": {
@@ -101,13 +105,15 @@
       "title": "Czy na pewno chcesz pominąć raportowanie czasu?",
       "message": "Zostaniesz przeniesiony bezpośrednio na stronę z podziękowaniami."
     },
-    "confirmCleanRow": {
-      "title": "Wyczyścić bieżący rząd osi czasu?",
-      "message": "Czy na pewno chcesz usunąć wszystkie aktywności z bieżącego rzędu osi czasu?"
+    "confirmClearTimeline": {
+      "title": "Wyczyścić tę oś czasu?",
+      "message": "Czy na pewno chcesz usunąć wszystkie aktywności z tej osi czasu?"
     },
     "activityContext": {
       "copy": "Kopiuj",
       "showInfo": "Pokaż informacje",
+      "moveEarlier": "Przenieś wcześniej",
+      "moveLater": "Przenieś później",
       "delete": "Usuń",
       "infoTitle": "Szczegóły aktywności",
       "start": "Początek",
@@ -120,36 +126,44 @@
     }
   },
   "messages": {
+    "activityRemoved": "Aktywność usunięta",
+    "timelineCleared": "Oś czasu wyczyszczona",
     "selectStudy": "Wybierz badanie, aby kontynuować",
     "noStudiesAvailable": "Brak dostępnych badań na serwerze.",
     "studyNotFound": "Żądane badanie nie istnieje.",
     "submitError": "Błąd przy wysyłaniu dziennika",
     "sending_retry": "Ponawianie próby zapisania dziennika (próba {{attempt}}/{{maxRetries}})...",
+    "syncNotSaved": "Nie zapisano",
+    "syncRetry": "Ponów próbę",
     "timelineCoverageMet": "✓",
     "timelineCoverageMetAria": "Minimalne pokrycie spełnione",
     "dayCompleteAria": "Dzień ukończony (spełniono minimalne pokrycie)",
     "timelineCoverageMissing": "Pokryto {{covered}} z {{required}} wymaganych minut",
-    "timelineMissing": "Brakuje informacji na tej osi czasu. Chcesz dodać coś?",
+    "timelineNothingEntered": "nic jeszcze nie wpisano",
+    "timelineSwitchHintAria": "{{timeline}}: {{state}}. Przełącz na tę os czasu.",
     "timelineHoverInactive": "Kliknij, aby przełączyć się na tę oś czasu",
     "timelineHoverActiveNoSelection": "Wybierz aktywność poniżej, a następnie umieść ją tutaj.",
     "timelineHoverActiveWithSelection": "Kliknij, aby umieścić tutaj wybraną aktywność.",
     "invalidPlacement": "Nie można umieścić aktywności w tym miejscu z powodu niewłaściwej pozycji.",
     "timelineValidationError": "Błąd walidacji osi czasu: {{message}}",
-    "templateLoadedBanner": "Załadowaliśmy Twoje aktywności z dnia <strong>{{day}}</strong> jako punkt wyjścia. Kliknij <strong>'Wyczyść rząd'</strong>, aby zacząć od nowa lub edytuj poniższe aktywności. Na urządzeniu mobilnym usuń pojedynczą aktywność przez długie naciśnięcie. Na komputerze kliknij aktywność prawym przyciskiem myszy i wybierz <strong>'Usuń'</strong> (lub najedź kursorem i naciśnij klawisz DEL albo 'd').",
-    "templateCopiedBanner": "Wstępnie wypełniliśmy Twój dziennik aktywnościami uczestnika wzorcowego. Kliknij <strong>'Wyczyść rząd'</strong>, aby zacząć od nowa lub edytuj poniższe aktywności.",
+    "templateLoadedBannerMobile": "Załadowaliśmy Twoje aktywności z dnia <strong>{{day}}</strong> jako punkt wyjścia. Dotknij <strong>'Wyczyść oś czasu'</strong>, aby zacząć od nowa lub edytuj swoje aktywności. Aby usunąć aktywność, przytrzymaj ją i wybierz <strong>'Usuń'</strong>.",
+    "templateLoadedBannerDesktop": "Załadowaliśmy Twoje aktywności z dnia <strong>{{day}}</strong> jako punkt wyjścia. Kliknij <strong>'Wyczyść oś czasu'</strong>, aby zacząć od nowa lub edytuj poniższe aktywności. Aby usunąć aktywność, kliknij ją prawym przyciskiem myszy i wybierz <strong>'Usuń'</strong>.",
+    "templateCopiedBanner": "Wstępnie wypełniliśmy Twój dziennik aktywnościami uczestnika wzorcowego. Kliknij <strong>'Wyczyść oś czasu'</strong>, aby zacząć od nowa lub edytuj poniższe aktywności.",
     "studyDayOf": "Dzień {{current}} z {{total}}",
     "currentDayTooltip": "{{dayName}} (Dzień {{current}} z {{total}})",
     "goBackToEditPreviousDays": "Przełącz na dzień:",
     "copyDayLink": "Skopiuj ten dzień",
+    "copyDayToAnother": "Skopiuj {{day}} do innego dnia",
+    "goToCopiedDay": "Przejdź do {{day}}",
     "copyToDay": "Skopiuj na inny dzień",
-    "copyFromDay": "Skopiuj z innego dnia",
     "copySuccess": "Skopiowano {{sourceDay}} do {{targetDay}}",
     "copyError": "Nie udało się skopiować: {{message}}",
     "copyEmptySource": "Dzień źródłowy nie ma aktywności do skopiowania.",
     "completeOtherDaysFirst": "Uzupełnij najpierw {{days}}, aby zakończyć badanie.",
-    "daySavedStayOnPage": "Dzień zapisany.",
     "copyDayEmpty": "pusty",
     "copyDayHasData": "ma dane",
+    "copyOverwriteTitle": "Nadpisać dzień?",
+    "copyOverwriteYes": "Nadpisz",
     "copyOverwriteConfirm": "{{day}} ma już dane. Nadpisać?",
     "submitStudyIncomplete": "Niekompletne dni: {{days}}",
     "submitStudyIncompleteHint": "Ukończ wszystkie dni przed wysłaniem"
@@ -160,17 +174,18 @@
     "loadingActivitiesShort": "Błąd ładowania aktywności. Proszę odświeżyć stronę, aby spróbować ponownie. Błąd:"
   },
   "banner": {
-    "dayOneInstructions": "Instrukcje: Wybierz aktywność poniżej, potem kliknij na osi czasu, aby ją umieścić, i przeciągnij krawędzie, aby wydłużyć. Aby usunąć aktywność, przytrzymaj ją na telefonie lub użyj menu po kliknięciu prawym przyciskiem myszy na komputerze."
+    "instructionsMobile": "Instrukcje: dotknij przycisku + w prawym dolnym rogu, aby wybrać aktywność, a następnie dotknij osi czasu, aby ją umieścić. Przeciągnij jej krawędzie, aby ją wydłużyć. Aby usunąć aktywność, przytrzymaj ją i wybierz Usuń.",
+    "instructionsDesktop": "Instrukcje: wybierz aktywność poniżej, a następnie kliknij oś czasu, aby ją umieścić. Przeciągnij jej krawędzie, aby ją wydłużyć. Aby usunąć aktywność, kliknij ją prawym przyciskiem myszy i wybierz Usuń."
   },
   "thankYou": {
-    "title": "Dziękujemy - O-ELIDDI",
+    "title": "Dziękujemy",
     "heading": "Dziękujemy!",
     "subtitle": "Twoje zgłoszenie zostało pomyślnie zakończone.",
     "defaultMessage": "Dziękujemy za udział w naszym badaniu. Twoje odpowiedzi zostały zapisane i przyczynią się do wartościowych badań.",
     "continueLink": "Kliknij tutaj, aby kontynuować."
   },
   "taskPage": {
-    "title": "TRAC Zadania",
+    "title": "Zadania",
     "heading": "Zadania końcowe",
     "subtitle": "Proszę wykonać następujące zadania przed zakończeniem badania.",
     "continueLink": "Przejdź do strony końcowej",
@@ -183,22 +198,19 @@
     "diaryTaskStatusNotCompleted": "Nie ukończono"
   },
   "timeout": {
-    "title": "Sesja wygasła - Dziennik użycia czasu",
-    "heading": "Badanie TRAC dotyczące wykorzystania czasu - sesja wygasła",
+    "title": "Sesja wygasła",
+    "heading": "Sesja wygasła",
     "message": "Twoja sesja została zakończona z powodu braku aktywności. Użyj linku z zaproszeniem, aby wrócić do dziennika i kontynuować."
   },
   "footer": {
-    "title": "TRAC",
-    "backend_status_connecting": "Łączenie z backendem...",
-    "backend_status_connected": "Połączono z backendem",
-    "backend_status_error": "Błąd przy łączeniu z backendem"
+    "opensInNewTab": "otwiera się w nowej karcie"
   },
   "idleTimeout": {
     "tooltip": "Limit czasu bezczynności. Kliknij, aby potwierdzić, że wciąż tu jesteś i zresetować licznik czasu."
   },
   "openStudies": {
-    "pageTitle": "Otwarte badania | TRAC",
-    "heading": "TRAC -- Otwarte badania",
+    "pageTitle": "Otwarte badania",
+    "heading": "Otwarte badania",
     "noStudies": "Brak dostępnych otwartych badań.",
     "loadError": "Nie udało się załadować otwartych badań: {{message}}",
     "accessStudy": "Przejdź do badania '{{study}}'"

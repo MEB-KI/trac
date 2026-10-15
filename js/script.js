@@ -11,6 +11,7 @@ import {
   getCurrentTimelineData,
   getCurrentTimelineKey,
   sendData,
+  createTimelineJSON,
   getPostDiaryRedirectPath,
   validateMinCoverage,
   getTimelineCoverage,
@@ -18,6 +19,7 @@ import {
   syncURLParamsToStudy,
 } from './utils.js';
 import { updateIsMobile, getIsMobile } from './globals.js';
+import { createAutosave } from './autosave.js';
 import {
   PENDING_TIMELINE_STATE_KEY,
   DRAFT_TIMELINE_STATE_KEY,
@@ -126,6 +128,23 @@ function wasDaySaved(study, pid, dayIndex) {
 }
 
 window.markDaySaved = markDaySaved;
+
+/**
+ * Mark the day the participant is looking at as intentionally saved. Used after
+ * an explicit save and after every successful autosave: it stops the template
+ * from being applied again over a day the participant deliberately left empty.
+ */
+function markDaySavedForCurrentDay() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const studyName =
+    window.timelineManager?.study?.study_name_short ||
+    urlParams.get('study_name');
+  const pid = window.timelineManager?.study?.pid || urlParams.get('pid');
+  const dayIndex = getCurrentDayIndex();
+  if (studyName && pid && Number.isInteger(dayIndex)) {
+    markDaySaved(studyName, pid, dayIndex);
+  }
+}
 
 function clearSelectedActivityButtons() {
   document.querySelectorAll('.activity-button.selected').forEach((btn) => {
@@ -525,13 +544,15 @@ function initInstructionBanner() {
 
   const bannerStorageKey = getInstructionBannerStorageKey();
 
-  if (getCurrentDayIndex() !== 0) {
-    banner.remove();
-    return;
-  }
-
-  // Check if user has already closed the banner (using localStorage). Storage
-  // access itself can throw (blocked cookies, private mode), so it is guarded.
+  // The banner stays until the participant closes it - including on later days,
+  // which is what makes it usable as a reminder of the gestures (feedback: "it
+  // only shows on first day of study, which is irritating; show it on all days
+  // UNTIL user first closes it"). It used to be a day-one-only banner, so a
+  // participant who came back the next day had to remember the gestures.
+  //
+  // Check if the user has already closed it (using localStorage).
+  // Storage access itself can throw (blocked cookies, private mode), so it is
+  // guarded.
   const bannerClosed = safeGetItem(localStorage, bannerStorageKey);
   if (bannerClosed === 'true') {
     banner.remove();
@@ -559,6 +580,10 @@ function getInstructionBannerStorageKey() {
     (TUD_SETTINGS && TUD_SETTINGS.DEFAULT_STUDY_NAME
       ? TUD_SETTINGS.DEFAULT_STUDY_NAME
       : '');
+  // One flag per participant and study, deliberately not per day and no longer
+  // carrying the historical `:day1` suffix in its name: the key predates the
+  // banner being shown on every day, and renaming it would make everyone who
+  // already closed the banner see it again.
   return `instructionBannerClosed:${studyName}:${pid}:day1`;
 }
 
@@ -618,6 +643,17 @@ function deleteActivityBlock(activityBlock) {
     }))
   );
 
+  // Keep what an undo needs: the removed row and the index it sat at.
+  const timelineActivitiesBeforeDelete =
+    window.timelineManager.activities[timelineKey];
+  const removedIndex = Array.isArray(timelineActivitiesBeforeDelete)
+    ? timelineActivitiesBeforeDelete.findIndex((activity) =>
+        activityIdsEqual(activity.id, activityId)
+      )
+    : -1;
+  const removedActivity =
+    removedIndex === -1 ? null : timelineActivitiesBeforeDelete[removedIndex];
+
   // Store reference to the timeline
   const timeline = activityBlock.closest('.timeline');
 
@@ -656,61 +692,8 @@ function deleteActivityBlock(activityBlock) {
         window.timelineManager.activities[timelineKey].length
       );
 
-      // Force a re-render of the timeline's activities container to ensure clean state
-      if (timeline) {
-        const activitiesContainer = timeline.querySelector('.activities');
-        if (activitiesContainer) {
-          console.log('Re-rendering all remaining activities...');
-
-          // Get remaining activities
-          const remainingActivities =
-            window.timelineManager.activities[timelineKey];
-          console.log(
-            'Remaining activities to render (',
-            remainingActivities.length,
-            '):',
-            remainingActivities.map((a) => ({ id: a.id, activity: a.activity }))
-          );
-
-          // Clear the container
-          activitiesContainer.innerHTML = '';
-          console.log('Activities container cleared');
-
-          // Recreate all remaining activity blocks
-          remainingActivities.forEach((activityData, idx) => {
-            console.log(
-              `Rendering activity ${idx + 1}/${remainingActivities.length}:`,
-              activityData.id,
-              activityData.activity
-            );
-
-            // Make sure the activityData has all required fields
-            if (!activityData.startMinutes || !activityData.endMinutes) {
-              console.error('Activity missing minutes:', activityData);
-              return;
-            }
-
-            // Use your existing function to recreate blocks
-            const result = recreateActivityBlockFromTemplate(activityData);
-            console.log(`Activity ${idx + 1} rendered, block:`, result.block);
-          });
-
-          console.log(
-            'All ',
-            remainingActivities.length,
-            ' activities re-rendered, container children:',
-            activitiesContainer.children.length
-          );
-
-          // Re-initialize interact.js for the new blocks
-          initTimelineInteraction(timeline);
-          console.log('Timeline interaction re-initialized');
-        } else {
-          console.error('Activities container not found in timeline');
-        }
-      } else {
-        console.error('Timeline element not found');
-      }
+      // Re-render the timeline from the manager state to ensure clean state
+      rerenderActivitiesInTimeline(timeline, timelineKey);
     } else {
       console.error('Activity not found in timelineActivities array');
     }
@@ -723,14 +706,143 @@ function deleteActivityBlock(activityBlock) {
   updateButtonStates();
   persistPendingTimelineStateSoon();
 
+  // Deleting is one tap in a menu, so offer the way back for a few seconds
+  // instead of keeping a "remove last" button in the toolbar.
+  if (removedActivity) {
+    showUndoDeleteToast(timelineKey, removedActivity, removedIndex);
+  }
+
   console.log(`=== DELETION COMPLETE ===`);
+}
+
+/**
+ * Re-render every block of a timeline from the manager state. Used by deletion
+ * and by undoing a deletion, so both paths render identically.
+ */
+function rerenderActivitiesInTimeline(timeline, timelineKey) {
+  if (!timeline) {
+    console.error('Timeline element not found');
+    return;
+  }
+
+  const activitiesContainer = timeline.querySelector('.activities');
+  if (!activitiesContainer) {
+    console.error('Activities container not found in timeline');
+    return;
+  }
+
+  const activities = window.timelineManager.activities[timelineKey] || [];
+  activitiesContainer.innerHTML = '';
+
+  activities.forEach((activityData) => {
+    if (!activityData.startMinutes || !activityData.endMinutes) {
+      console.error('Activity missing minutes:', activityData);
+      return;
+    }
+    recreateActivityBlockFromTemplate(activityData);
+  });
+
+  // Re-initialize interact.js for the new blocks
+  initTimelineInteraction(timeline);
+}
+
+/** Put a deleted activity back where it was and re-render its timeline. */
+function undoDeleteActivity(timelineKey, activityData, index) {
+  const activities = window.timelineManager.activities[timelineKey];
+  if (!Array.isArray(activities)) return;
+
+  const insertAt = Math.max(0, Math.min(index, activities.length));
+  activities.splice(insertAt, 0, activityData);
+  window.timelineManager.activities[timelineKey] = [...activities];
+
+  if (getCurrentTimelineKey() === timelineKey) {
+    rerenderActivitiesInTimeline(
+      window.timelineManager.activeTimeline,
+      timelineKey
+    );
+  }
+
+  updateButtonStates();
+  persistPendingTimelineStateSoon();
+}
+
+function showUndoDeleteToast(timelineKey, activityData, index) {
+  if (typeof window.showToast !== 'function') return;
+
+  const translate = (key, fallback) =>
+    window.i18n && window.i18n.isReady() ? window.i18n.t(key) : fallback;
+
+  window.showToast(
+    translate('messages.activityRemoved', 'Activity removed'),
+    'info',
+    6000,
+    {
+      label: translate('buttons.undo', 'Undo'),
+      onClick: () => undoDeleteActivity(timelineKey, activityData, index),
+    }
+  );
 }
 
 window.deleteActivityBlock = deleteActivityBlock;
 
-function initMobileDelete() {
-  const LONG_PRESS_DURATION = 1200;
-  const LONG_PRESS_VISUAL_DELAY = 400;
+/**
+ * Clear timeline empties a whole timeline at once. Before autosave that was
+ * recoverable by simply not pressing Save Day; now the empty timeline reaches
+ * the backend a second later, so the action needs an undo of its own - the same
+ * one the single-activity delete has.
+ */
+function undoClearTimeline(timelineKey, activitiesSnapshot) {
+  window.timelineManager.activities[timelineKey] = [...activitiesSnapshot];
+
+  if (getCurrentTimelineKey() === timelineKey) {
+    rerenderActivitiesInTimeline(
+      window.timelineManager.activeTimeline,
+      timelineKey
+    );
+  }
+
+  // The day is different again, which is what makes autosave store it.
+  updateButtonStates();
+  persistPendingTimelineStateSoon();
+}
+
+function showUndoClearTimelineToast(timelineKey, activitiesSnapshot) {
+  if (typeof window.showToast !== 'function') return;
+
+  const translate = (key, fallback) =>
+    window.i18n && window.i18n.isReady() ? window.i18n.t(key) : fallback;
+
+  // Longer than the single-activity undo: this one removed a whole timeline, and
+  // it is the participant's only way back.
+  window.showToast(
+    translate('messages.timelineCleared', 'Timeline cleared'),
+    'info',
+    8000,
+    {
+      label: translate('buttons.undo', 'Undo'),
+      onClick: () => undoClearTimeline(timelineKey, activitiesSnapshot),
+    }
+  );
+}
+
+window.showUndoClearTimelineToast = showUndoClearTimelineToast;
+
+/**
+ * Mobile: long-pressing an activity opens the shared activity context menu
+ * (Copy / Show info / Delete) instead of deleting it outright. The hold is the
+ * mobile equivalent of the desktop right-click, and deleting is one explicit
+ * choice inside the menu - which is what pages/instructions.html describes.
+ *
+ * Bound on mobile only; the desktop entry point is the `contextmenu` event in
+ * initActivityContextMenu().
+ */
+function initMobileLongPressMenu() {
+  if (!getIsMobile()) return;
+
+  // Long enough not to fire while scrolling or tapping, short enough to feel
+  // like the platform long-press.
+  const LONG_PRESS_DURATION = 500;
+  const LONG_PRESS_VISUAL_DELAY = 120;
   const LONG_PRESS_MOVE_PX = 6;
 
   let pressedActivity = null;
@@ -740,7 +852,7 @@ function initMobileDelete() {
   let pressStartY = 0;
   let visualFrame = null;
   let pointerId = null;
-  let deleteTriggered = false;
+  let menuOpened = false;
 
   document.addEventListener('pointerdown', handlePressStart, {
     passive: false,
@@ -752,17 +864,17 @@ function initMobileDelete() {
   });
 
   function getOrCreateLongPressIndicator(activityBlock) {
-    let indicator = activityBlock.querySelector('.long-press-delete-indicator');
+    let indicator = activityBlock.querySelector('.long-press-indicator');
     if (!indicator) {
       indicator = document.createElement('div');
-      indicator.className = 'long-press-delete-indicator';
+      indicator.className = 'long-press-indicator';
       activityBlock.appendChild(indicator);
     }
     return indicator;
   }
 
   function updateVisualProgress() {
-    if (!pressedActivity || deleteTriggered) {
+    if (!pressedActivity || menuOpened) {
       visualFrame = null;
       return;
     }
@@ -805,10 +917,8 @@ function initMobileDelete() {
     clearVisualFrame();
 
     if (pressedActivity) {
-      pressedActivity.classList.remove('long-press-delete-armed');
-      const indicator = pressedActivity.querySelector(
-        '.long-press-delete-indicator'
-      );
+      pressedActivity.classList.remove('long-press-armed');
+      const indicator = pressedActivity.querySelector('.long-press-indicator');
       if (indicator) {
         indicator.style.opacity = '0';
         indicator.style.setProperty('--long-press-progress', '0');
@@ -817,7 +927,7 @@ function initMobileDelete() {
 
     pressedActivity = null;
     pointerId = null;
-    deleteTriggered = false;
+    menuOpened = false;
   }
 
   function handlePressStart(e) {
@@ -846,7 +956,7 @@ function initMobileDelete() {
     pressStartY = e.clientY;
     pointerId = e.pointerId;
 
-    pressedActivity.classList.add('long-press-delete-armed');
+    pressedActivity.classList.add('long-press-armed');
     const indicator = getOrCreateLongPressIndicator(pressedActivity);
     indicator.style.opacity = '0';
     indicator.style.setProperty('--long-press-progress', '0');
@@ -855,11 +965,13 @@ function initMobileDelete() {
       if (!pressedActivity) {
         return;
       }
-      deleteTriggered = true;
-      const blockToDelete = pressedActivity;
+      const blockToMenu = pressedActivity;
       cleanupPress();
-      if (blockToDelete.isConnected) {
-        deleteActivityBlock(blockToDelete);
+      if (
+        blockToMenu.isConnected &&
+        typeof window.showActivityContextMenu === 'function'
+      ) {
+        window.showActivityContextMenu(pressStartX, pressStartY, blockToMenu);
       }
     }, LONG_PRESS_DURATION);
 
@@ -890,81 +1002,6 @@ function initMobileDelete() {
       return;
     }
     cleanupPress();
-  }
-}
-
-function initMobileSwipeNavigation() {
-  if (!getIsMobile()) return;
-
-  const SWIPE_THRESHOLD = 50;
-  const SWIPE_MAX_VERTICAL = 100;
-
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let touchStartTime = 0;
-  let isSwiping = false;
-
-  const timelineCanvas = document.querySelector('.timeline-canvas');
-  if (!timelineCanvas) return;
-
-  timelineCanvas.addEventListener('touchstart', handleTouchStart, {
-    passive: true,
-  });
-  timelineCanvas.addEventListener('touchmove', handleTouchMove, {
-    passive: true,
-  });
-  timelineCanvas.addEventListener('touchend', handleTouchEnd, {
-    passive: true,
-  });
-
-  function handleTouchStart(e) {
-    if (e.touches.length !== 1) return;
-
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchStartTime = Date.now();
-    isSwiping = false;
-  }
-
-  function handleTouchMove(e) {
-    if (e.touches.length !== 1) return;
-
-    const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
-    const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-
-    if (deltaX > 20 && deltaX > deltaY) {
-      isSwiping = true;
-    }
-  }
-
-  function handleTouchEnd(e) {
-    if (!isSwiping) return;
-
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaX = touchEndX - touchStartX;
-    const deltaY = Math.abs(touchEndY - touchStartY);
-    const deltaTime = Date.now() - touchStartTime;
-
-    if (
-      Math.abs(deltaX) >= SWIPE_THRESHOLD &&
-      deltaY <= SWIPE_MAX_VERTICAL &&
-      deltaTime < 500
-    ) {
-      if (deltaX < 0) {
-        const nextBtn = document.getElementById('nextBtn');
-        if (nextBtn && !nextBtn.disabled) {
-          nextBtn.click();
-        }
-      } else {
-        const backBtn = document.getElementById('backBtn');
-        if (backBtn && backBtn.style.display !== 'none') {
-          backBtn.click();
-        }
-      }
-    }
-
-    isSwiping = false;
   }
 }
 
@@ -1178,7 +1215,100 @@ function handleCopyActivity(activityBlock) {
   };
 }
 
-function initDesktopActivityContextMenu() {
+/**
+ * Write a new start/end pair into a block: its datasets, its position on the
+ * timeline, its time chip, and the timeline state the rest of the app reads -
+ * then refresh the button states (coverage indicator, Submit gate, day row),
+ * which is also what marks the day dirty for autosave.
+ *
+ * The arrow-key nudge and the phone menu's move both go through here; the drag
+ * and resize handlers keep their own version because they write during the
+ * gesture and validate/revert at its end.
+ */
+function commitActivityTiming(block, newStartMinutes, newEndMinutes) {
+  const newStartTime = formatTimelineStart(newStartMinutes);
+  const newEndTime = formatTimelineEnd(newEndMinutes);
+
+  block.dataset.startMinutes = newStartMinutes;
+  block.dataset.endMinutes = newEndMinutes;
+  block.dataset.start = newStartTime;
+  block.dataset.end = newEndTime;
+  block.dataset.length = newEndMinutes - newStartMinutes;
+
+  if (getIsMobile()) {
+    block.style.top = `${minutesToPercentage(newStartMinutes)}%`;
+    block.style.height = `${
+      ((newEndMinutes - newStartMinutes) / MINUTES_PER_DAY) * 100
+    }%`;
+  } else {
+    block.style.left = `${minutesToPercentage(newStartMinutes)}%`;
+    block.style.width = `${
+      ((newEndMinutes - newStartMinutes) / MINUTES_PER_DAY) * 100
+    }%`;
+  }
+
+  const timeLabel = block.querySelector('.time-label');
+  if (timeLabel) {
+    updateTimeLabel(timeLabel);
+  }
+
+  const timelineKey = block.dataset.timelineKey;
+  const currentData = window.timelineManager.activities[timelineKey] || [];
+  const activityEntry = currentData.find((activity) =>
+    activityIdsEqual(activity.id, block.dataset.id)
+  );
+  if (activityEntry) {
+    activityEntry.startTime = newStartTime;
+    activityEntry.endTime = newEndTime;
+    activityEntry.startMinutes = newStartMinutes;
+    activityEntry.endMinutes = newEndMinutes;
+    activityEntry.blockLength = newEndMinutes - newStartMinutes;
+  }
+
+  persistPendingTimelineStateSoon();
+  updateButtonStates();
+}
+
+/** Minutes one nudge moves; the desktop drag snaps to the same grid. */
+const ACTIVITY_MOVE_STEP_MINUTES = 10;
+
+/**
+ * Move a whole block along the time axis by `deltaMinutes`, keeping its duration.
+ *
+ * This is what the phone's long-press menu uses ("Move earlier" / "Move later").
+ * A phone has no drag-to-move - interact.js' draggable is desktop-only, and the
+ * long press already opens this menu - so shifting a block has to be an action.
+ * A move that would leave the day or land on another activity changes nothing
+ * and only flashes the block, exactly like the arrow keys.
+ */
+function moveActivityBlockBy(block, deltaMinutes) {
+  const startMinutes = parseInt(block.dataset.startMinutes, 10);
+  const endMinutes = parseInt(block.dataset.endMinutes, 10);
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+    return;
+  }
+
+  // Same bounds as the arrow keys and the desktop drag: the day runs 04:00 to
+  // 04:00(+1), and a block slides up against either end but not past it.
+  const duration = endMinutes - startMinutes;
+  const newStart = Math.max(
+    240,
+    Math.min(1680 - duration, startMinutes + deltaMinutes)
+  );
+
+  // Already against the end of the day: there is nowhere left to go.
+  if (newStart === startMinutes) return;
+
+  if (!canPlaceActivity(newStart, newStart + duration, block.dataset.id)) {
+    block.classList.add('invalid');
+    setTimeout(() => block.classList.remove('invalid'), 400);
+    return;
+  }
+
+  commitActivityTiming(block, newStart, newStart + duration);
+}
+
+function initActivityContextMenu() {
   const MENU_ID = 'activityContextMenu';
   let targetBlock = null;
 
@@ -1191,6 +1321,20 @@ function initDesktopActivityContextMenu() {
     menu = document.createElement('div');
     menu.id = MENU_ID;
     menu.className = 'activity-context-menu';
+    // Moving a whole block is a phone action: desktop drags it, and on a phone
+    // the long press owns the gesture that would otherwise start a drag. The
+    // arrow keys resize (each one moves one edge), so they are not a substitute.
+    const moveItems = getIsMobile()
+      ? `
+            <button type="button" class="activity-context-menu-item" data-action="move-earlier">${translateOrFallback(
+              'modals.activityContext.moveEarlier',
+              'Move earlier'
+            )}</button>
+            <button type="button" class="activity-context-menu-item" data-action="move-later">${translateOrFallback(
+              'modals.activityContext.moveLater',
+              'Move later'
+            )}</button>`
+      : '';
     menu.innerHTML = `
             <button type="button" class="activity-context-menu-item" data-action="copy">${translateOrFallback(
               'modals.activityContext.copy',
@@ -1199,7 +1343,7 @@ function initDesktopActivityContextMenu() {
             <button type="button" class="activity-context-menu-item" data-action="show-info">${translateOrFallback(
               'modals.activityContext.showInfo',
               'Show info'
-            )}</button>
+            )}</button>${moveItems}
             <button type="button" class="activity-context-menu-item danger" data-action="delete">${translateOrFallback(
               'modals.activityContext.delete',
               'Delete'
@@ -1224,6 +1368,10 @@ function initDesktopActivityContextMenu() {
         handleCopyActivity(blockForAction);
       } else if (action === 'show-info') {
         showActivityInfoModal(blockForAction);
+      } else if (action === 'move-earlier') {
+        moveActivityBlockBy(blockForAction, -ACTIVITY_MOVE_STEP_MINUTES);
+      } else if (action === 'move-later') {
+        moveActivityBlockBy(blockForAction, ACTIVITY_MOVE_STEP_MINUTES);
       } else if (action === 'delete') {
         deleteActivityBlock(blockForAction);
       }
@@ -1268,12 +1416,13 @@ function initDesktopActivityContextMenu() {
     menu.style.top = `${top}px`;
   }
 
-  document.addEventListener('contextmenu', (event) => {
-    if (getIsMobile()) {
-      hideMenu();
-      return;
-    }
+  // Shared with the mobile long-press handler (initMobileLongPressMenu).
+  window.showActivityContextMenu = showMenu;
 
+  // Desktop right-click - and the native long-press menu on platforms that emit
+  // `contextmenu` for it (Android). iOS does not, which is why the mobile
+  // long-press runs its own timer.
+  document.addEventListener('contextmenu', (event) => {
     const activityBlock = event.target.closest('.activity-block');
     if (!activityBlock) {
       hideMenu();
@@ -1484,6 +1633,36 @@ function createActivityBlock(activityData, isFromTemplate = false) {
   bottomTooltip.textContent = currentBlock.dataset.tooltipText || '';
   currentBlock.appendChild(bottomTooltip);
 
+  // Resize grips: the left/right edges have always been draggable (a 10 px
+  // zone plus interact.js resizing), but nothing on the block showed it, so
+  // participants did not find the gesture and asked for a visible marker in
+  // the style of an Excel fill handle. The grips are decoration only
+  // (`pointer-events: none`), which keeps the block the pointer target and
+  // leaves the resize zones and cursor untouched. Whether they are shown at
+  // all, and how they are oriented, is decided by the media queries in
+  // styles/styles.css: vertical bars on the block's side edges on desktop,
+  // horizontal bars on its top/bottom ends on a phone.
+  ['left', 'right'].forEach((side) => {
+    const grip = document.createElement('span');
+    grip.className = `activity-block-grip activity-block-grip-${side}`;
+    grip.setAttribute('aria-hidden', 'true');
+    currentBlock.appendChild(grip);
+  });
+
+  // Mobile end zones: they reserve the top/bottom band of the block for the
+  // resize gesture by declaring `touch-action: none`, so the browser does not
+  // take the drag over as a scroll and cancel the resize (see the mobile rules
+  // in styles/styles.css). The rest of the block allows vertical panning, which
+  // is what makes a swipe that starts on a block scroll the timeline again -
+  // before, `touch-action: none` on the whole block turned 75 % of the timeline
+  // width into a scroll dead zone ("Handy-Scrollen defekt").
+  ['top', 'bottom'].forEach((end) => {
+    const zone = document.createElement('span');
+    zone.className = `activity-block-edge-zone activity-block-edge-zone-${end}`;
+    zone.setAttribute('aria-hidden', 'true');
+    currentBlock.appendChild(zone);
+  });
+
   // No extra title attribute - child/custom label is shown inline in the block
 
   // Give the focusable block an accessible name (activity + time range) so a
@@ -1550,46 +1729,10 @@ function createActivityBlock(activityData, isFromTemplate = false) {
       return;
     }
 
-    // Commit the change
-    const newStartTime = formatTimelineStart(newStart);
-    const newEndTime = formatTimelineEnd(newEnd);
-
-    block.dataset.startMinutes = newStart;
-    block.dataset.endMinutes = newEnd;
-    block.dataset.start = newStartTime;
-    block.dataset.end = newEndTime;
-    block.dataset.length = newEnd - newStart;
-
-    if (!isMobile) {
-      block.style.left = `${minutesToPercentage(newStart)}%`;
-      block.style.width = `${((newEnd - newStart) / MINUTES_PER_DAY) * 100}%`;
-    } else {
-      block.style.top = `${minutesToPercentage(newStart)}%`;
-      block.style.height = `${((newEnd - newStart) / MINUTES_PER_DAY) * 100}%`;
-    }
-
-    const timeLabel = block.querySelector('.time-label');
-    if (timeLabel) {
-      updateTimeLabel(timeLabel);
-    }
-
-    // Sync to timelineManager
-    const currentData = window.timelineManager.activities[timelineKey] || [];
-    const activityEntry = currentData.find((a) =>
-      activityIdsEqual(a.id, block.dataset.id)
-    );
-    if (activityEntry) {
-      activityEntry.startTime = newStartTime;
-      activityEntry.endTime = newEndTime;
-      activityEntry.startMinutes = newStart;
-      activityEntry.endMinutes = newEnd;
-      activityEntry.blockLength = newEnd - newStart;
-    }
-
-    // Arrow-key changes to start/end time affect coverage, so refresh the
-    // Next/Submit and day-switch button states the same way drag/resize end
-    // does (updateButtonStates() also re-renders #previousDaysSwitchRow).
-    updateButtonStates();
+    // Same commit path the phone menu's move uses: datasets, position, time
+    // chip, timeline state, then the button states (coverage, Submit gate,
+    // day row) - the latter is also what marks the day dirty for autosave.
+    commitActivityTiming(block, newStart, newEnd);
   });
 
   // Positioning logic
@@ -1599,7 +1742,12 @@ function createActivityBlock(activityData, isFromTemplate = false) {
     100;
 
   // Fixed dimensions for consistency
-  const MOBILE_BLOCK_WIDTH = 75;
+  // Mobile: the block starts after the 25 % label gutter and stops 5 % short of
+  // the right edge instead of running flush against it - against the screen
+  // border it looked cut off, and it left no thumb-safe margin for the Android
+  // back gesture. Desktop keeps its own values (time is the horizontal axis
+  // there, so the width is the duration).
+  const MOBILE_BLOCK_WIDTH = 70;
   const DESKTOP_BLOCK_HEIGHT = 90;
   const MOBILE_OFFSET = 25;
   const DESKTOP_OFFSET = 5;
@@ -1850,6 +1998,27 @@ function updateTimelineHeader(title, description) {
   }
 }
 
+/**
+ * A timeline's name plus where it sits in the set - "Hauptaktivität (1/2)" - the
+ * compact pattern the phone day counter already uses ("(3/7)"). The bare name
+ * left a participant who had only ever seen one timeline with no hint that the
+ * study has a second one; the count says so for the price of a few characters,
+ * and it is plain numbers, so it needs no translation. A single-timeline study
+ * is unchanged: "(1/1)" would announce a choice that does not exist.
+ */
+function getTimelineLabel(timelineKey) {
+  const manager = window.timelineManager;
+  const name = manager?.metadata?.[timelineKey]?.name || timelineKey || '';
+  const keys = manager?.keys || [];
+  const index = keys.indexOf(timelineKey);
+
+  if (keys.length < 2 || index === -1) {
+    return name;
+  }
+
+  return `${name} (${index + 1}/${keys.length})`;
+}
+
 function appendTimelineCanvasLabels(
   containerElement,
   timelineKey,
@@ -1857,7 +2026,7 @@ function appendTimelineCanvasLabels(
 ) {
   const titleDiv = document.createElement('div');
   titleDiv.className = 'title';
-  titleDiv.textContent = timelineMeta?.name || '';
+  titleDiv.textContent = getTimelineLabel(timelineKey);
 
   const coverageIndicator = document.createElement('span');
   coverageIndicator.className = 'timeline-coverage-indicator';
@@ -1931,11 +2100,6 @@ async function restoreNextTimeline(nextTimelineIndex, nextTimelineKey) {
       updateButtonStates();
       scrollToActiveTimeline();
 
-      const backButton = document.getElementById('backBtn');
-      if (backButton) {
-        backButton.disabled = false;
-      }
-
       const activitiesContainerElement = document.querySelector(
         '#activitiesContainer'
       );
@@ -2008,12 +2172,6 @@ async function restoreNextTimeline(nextTimelineIndex, nextTimelineKey) {
           )
         )
       );
-    }
-
-    // Update Back button state
-    const backButton = document.getElementById('backBtn');
-    if (backButton) {
-      backButton.disabled = false;
     }
 
     // Update activities container data-mode
@@ -2191,11 +2349,6 @@ async function addNextTimeline() {
       updateButtonStates();
       scrollToActiveTimeline();
 
-      const backButton = document.getElementById('backBtn');
-      if (backButton) {
-        backButton.disabled = false;
-      }
-
       const activitiesContainerElement = document.querySelector(
         '#activitiesContainer'
       );
@@ -2306,12 +2459,6 @@ async function addNextTimeline() {
           )
         )
       );
-    }
-
-    // Update Back button state
-    const backButton = document.getElementById('backBtn');
-    if (backButton) {
-      backButton.disabled = false;
     }
 
     // Update activities container data-mode
@@ -5207,7 +5354,13 @@ function showTemplateBanner(templateSourceDay, messageKey) {
     `;
 
   const text = document.createElement('span');
-  const effectiveMessageKey = messageKey || 'messages.templateLoadedBanner';
+  // The delete instructions differ per layout (long-press vs right-click), and a
+  // phone can only act on its own. Crossing the breakpoint reloads the page, so
+  // choosing once at render time is enough.
+  const defaultMessageKey = getIsMobile()
+    ? 'messages.templateLoadedBannerMobile'
+    : 'messages.templateLoadedBannerDesktop';
+  const effectiveMessageKey = messageKey || defaultMessageKey;
   text.innerHTML = i18n.t(
     effectiveMessageKey,
     templateSourceDay ? { day: templateSourceDay } : {}
@@ -5596,7 +5749,9 @@ function ensureLanguageSelector(supportedLanguages, selectedLanguage) {
     return;
   }
 
-  const controlsContainer = document.querySelector('.header-section .controls');
+  const controlsContainer =
+    document.querySelector('.header-section .controls-group') ||
+    document.querySelector('.header-section .controls');
   if (!controlsContainer) {
     return;
   }
@@ -5609,10 +5764,7 @@ function ensureLanguageSelector(supportedLanguages, selectedLanguage) {
   }
 
   const wrapper = document.createElement('div');
-  wrapper.style.display = 'inline-flex';
-  wrapper.style.alignItems = 'center';
-  wrapper.style.gap = '0.4rem';
-  wrapper.style.marginLeft = '0.5rem';
+  wrapper.className = 'language-select-wrapper';
 
   const label = document.createElement('label');
   label.setAttribute('for', 'languageSelectMain');
@@ -5673,11 +5825,13 @@ async function saveAndSwitchToDay(targetDayIndex) {
     button.disabled = true;
   });
 
-  const result = await sendData({
-    shouldRedirect: false,
-    isLastDay: false,
-    currentDayIndex,
-  });
+  // Flush through the autosave engine instead of saving unconditionally: when
+  // nothing changed since the last save there is nothing to write, and a
+  // pointless write would re-date the day's rows (diary_completed_at is derived
+  // from the earliest created_at per day).
+  const result = window.autosave
+    ? await window.autosave.flush()
+    : await sendData();
 
   if (!result?.success) {
     if (window.showToast) {
@@ -5710,9 +5864,19 @@ async function saveAndSwitchToDay(targetDayIndex) {
   window.location.href = url.toString();
 }
 
+// Used by the phone context bar and its day menu (ui.js).
+window.saveAndSwitchToDay = saveAndSwitchToDay;
+
 function renderPreviousDaysSwitchRow() {
   const controlsContainer = document.querySelector('.header-section .controls');
   if (!controlsContainer || !controlsContainer.parentElement) {
+    return;
+  }
+
+  // Phones use the context bar's day picker instead (initMobileContextBar);
+  // a row of seven day buttons is exactly the chrome this replaces.
+  if (getIsMobile()) {
+    document.getElementById('previousDaysSwitchRow')?.remove();
     return;
   }
 
@@ -5854,15 +6018,6 @@ async function init() {
               : 'No studies available on server.';
           timelinesWrapper.appendChild(msg);
         }
-        // Update footer status
-        const footerStatus = document.getElementById('footer_backend_status');
-        if (footerStatus) {
-          footerStatus.textContent =
-            window.i18n && window.i18n.isReady()
-              ? i18n.t('messages.noStudiesAvailable')
-              : 'No studies available on server.';
-          footerStatus.style.color = 'orange';
-        }
         // Hide footer action buttons (Submit, Skip) since no study is active
         const footerActions = document.getElementById('instructionsFooter');
         if (footerActions) footerActions.style.display = 'none';
@@ -5895,12 +6050,6 @@ async function init() {
             msg.appendChild(detail);
           }
           timelinesWrapper.appendChild(msg);
-        }
-        // Update footer status
-        const footerStatus = document.getElementById('footer_backend_status');
-        if (footerStatus) {
-          footerStatus.textContent = msgText;
-          footerStatus.style.color = 'orange';
         }
         // Hide footer action buttons (Submit, Skip) since no study is active
         const footerActions = document.getElementById('instructionsFooter');
@@ -6029,12 +6178,30 @@ async function init() {
         currentStudy.inactivity_page_custom_text ?? null,
     });
 
+    // Autosave: the day is written shortly after the last edit, and flushed
+    // before anything that leaves it (day switch, tab hidden, idle timeout,
+    // submit). See js/autosave.js for the rules - it compares the serialised day
+    // with the last stored one, so notePossibleChange() is safe to over-call.
+    window.autosave = createAutosave({
+      save: () => sendData(),
+      serialize: () => createTimelineJSON(true),
+      onSaved: () => {
+        // The same in-place refresh an explicit save does (day status, coverage,
+        // Submit gate) - see refreshDayStatusAfterSave in ui.js.
+        window.refreshDayStatusAfterSave?.();
+        markDaySavedForCurrentDay();
+      },
+      // Visible state (Saving... / Saved / Not saved + Retry) - see the sync
+      // status chip in ui.js. Silent autosave failure would be worse than a
+      // failed explicit save.
+      onStateChange: (state) => window.renderSyncStatus?.(state),
+    });
+
     // Now sync URL parameters so they are stored in timelineManager.study
     syncURLParamsToStudy();
 
     checkAndRequestPID();
     preventPullToRefresh();
-    let configLoadBackendSuccess = false;
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -6128,18 +6295,6 @@ async function init() {
       footerVersionEl.textContent = `v${TUD_FRONTEND_VERSION}`;
     }
 
-    const footerStatus = document.getElementById('footer_backend_status');
-    const updateFooterBackendStatus = (statusKey, color, fallbackText) => {
-      if (!footerStatus) {
-        return;
-      }
-
-      footerStatus.setAttribute('data-i18n', statusKey);
-      footerStatus.textContent =
-        window.i18n && window.i18n.isReady() ? i18n.t(statusKey) : fallbackText;
-      footerStatus.style.color = color;
-    };
-
     try {
       configData = await loadActivitiesConfig({
         participantId,
@@ -6152,23 +6307,8 @@ async function init() {
         useCache: true,
       });
       console.log('Successfully loaded activities config from backend');
-      document.title = configData.general.app_name || 'Time Use Diary';
-      configLoadBackendSuccess = true;
     } catch (error) {
       console.error('Failed to load activities config from backend:', error);
-      configLoadBackendSuccess = false;
-      if (footerStatus) {
-        updateFooterBackendStatus(
-          'footer.backend_status_error',
-          'red',
-          'Backend error'
-        );
-      } else {
-        console.warn(
-          'Footer status element not found, cannot display backend error status'
-        );
-      }
-      document.title = 'Time Use Diary';
       throw new Error(
         `Cannot load activities configuration: ${error.message}. The application requires backend configuration to run.`
       );
@@ -6189,6 +6329,9 @@ async function init() {
 
     await i18n.init(language);
     i18n.applyTranslations();
+    // Deliberately after the i18n pass: it rewrites the text of every element
+    // with a data-i18n attribute, <title> included. See applyPageTitle().
+    applyPageTitle();
     renderPreviousDaysSwitchRow();
 
     const studyConsentRequired = currentStudy?.require_consent === true;
@@ -6217,22 +6360,6 @@ async function init() {
       });
       window.location.href = redirectUrl.toString();
       return;
-    }
-
-    if (footerStatus) {
-      if (configLoadBackendSuccess) {
-        updateFooterBackendStatus(
-          'footer.backend_status_connected',
-          '#ccc',
-          'Connected to backend'
-        );
-      } else {
-        updateFooterBackendStatus(
-          'footer.backend_status_error',
-          'red',
-          'Backend error'
-        );
-      }
     }
 
     // Handle instructions or redirection if needed
@@ -6555,7 +6682,9 @@ async function init() {
             : window.timelineManager.dayIndicesWithData;
           renderPreviousDaysSwitchRow();
 
-          if (typeof window.addCopyDayLink === 'function') {
+          // Phones copy from the context bar's day menu and do not render the
+          // timeline title at all.
+          if (!getIsMobile() && typeof window.addCopyDayLink === 'function') {
             const timelineTitle = document.querySelector('.timeline-title');
             if (timelineTitle) {
               window.addCopyDayLink(timelineTitle, dayIndex);
@@ -6706,9 +6835,8 @@ async function init() {
     initButtons();
     initKeyboardShortcuts();
     initInstructionBanner();
-    initMobileDelete();
-    initMobileSwipeNavigation();
-    initDesktopActivityContextMenu();
+    initActivityContextMenu();
+    initMobileLongPressMenu();
 
     // Initialize header and footer heights early
     updateHeaderHeight();
@@ -6783,6 +6911,32 @@ async function init() {
   updateButtonStates();
 }
 
+/**
+ * The diary's tab title and footer line: the study's own name (`app_name` from
+ * the study config), because a participant knows the study they joined, not the
+ * software behind it. Falls back to the localized generic page name.
+ *
+ * Must run AFTER i18n.applyTranslations(): that pass rewrites the text of every
+ * element carrying a data-i18n attribute - <title> and the footer span included -
+ * so a title set before it is silently reverted. That is what left the tab stuck
+ * on "Loading..." while the <title> was wired to the common.loading key.
+ */
+function applyPageTitle() {
+  const localizedPageTitle =
+    window.i18n && window.i18n.isReady()
+      ? i18n.t('common.pageTitle')
+      : 'Time Use Diary';
+  const appName =
+    window.timelineManager?.general?.app_name || localizedPageTitle;
+
+  document.title = appName;
+
+  const footerAppTitle = document.getElementById('footer_app_title');
+  if (footerAppTitle) {
+    footerAppTitle.textContent = appName;
+  }
+}
+
 function renderFatalInitializationError({
   title,
   message,
@@ -6790,7 +6944,18 @@ function renderFatalInitializationError({
   hideInteractiveUi = false,
 }) {
   if (hideInteractiveUi) {
-    document.title = 'TRAC -- ERROR';
+    // No software brand here either: a participant who just hit an error should
+    // not be introduced to a name they have never seen. The study's own name if
+    // we got far enough to know it, plus the localized "Error".
+    const appName =
+      window.timelineManager?.general?.app_name ||
+      (window.i18n && window.i18n.isReady() ? i18n.t('common.pageTitle') : '');
+    const errorLabel =
+      window.i18n && window.i18n.isReady() ? i18n.t('common.error') : '';
+    const parts = [appName, errorLabel].filter(Boolean);
+    if (parts.length) {
+      document.title = parts.join(' - ');
+    }
   }
 
   const activitiesContainer = document.getElementById('activitiesContainer');
@@ -6803,11 +6968,6 @@ function renderFatalInitializationError({
   }
 
   if (hideInteractiveUi) {
-    const backendStatus = document.getElementById('footer_backend_status');
-    if (backendStatus) {
-      backendStatus.style.display = 'none';
-    }
-
     [
       '.controls',
       '.timeline-header',
@@ -6970,17 +7130,17 @@ function showCopyTargetPicker(sourceDayIndex, event) {
     t('common.day') + ' ' + (sourceDayIndex + 1);
 
   const menu = document.createElement('div');
-  menu.className = 'copy-day-context-menu';
+  menu.className = 'copy-day-context-menu context-menu';
 
   const header = document.createElement('div');
-  header.className = 'copy-day-context-menu-header';
+  header.className = 'copy-day-context-menu-header context-menu-header';
   header.textContent = t('messages.copyToDay') + ': ' + sourceDayName;
   menu.appendChild(header);
 
   for (const target of targets) {
     const item = document.createElement('button');
     item.type = 'button';
-    item.className = 'copy-day-context-menu-item';
+    item.className = 'copy-day-context-menu-item context-menu-item';
     const targetDayName =
       window.studyConfigManager?.getDayDisplayLabel(target.index) ||
       t('common.day') + ' ' + (target.index + 1);
@@ -7018,81 +7178,12 @@ function showCopyTargetPicker(sourceDayIndex, event) {
   }, 0);
 }
 
-/**
- * Copy Days: "Copy from..." picker — reverse direction.
- * Shows all other days as SOURCE options; on selection copies FROM the
- * selected source INTO the current day.
- */
-function showCopySourcePicker(targetDayIndex, event) {
-  removeCopyDayContextMenu();
-
-  const targets = getAllTargetDayIndices(targetDayIndex);
-  if (!targets.length) {
-    return;
-  }
-
-  const t =
-    window.i18n && window.i18n.isReady()
-      ? window.i18n.t.bind(window.i18n)
-      : function (key) {
-          return key;
-        };
-
-  const targetDayName =
-    window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
-    t('common.day') + ' ' + (targetDayIndex + 1);
-
-  const menu = document.createElement('div');
-  menu.className = 'copy-day-context-menu';
-
-  const header = document.createElement('div');
-  header.className = 'copy-day-context-menu-header';
-  header.textContent = t('messages.copyFromDay') + ': ' + targetDayName;
-  menu.appendChild(header);
-
-  for (const source of targets) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'copy-day-context-menu-item';
-    const sourceDayName =
-      window.studyConfigManager?.getDayDisplayLabel(source.index) ||
-      t('common.day') + ' ' + (source.index + 1);
-    const status = source.hasData
-      ? ' (' + t('messages.copyDayHasData') + ')'
-      : ' (' + t('messages.copyDayEmpty') + ')';
-    item.textContent = sourceDayName + status;
-    item.addEventListener('click', async () => {
-      removeCopyDayContextMenu();
-      // Reverse: copy FROM selected source INTO current (target) day
-      await copyDayTo(source.index, targetDayIndex);
-    });
-    menu.appendChild(item);
-  }
-
-  // Position the menu at the cursor.  The CSS keeps the menu position:fixed,
-  // so this works both for the desktop right-click entry point and for the
-  // "Copy from..." button (which supplies clientX/clientY).
-  const menuX = Math.min(event.clientX, window.innerWidth - 210);
-  const menuY = Math.min(event.clientY, window.innerHeight - 200);
-  menu.style.position = 'fixed';
-  menu.style.left = menuX + 'px';
-  menu.style.top = menuY + 'px';
-
-  document.body.appendChild(menu);
-
-  const closeHandler = function (e) {
-    if (!menu.contains(e.target)) {
-      removeCopyDayContextMenu();
-      document.removeEventListener('click', closeHandler, true);
-    }
-  };
-  setTimeout(function () {
-    document.addEventListener('click', closeHandler, true);
-  }, 0);
-}
-
-window.showCopySourcePicker = showCopySourcePicker;
 window.showCopyTargetPicker = showCopyTargetPicker;
+
+// copyDayTo() and the day-menu copy row both need the same "does this day have
+// anything in it" test the picker uses for the day being viewed, so ui.js can
+// grey that row out instead of offering an action that cannot run yet.
+window.hasFrontendActivities = hasFrontendActivities;
 
 async function copyDayTo(sourceDayIndex, targetDayIndex) {
   const t =
@@ -7135,9 +7226,16 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
     const targetDayName =
       window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
       t('common.day') + ' ' + (targetDayIndex + 1);
-    const confirmed = window.confirm(
-      t('messages.copyOverwriteConfirm', { day: targetDayName })
-    );
+    // Styled dialog, not window.confirm() - the native prompt is unstyled and
+    // has to be intercepted in tests. See showConfirmDialog in ui.js.
+    const confirmed = await window.showConfirmDialog({
+      overlayId: 'copyOverwriteConfirm',
+      confirmId: 'copyOverwriteYes',
+      cancelId: 'copyOverwriteNo',
+      title: t('messages.copyOverwriteTitle'),
+      message: t('messages.copyOverwriteConfirm', { day: targetDayName }),
+      confirmLabel: t('messages.copyOverwriteYes'),
+    });
     if (!confirmed) {
       return;
     }
@@ -7162,11 +7260,7 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
   // day — copying never advances day_label_index.
   if (sourceDayIndex === currentDayIndex) {
     try {
-      const saveResult = await sendData({
-        shouldRedirect: false,
-        isLastDay: false,
-        currentDayIndex,
-      });
+      const saveResult = await sendData();
 
       if (!saveResult?.success) {
         const submitErrorMessage = window.i18n
@@ -7181,6 +7275,9 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
         );
         return;
       }
+
+      // Copying saved the current day itself, so this is the autosave baseline.
+      window.autosave?.markSaved?.();
 
       // The save persisted the current frontend state to the DB for the
       // current day label, so mark it clean and record it as a day with data.
@@ -7243,11 +7340,21 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
     const targetDayName =
       window.studyConfigManager?.getDayDisplayLabel(targetDayIndex) ||
       targetDayLabel;
+    // Offer the jump to the day that was just filled: the participant stays on
+    // the source day, and the target day is the one they still have to complete.
+    // Skipped when the target *is* the day being viewed - that case reloads.
     showCopyToast(
       t('messages.copySuccess', {
         sourceDay: sourceDayName,
         targetDay: targetDayName,
-      })
+      }),
+      false,
+      targetDayIndex === currentDayIndex
+        ? null
+        : {
+            label: t('messages.goToCopiedDay', { day: targetDayName }),
+            onClick: () => window.saveAndSwitchToDay?.(targetDayIndex),
+          }
     );
 
     if (
@@ -7290,7 +7397,7 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
       window.updateSubmitStudyButton();
     }
 
-    if (typeof window.addCopyDayLink === 'function') {
+    if (!getIsMobile() && typeof window.addCopyDayLink === 'function') {
       const timelineTitle = document.querySelector('.timeline-title');
       const currentDayIndex = getCurrentDayIndex();
       if (timelineTitle && typeof currentDayIndex === 'number') {
@@ -7310,9 +7417,16 @@ async function copyDayTo(sourceDayIndex, targetDayIndex) {
   }
 }
 
-function showCopyToast(message, isError) {
+function showCopyToast(message, isError, action) {
   if (window.showToast) {
-    window.showToast(message, isError ? 'error' : 'success', 4000);
+    // An action needs longer on screen than a plain confirmation: the
+    // participant has to read the second line and decide to tap it.
+    window.showToast(
+      message,
+      isError ? 'error' : 'success',
+      action ? 6000 : 4000,
+      action
+    );
   } else {
     console.log(message);
   }
@@ -7327,19 +7441,29 @@ window.addEventListener('beforeunload', function () {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (
-    document.visibilityState === 'hidden' &&
-    typeof window.__TRAC_CAPTURE_PENDING_STATE === 'function'
-  ) {
+  if (document.visibilityState !== 'hidden') return;
+
+  // Leaving the tab is a natural checkpoint: persist pending edits while the
+  // page is still alive (the draft capture below is only the last resort).
+  window.autosave?.flush?.();
+
+  if (typeof window.__TRAC_CAPTURE_PENDING_STATE === 'function') {
     window.__TRAC_CAPTURE_PENDING_STATE();
   }
 });
 
-// Export addNextTimeline, goToPreviousTimeline, renderActivities and
-// getCurrentDayIndex for ui.js
+// Best effort on unload; the draft in local storage covers the rest.
+window.addEventListener('pagehide', () => {
+  window.autosave?.flush?.();
+});
+
+// Export addNextTimeline, goToPreviousTimeline, navigateToTimelineByKey,
+// renderActivities, getCurrentDayIndex and getTimelineLabel for ui.js
 export {
   addNextTimeline,
   goToPreviousTimeline,
+  navigateToTimelineByKey,
   renderActivities,
   getCurrentDayIndex,
+  getTimelineLabel,
 };

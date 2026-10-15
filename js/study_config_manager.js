@@ -1,30 +1,24 @@
 // @ts-check
 // settings/study_config_manager.js - IMPROVED
+import { captureClientInfoIfEnabled } from './client_info.js';
+import { fetchWithRetry } from './api_request.js';
 console.log('=== Study Config Manager Loading ===');
 
-// Simple retry helper for background sync operations
-async function fetchWithBackgroundRetry(url, maxRetries = 2, delayMs = 1500) {
-  let lastError = null;
-  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return response;
-      // Don't retry on client errors (4xx) - return to caller for specific handling.
-      if (response.status < 500) return response;
-      // Retry on server errors (5xx)
-      throw new Error(`HTTP ${response.status}`);
-    } catch (error) {
-      lastError = error;
-      if (attempt > maxRetries) throw lastError;
-      const delay = delayMs * attempt;
+// Simple retry helper for background sync operations. The retry policy itself
+// lives in js/api_request.js so the standalone pages (consent, ...) retry the
+// same failures; only the logging differs here.
+function fetchWithBackgroundRetry(url, maxRetries = 2, delayMs = 1500) {
+  return fetchWithRetry(url, {}, {
+    maxRetries,
+    delayMs,
+    onRetry: (attempt, delay) => {
       console.log(
         `Study config sync attempt ${attempt}/${
           maxRetries + 1
         } failed, retrying in ${delay}ms...`
       );
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
+    },
+  });
 }
 
 if (!TUD_SETTINGS) {
@@ -310,6 +304,11 @@ async function loadStudiesConfigFromFile() {
     );
     CURRENT_STUDY_CACHE.study_text_instructions = resolveLocalizedStudyText(
       CURRENT_STUDY_CACHE.study_text_instructions,
+      selectedLanguage,
+      CURRENT_STUDY_CACHE.default_language || 'en'
+    );
+    CURRENT_STUDY_CACHE.study_text_instructions_title = resolveLocalizedStudyText(
+      CURRENT_STUDY_CACHE.study_text_instructions_title,
       selectedLanguage,
       CURRENT_STUDY_CACHE.default_language || 'en'
     );
@@ -643,6 +642,19 @@ async function syncWithBackendConfig() {
         CURRENT_STUDY_CACHE.study_text_instructions = resolvedInstructions;
       }
 
+      const resolvedInstructionsTitle = resolveLocalizedStudyText(
+        backendConfig.study_text_instructions_title,
+        selectedLanguage,
+        defaultLanguage
+      );
+      if (
+        resolvedInstructionsTitle &&
+        !CURRENT_STUDY_CACHE.study_text_instructions_title
+      ) {
+        CURRENT_STUDY_CACHE.study_text_instructions_title =
+          resolvedInstructionsTitle;
+      }
+
       if (backendConfig.require_consent !== undefined) {
         CURRENT_STUDY_CACHE.require_consent = backendConfig.require_consent;
       }
@@ -672,6 +684,12 @@ async function syncWithBackendConfig() {
       if (backendConfig.hide_server_wide_links != null) {
         CURRENT_STUDY_CACHE.hide_server_wide_links =
           backendConfig.hide_server_wide_links;
+      }
+
+      // Browser/device identification capture (per-study opt-out, on by default).
+      if (backendConfig.save_browser_identification != null) {
+        CURRENT_STUDY_CACHE.save_browser_identification =
+          backendConfig.save_browser_identification;
       }
 
       if (backendConfig.consent_given !== undefined) {
@@ -738,6 +756,17 @@ async function syncWithBackendConfig() {
       // Store full backend config for reference
       CURRENT_STUDY_CACHE.backend_config = backendConfig;
       CURRENT_STUDY_CACHE.source = 'backend';
+
+      // Best-effort, fire-and-forget: record browser/device identification once
+      // per participant. Never blocks or breaks study initialisation. Skipped
+      // until consent is given when the study requires it.
+      void captureClientInfoIfEnabled({
+        studyNameShort: CURRENT_STUDY_CACHE.name_short || studyName,
+        participantId,
+        enabled: CURRENT_STUDY_CACHE.save_browser_identification,
+        requiresConsent: CURRENT_STUDY_CACHE.require_consent === true,
+        consentGiven: CURRENT_STUDY_CACHE.consent_given === true,
+      });
 
       console.log('[TRAC day-label-debug] study cache after backend sync', {
         selected_language: CURRENT_STUDY_CACHE.selected_language,

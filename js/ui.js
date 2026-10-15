@@ -7,15 +7,21 @@ import {
   positionToMinutes,
 } from './utils.js';
 import { getIsMobile, updateIsMobile } from './globals.js';
+import { syncStatusView } from './sync_status.js';
 import {
-  goToPreviousTimeline,
+  navigateToTimelineByKey,
   renderActivities,
   getCurrentDayIndex,
+  getTimelineLabel,
 } from './script.js';
-import { DEBUG_MODE } from './constants.js';
+import { DEBUG_MODE, shouldShowTimelineTabs } from './constants.js';
 
 // Toast notification system
-function showToast(message, type = 'info', duration = 3000) {
+/**
+ * Transient notification. `action` optionally adds a button (label + onClick),
+ * which is how deleting an activity offers an undo.
+ */
+function showToast(message, type = 'info', duration = 3000, action = null) {
   // Remove any existing toasts
   const existingToasts = document.querySelectorAll('.toast');
   existingToasts.forEach((toast) => toast.remove());
@@ -23,7 +29,31 @@ function showToast(message, type = 'info', duration = 3000) {
   // Create new toast
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = message;
+
+  const text = document.createElement('span');
+  text.className = 'toast-message';
+  text.textContent = message;
+  toast.appendChild(text);
+
+  let removalTimer = null;
+  const dismissToast = () => {
+    clearTimeout(removalTimer);
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  };
+
+  if (action && typeof action.onClick === 'function') {
+    const actionButton = document.createElement('button');
+    actionButton.type = 'button';
+    actionButton.className = 'toast-action';
+    actionButton.textContent = action.label;
+    actionButton.addEventListener('click', () => {
+      dismissToast();
+      action.onClick();
+    });
+    toast.appendChild(actionButton);
+  }
+
   // Announce to screen readers: errors as alerts, other types as polite
   // status updates.  The toast is transient, so use aria-atomic.
   if (type === 'error') {
@@ -39,158 +69,113 @@ function showToast(message, type = 'info', duration = 3000) {
   setTimeout(() => toast.classList.add('show'), 10);
 
   // Remove after duration
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
+  removalTimer = setTimeout(dismissToast, duration);
 }
 
 // Make showToast globally available for debugging and accessibility
 window.showToast = showToast;
 
-// Create invisible overlays for disabled buttons to capture real mouse/touch events
-function createDisabledButtonOverlay(buttonId) {
-  const button = document.getElementById(buttonId);
-  if (!button) return;
+// ---------------------------------------------------------------------------
+// Autosave status chip
+//
+// The diary saves itself, so nobody presses a button - and a day that is stored
+// does not need to be announced. The chip therefore only ever appears for one
+// reason: the day could NOT be stored. That message is persistent and carries a
+// Retry that does not wait for the engine's own backoff; a silent autosave
+// failure would be worse than a failed explicit save. "Saving..." and "Saved"
+// were removed because announcing every write made the app feel busy (and, with
+// the ~2 s debounce, laggy) for no information the participant can act on.
+//
+// The chip sits in the toolbar, where "is my day stored?" is looked for;
+// sync_status.js owns the state -> label mapping.
+// ---------------------------------------------------------------------------
 
-  // Remove existing overlay if any
-  const existingOverlay = document.getElementById(`${buttonId}-overlay`);
-  if (existingOverlay) {
-    existingOverlay.remove();
-  }
-
-  const overlay = document.createElement('div');
-  overlay.id = `${buttonId}-overlay`;
-  overlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: transparent;
-        cursor: not-allowed;
-        z-index: 10;
-        display: none;
-    `;
-
-  // Add click handler to overlay
-  overlay.addEventListener('click', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    console.log('Disabled button overlay clicked:', buttonId);
-
-    const message = window.i18n
-      ? window.i18n.t('messages.timelineMissing')
-      : 'There is information missing from this timeline. Would you like to add anything?';
-    showToast(message, 'warning', 4000);
-  });
-
-  // Add touch handler for mobile
-  overlay.addEventListener('touchend', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    console.log('Disabled button overlay touched:', buttonId);
-
-    const message = window.i18n
-      ? window.i18n.t('messages.timelineMissing')
-      : 'There is information missing from this timeline. Would you like to add anything?';
-    showToast(message, 'warning', 4000);
-  });
-
-  // Position overlay directly over the button
-  button.style.position = 'relative';
-  button.appendChild(overlay);
-  return overlay;
+function uiText(key, fallback) {
+  return window.i18n && window.i18n.isReady() ? window.i18n.t(key) : fallback;
 }
 
-// Function to update overlay visibility based on button state
-function updateDisabledButtonOverlays() {
-  const nextBtn = document.getElementById('nextBtn');
-  const navBtn = document.getElementById('navSubmitBtn');
+/** Build the chip on first use, inside the diary toolbar's button group. */
+function ensureSyncStatusChip() {
+  const existing = document.getElementById('syncStatus');
+  if (existing) return existing;
 
-  [nextBtn, navBtn].forEach((button) => {
-    if (button) {
-      const overlay = document.getElementById(`${button.id}-overlay`);
-      if (button.disabled && overlay) {
-        overlay.style.display = 'block';
-      } else if (overlay) {
-        overlay.style.display = 'none';
-      }
-    }
+  // Inside .controls-group: on desktop the chip is positioned against that group
+  // (so the buttons never move), on phones it floats. Falls back to the toolbar
+  // itself if the group is ever missing.
+  const toolbar =
+    document.querySelector('.header-section .controls-group') ||
+    document.querySelector('.header-section .controls');
+  if (!toolbar) return null;
+
+  const chip = document.createElement('span');
+  chip.id = 'syncStatus';
+  chip.className = 'sync-status';
+  // role=status + aria-live announces the text; the retry is an ordinary button
+  // inside it, so it keeps its own role.
+  chip.setAttribute('role', 'status');
+  chip.setAttribute('aria-live', 'polite');
+  chip.hidden = true;
+
+  const icon = document.createElement('i');
+  icon.className = 'fas sync-status-icon';
+  icon.setAttribute('aria-hidden', 'true');
+
+  const text = document.createElement('span');
+  text.className = 'sync-status-text';
+
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'btn sync-status-retry';
+  retry.hidden = true;
+  retry.addEventListener('click', () => {
+    // flush() clears the scheduled backoff, so this is the retry - not a second
+    // one racing the engine's own timer.
+    window.autosave?.flush?.();
   });
+
+  chip.append(icon, text, retry);
+  // Out of the flex flow in both layouts (absolute on desktop, fixed on phones),
+  // so appearing and disappearing never moves the buttons.
+  toolbar.appendChild(chip);
+  return chip;
 }
 
-// Initialize overlays immediately and with intervals
-let overlaysInitialized = false;
-function initializeOverlays() {
-  if (overlaysInitialized) return;
-  overlaysInitialized = true;
-  console.log('Initializing overlays...');
+/**
+ * Autosave state -> chip. Called by the engine on every transition. Only the
+ * failure state has anything to say (see sync_status.js); it stays on screen
+ * until the day is stored.
+ */
+function renderSyncStatus(state) {
+  const chip = ensureSyncStatusChip();
+  if (!chip) return;
 
-  // Create overlays for disabled buttons
-  createDisabledButtonOverlay('nextBtn');
-  createDisabledButtonOverlay('navSubmitBtn');
-
-  // Update overlay visibility initially
-  updateDisabledButtonOverlays();
-
-  // Watch for button state changes using MutationObserver
-  const observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-      if (
-        mutation.type === 'attributes' &&
-        mutation.attributeName === 'disabled'
-      ) {
-        updateDisabledButtonOverlays();
-      }
-    });
-  });
-
-  // Observe both buttons for disabled attribute changes
-  const nextBtn = document.getElementById('nextBtn');
-  const navBtn = document.getElementById('navSubmitBtn');
-
-  if (nextBtn) {
-    observer.observe(nextBtn, {
-      attributes: true,
-      attributeFilter: ['disabled'],
-    });
+  const view = syncStatusView(state);
+  if (!view) {
+    chip.hidden = true;
+    return;
   }
-  if (navBtn) {
-    observer.observe(navBtn, {
-      attributes: true,
-      attributeFilter: ['disabled'],
-    });
+
+  chip.hidden = false;
+  chip.classList.toggle('is-error', view.kind === 'error');
+
+  const icon = chip.querySelector('.sync-status-icon');
+  icon.className = `fas sync-status-icon ${view.icon}`;
+
+  // data-i18n so the next applyTranslations() pass (language switch) rewrites
+  // the text from the same key.
+  const text = chip.querySelector('.sync-status-text');
+  text.setAttribute('data-i18n', view.textKey);
+  text.textContent = uiText(view.textKey, state);
+
+  const retry = chip.querySelector('.sync-status-retry');
+  retry.hidden = !view.canRetry;
+  if (view.canRetry) {
+    retry.setAttribute('data-i18n', 'messages.syncRetry');
+    retry.textContent = uiText('messages.syncRetry', 'Retry');
   }
 }
 
-// Try to initialize immediately
-setTimeout(initializeOverlays, 100);
-
-// Also try when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeOverlays);
-} else {
-  initializeOverlays();
-}
-
-// Also update overlays periodically as a fallback
-setInterval(() => {
-  updateDisabledButtonOverlays();
-
-  // Re-create overlays if they don't exist
-  if (!document.getElementById('nextBtn-overlay')) {
-    createDisabledButtonOverlay('nextBtn');
-  }
-  if (!document.getElementById('navSubmitBtn-overlay')) {
-    createDisabledButtonOverlay('navSubmitBtn');
-  }
-}, 2000);
-
-// Make the update function globally available for manual calls
-window.updateDisabledButtonOverlays = updateDisabledButtonOverlays;
+window.renderSyncStatus = renderSyncStatus;
 
 // ── Modal focus management (Tier 2 accessibility) ─────────────────────────
 // All dialogs carry role="dialog" (see createModal / ensureActivityInfoModal /
@@ -205,7 +190,7 @@ window.updateDisabledButtonOverlays = updateDisabledButtonOverlays;
 const MODAL_FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const MODAL_CLOSE_SELECTOR =
-  '.modal-close, .close, #confirmSkipCancel, #confirmCleanRowCancel';
+  '.modal-close, .close, #confirmSkipCancel, #confirmClearTimelineCancel, [data-modal-cancel]';
 
 // Stack of open dialogs: [{ dialog, trigger }]
 const modalFocusStack = [];
@@ -352,6 +337,99 @@ function initModalFocusManagement() {
 }
 
 window.initModalFocusManagement = initModalFocusManagement;
+
+// ── Reusable confirmation dialog ─────────────────────────────────────
+// A styled replacement for window.confirm(): the browser's native prompt is
+// unstyled and looks nothing like the rest of the app (it is also untestable -
+// Playwright has to intercept a real OS-level dialog). Callers get a promise
+// that resolves true on confirm and false on cancel / Escape / backdrop click.
+//
+// The overlay is built on first use and reused afterwards; the ids are the
+// caller's so the copy-overwrite dialog keeps #copyOverwriteConfirm /
+// #copyOverwriteYes, the ids the Copy Days plan and the E2E helpers use.
+// The cancel button carries data-modal-cancel, which is in
+// MODAL_CLOSE_SELECTOR, so the shared focus manager closes the dialog on Escape
+// and restores focus to the control that opened it.
+let pendingConfirmResolver = null;
+
+function showConfirmDialog({
+  overlayId,
+  confirmId,
+  cancelId,
+  title,
+  message,
+  confirmLabel,
+  cancelLabel,
+}) {
+  const translate = (key) =>
+    window.i18n && window.i18n.isReady() ? window.i18n.t(key) : key;
+
+  let overlay = document.getElementById(overlayId);
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = overlayId;
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', `${overlayId}Title`);
+    overlay.innerHTML = `
+        <div class="modal">
+            <div class="modal-content">
+                <h3 id="${overlayId}Title"></h3>
+                <p class="confirm-dialog-message"></p>
+                <div class="button-container">
+                    <button type="button" class="btn btn-secondary" id="${cancelId}" data-modal-cancel></button>
+                    <button type="button" class="btn save-btn" id="${confirmId}"></button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  overlay.querySelector(`#${overlayId}Title`).textContent = title;
+  overlay.querySelector('.confirm-dialog-message').textContent = message;
+  const cancelBtn = overlay.querySelector(`#${cancelId}`);
+  const confirmBtn = overlay.querySelector(`#${confirmId}`);
+  cancelBtn.textContent = cancelLabel || translate('buttons.cancel');
+  confirmBtn.textContent = confirmLabel;
+
+  // A promise settles once; opening the dialog again gets fresh listeners. Any
+  // earlier dialog still waiting is answered "no" rather than left hanging.
+  if (pendingConfirmResolver) {
+    const stale = pendingConfirmResolver;
+    pendingConfirmResolver = null;
+    stale(false);
+  }
+
+  return new Promise((resolve) => {
+    const settle = (value) => {
+      cancelBtn.removeEventListener('click', onCancel);
+      confirmBtn.removeEventListener('click', onConfirm);
+      overlay.removeEventListener('click', onBackdropClick);
+      overlay.style.display = 'none';
+      pendingConfirmResolver = null;
+      resolve(value);
+    };
+    const onCancel = () => settle(false);
+    const onConfirm = () => settle(true);
+    const onBackdropClick = (event) => {
+      if (event.target === overlay) settle(false);
+    };
+
+    cancelBtn.addEventListener('click', onCancel);
+    confirmBtn.addEventListener('click', onConfirm);
+    overlay.addEventListener('click', onBackdropClick);
+    pendingConfirmResolver = settle;
+
+    // .modal-overlay is display:none until an inline display:block is set (the
+    // stylesheet turns that into flex) - same show/hide contract as the other
+    // dialogs, which is also what the focus manager observes.
+    overlay.style.display = 'block';
+  });
+}
+
+window.showConfirmDialog = showConfirmDialog;
 
 // Modal management
 function createModal() {
@@ -519,49 +597,49 @@ function createModal() {
     }
   });
 
-  const cleanRowConfirmationModal = document.createElement('div');
-  cleanRowConfirmationModal.className = 'modal-overlay';
-  cleanRowConfirmationModal.id = 'cleanRowConfirmationModal';
-  cleanRowConfirmationModal.setAttribute('role', 'dialog');
-  cleanRowConfirmationModal.setAttribute('aria-modal', 'true');
-  cleanRowConfirmationModal.setAttribute(
+  const clearTimelineConfirmModal = document.createElement('div');
+  clearTimelineConfirmModal.className = 'modal-overlay';
+  clearTimelineConfirmModal.id = 'clearTimelineConfirmModal';
+  clearTimelineConfirmModal.setAttribute('role', 'dialog');
+  clearTimelineConfirmModal.setAttribute('aria-modal', 'true');
+  clearTimelineConfirmModal.setAttribute(
     'aria-labelledby',
-    'cleanRowConfirmationModalTitle'
+    'clearTimelineConfirmModalTitle'
   );
-  cleanRowConfirmationModal.innerHTML = `
+  clearTimelineConfirmModal.innerHTML = `
         <div class="modal">
             <div class="modal-content">
-                <h3 id="cleanRowConfirmationModalTitle" data-i18n="modals.confirmCleanRow.title">Clear current timeline row?</h3>
-                <p data-i18n="modals.confirmCleanRow.message">Are you sure you want to delete all activities in the current timeline row?</p>
+                <h3 id="clearTimelineConfirmModalTitle" data-i18n="modals.confirmClearTimeline.title">Clear this timeline?</h3>
+                <p data-i18n="modals.confirmClearTimeline.message">Are you sure you want to delete all activities in this timeline?</p>
                 <div class="button-container">
-                    <button id="confirmCleanRowCancel" class="btn btn-secondary" data-i18n="buttons.cancel">Cancel</button>
-                    <button id="confirmCleanRowOk" class="btn save-btn" data-i18n="buttons.cleanRow">Clean Row</button>
+                    <button id="confirmClearTimelineCancel" class="btn btn-secondary" data-i18n="buttons.cancel">Cancel</button>
+                    <button id="confirmClearTimelineOk" class="btn save-btn" data-i18n="buttons.clearTimeline">Clear timeline</button>
                 </div>
             </div>
         </div>
     `;
 
-  cleanRowConfirmationModal
-    .querySelector('#confirmCleanRowCancel')
+  clearTimelineConfirmModal
+    .querySelector('#confirmClearTimelineCancel')
     .addEventListener('click', () => {
-      cleanRowConfirmationModal.style.cssText = 'display: none !important';
+      clearTimelineConfirmModal.style.cssText = 'display: none !important';
     });
 
-  cleanRowConfirmationModal
-    .querySelector('#confirmCleanRowOk')
+  clearTimelineConfirmModal
+    .querySelector('#confirmClearTimelineOk')
     .addEventListener('click', () => {
-      cleanRowConfirmationModal.style.cssText = 'display: none !important';
+      clearTimelineConfirmModal.style.cssText = 'display: none !important';
     });
 
-  cleanRowConfirmationModal.addEventListener('click', (e) => {
-    if (e.target === cleanRowConfirmationModal) {
-      cleanRowConfirmationModal.style.cssText = 'display: none !important';
+  clearTimelineConfirmModal.addEventListener('click', (e) => {
+    if (e.target === clearTimelineConfirmModal) {
+      clearTimelineConfirmModal.style.cssText = 'display: none !important';
     }
   });
 
   document.body.appendChild(activitiesModal);
   document.body.appendChild(skipConfirmationModal);
-  document.body.appendChild(cleanRowConfirmationModal);
+  document.body.appendChild(clearTimelineConfirmModal);
   document.body.appendChild(customActivityModal);
 
   // Tier 2: enable focus management for the dialogs just created (it also
@@ -684,35 +762,182 @@ function updateTimelineCoverageIndicators() {
 
   coverageIndicators.forEach((indicator) => {
     const timelineKey = indicator.dataset.timelineKey;
-    const timelineMetadata = window.timelineManager.metadata[timelineKey] || {};
-    const requiredMinutes = parseInt(timelineMetadata?.minCoverage) || 0;
-    const coveredMinutes = getCoverageForTimelineKey(timelineKey);
-    const meetsCoverage = coveredMinutes >= requiredMinutes;
+    const { text, label, state } = getTimelineCoverageText(timelineKey);
 
-    if (meetsCoverage) {
-      const metText = window.i18n
-        ? window.i18n.t('messages.timelineCoverageMet')
-        : '✓';
-      indicator.textContent = metText;
-      indicator.classList.remove('is-missing');
-      indicator.classList.add('is-met');
-      const metAriaLabel = window.i18n
-        ? window.i18n.t('messages.timelineCoverageMetAria')
-        : 'Minimum coverage met';
-      indicator.setAttribute('aria-label', metAriaLabel);
-    } else {
-      const missingText = window.i18n
-        ? window.i18n.t('messages.timelineCoverageMissing', {
-            covered: coveredMinutes,
-            required: requiredMinutes,
-          })
-        : `${coveredMinutes} of ${requiredMinutes} required minutes covered`;
-      indicator.textContent = missingText;
-      indicator.classList.remove('is-met');
-      indicator.classList.add('is-missing');
-      indicator.setAttribute('aria-label', missingText);
-    }
+    indicator.textContent = text;
+    indicator.classList.toggle('is-met', state === 'met');
+    indicator.classList.toggle('is-missing', state === 'missing');
+    indicator.classList.toggle('is-empty', state === 'empty');
+    indicator.setAttribute('aria-label', label);
   });
+}
+
+/**
+ * How one timeline reads for the day being viewed: the visible text, the text a
+ * screen reader gets instead, and which of three states it is in. Every surface
+ * that reports coverage goes through here so the title indicator and the
+ * timeline menu cannot drift apart.
+ *
+ * The rule that matters, and the bug this fixed: min_coverage 0 is satisfied by
+ * an empty timeline, so a timeline the participant had never touched was
+ * reported as "requirement met" - a green ✓, read as "this one is done, skip
+ * it". A ✓ is only earned where the study actually requires something and that
+ * requirement is met; a timeline with no requirement and no entries is reported
+ * as empty instead, in the neutral colour that claims nothing.
+ */
+function getTimelineCoverageText(timelineKey) {
+  const timelineMetadata = window.timelineManager?.metadata?.[timelineKey] || {};
+  const requiredMinutes = parseInt(timelineMetadata?.minCoverage) || 0;
+  const coveredMinutes = getCoverageForTimelineKey(timelineKey);
+
+  const translate = (key, params, fallback) =>
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t(key, params)
+      : fallback;
+
+  if (requiredMinutes <= 0 && coveredMinutes === 0) {
+    const emptyText = translate(
+      'messages.timelineNothingEntered',
+      undefined,
+      'nothing entered yet'
+    );
+    return { text: emptyText, label: emptyText, state: 'empty' };
+  }
+
+  if (coveredMinutes >= requiredMinutes) {
+    return {
+      text: translate('messages.timelineCoverageMet', undefined, '✓'),
+      label: translate(
+        'messages.timelineCoverageMetAria',
+        undefined,
+        'Minimum coverage met'
+      ),
+      state: 'met',
+    };
+  }
+
+  const missingText = translate(
+    'messages.timelineCoverageMissing',
+    { covered: coveredMinutes, required: requiredMinutes },
+    `${coveredMinutes} of ${requiredMinutes} required minutes covered`
+  );
+  return { text: missingText, label: missingText, state: 'missing' };
+}
+
+const EMPTY_TIMELINE_HINT_CLASS = 'empty-timeline-hint';
+
+/**
+ * Phones lay out a single timeline at a time - every other container measures
+ * 0×0 there - so nothing on the page says that a second timeline exists, and a
+ * participant who never opens the timeline picker in the context bar never
+ * finds out. (On a desktop both timelines are side by side and need no help.)
+ *
+ * This renders one row per untouched other timeline of the current day, in the
+ * active timeline's label block just below its description - the block a
+ * participant reads before starting the day. The row names the timeline, says
+ * it is still empty, and tapping it switches timelines through the same path the
+ * timeline picker uses.
+ *
+ * Deliberately not a navigation bar: a timeline that already has something on
+ * this day gets no row (it is not a nudge, only a discovery aid for a track the
+ * participant never saw), the rows are gone once every timeline has entries, and
+ * a single-timeline study shows nothing at all.
+ */
+function updateEmptyTimelineHints() {
+  document
+    .querySelectorAll(`.${EMPTY_TIMELINE_HINT_CLASS}`)
+    .forEach((node) => node.remove());
+
+  if (!getIsMobile()) {
+    return;
+  }
+
+  const manager = window.timelineManager;
+  const activeKey = getCurrentTimelineKey();
+  if (!manager || !activeKey || !Array.isArray(manager.keys)) {
+    return;
+  }
+
+  const emptyOtherKeys = manager.keys.filter(
+    (key) => key !== activeKey && getCoverageForTimelineKey(key) === 0
+  );
+  if (emptyOtherKeys.length === 0) {
+    return;
+  }
+
+  // The labels live in the active container; the inactive ones are 0×0 and
+  // would put the row inside a box nobody can see.
+  const activeContainer =
+    manager.activeTimeline?.closest?.('.timeline-container') ||
+    document.querySelector(".timeline-container[data-active='true']");
+  const host =
+    activeContainer &&
+    (activeContainer.querySelector('.timeline-canvas-description') ||
+      activeContainer.querySelector('.title'));
+  if (!host) {
+    return;
+  }
+
+  const translate = (key, params, fallback) =>
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t(key, params)
+      : fallback;
+  const emptyText = translate(
+    'messages.timelineNothingEntered',
+    undefined,
+    'nothing entered yet'
+  );
+
+  const list = document.createElement('div');
+  list.className = EMPTY_TIMELINE_HINT_CLASS;
+
+  emptyOtherKeys.forEach((key) => {
+    const name = manager.metadata?.[key]?.name || key;
+
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'empty-timeline-hint-row';
+    row.setAttribute(
+      'aria-label',
+      translate(
+        'messages.timelineSwitchHintAria',
+        { timeline: name, state: emptyText },
+        `${name}: ${emptyText} - switch to this timeline`
+      )
+    );
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'empty-timeline-hint-name';
+    nameSpan.textContent = name;
+
+    const stateSpan = document.createElement('span');
+    stateSpan.className = 'empty-timeline-hint-state';
+    stateSpan.textContent = emptyText;
+
+    const chevron = document.createElement('i');
+    chevron.className = 'fas fa-chevron-right';
+    chevron.setAttribute('aria-hidden', 'true');
+
+    row.append(nameSpan, stateSpan, chevron);
+    row.addEventListener('click', async () => {
+      row.disabled = true;
+      try {
+        await navigateToTimelineByKey(key);
+      } catch (error) {
+        console.error('Failed to switch timeline from the hint row:', error);
+      } finally {
+        // The switch re-renders the containers, so this rebuilds the rows for
+        // the timeline that is now active - and re-enables the row if the
+        // switch did nothing.
+        updateEmptyTimelineHints();
+        row.disabled = false;
+      }
+    });
+
+    list.appendChild(row);
+  });
+
+  host.insertAdjacentElement('afterend', list);
 }
 
 function addCopyDayLink(timelineTitle, dayIndex) {
@@ -756,26 +981,6 @@ function addCopyDayLink(timelineTitle, dayIndex) {
     }
   });
   timelineTitle.appendChild(link);
-
-  // Copy Days: optional "Copy from..." button (pull direction, configurable)
-  if (TUD_SETTINGS.SHOW_COPY_FROM_BUTTON && getTargetDayCount() > 0) {
-    const fromLink = document.createElement('button');
-    fromLink.type = 'button';
-    fromLink.className = 'btn copy-day-link copy-from-link';
-    fromLink.textContent = t('messages.copyFromDay');
-    fromLink.addEventListener('click', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      const pickerEvent = {
-        clientX: event.clientX,
-        clientY: event.clientY + 8,
-      };
-      if (typeof window.showCopySourcePicker === 'function') {
-        window.showCopySourcePicker(dayIndex, pickerEvent);
-      }
-    });
-    timelineTitle.appendChild(fromLink);
-  }
 }
 
 window.addCopyDayLink = addCopyDayLink;
@@ -853,8 +1058,15 @@ export function updateCurrentDayDisplay() {
     studyDaysCount
   );
 
-  const timelineTitle = document.querySelector('.timeline-title');
-  if (!timelineTitle) {
+  // Phones show the day in the context bar; the title row is not rendered there
+  // (`.header-section .timeline-title { display: none }`). Desktop keeps the day
+  // in the timeline title, next to "Copy this day".
+  const isMobile = getIsMobile();
+  const container = isMobile
+    ? ensureMobileContextBar()?.querySelector('#contextDayText')
+    : document.querySelector('.timeline-title');
+
+  if (!container) {
     return null;
   }
 
@@ -875,33 +1087,59 @@ export function updateCurrentDayDisplay() {
         })
       : `${dayName} (Day ${dayIndex + 1} of ${studyDaysCount})`;
 
-  timelineTitle.textContent = '';
+  container.textContent = '';
 
   const dayNameSpan = document.createElement('span');
   dayNameSpan.className = 'timeline-header-emphasis';
   dayNameSpan.textContent = dayName;
-  timelineTitle.appendChild(dayNameSpan);
+  container.appendChild(dayNameSpan);
 
-  timelineTitle.appendChild(document.createTextNode(' '));
+  container.appendChild(document.createTextNode(' '));
 
   const dayDisplay = document.createElement('span');
   dayDisplay.id = 'currentDayDisplay';
   dayDisplay.className = 'timeline-study-day-meta';
-  dayDisplay.textContent = `(${studyDayText})`;
+  // Phones show a compact counter ("(3/7)") so the context row stays one line;
+  // the full sentence is still the button's accessible name and tooltip.
+  dayDisplay.textContent = isMobile
+    ? `(${dayIndex + 1}/${studyDaysCount})`
+    : `(${studyDayText})`;
   dayDisplay.title = dayTooltipText;
-  timelineTitle.appendChild(dayDisplay);
+  container.appendChild(dayDisplay);
 
-  addCopyDayLink(timelineTitle, dayIndex);
+  if (isMobile) {
+    const dayTrigger = document.getElementById('dayPickerBtn');
+    if (dayTrigger) {
+      dayTrigger.setAttribute('aria-label', dayTooltipText);
+      dayTrigger.title = dayTooltipText;
+    }
+  }
+
+  // Copying happens in the day menu on phones, so the inline link stays a
+  // desktop affordance.
+  if (!isMobile) {
+    addCopyDayLink(container, dayIndex);
+  }
 
   // Custom page title from URL param (frontend-only, not sent to backend)
   const customTitle = urlParams.get('custom_page_title');
   if (customTitle && customTitle.trim()) {
-    timelineTitle.appendChild(document.createTextNode(' '));
     const customTitleSpan = document.createElement('span');
     customTitleSpan.id = 'customPageTitle';
     customTitleSpan.className = 'timeline-header-emphasis';
     customTitleSpan.textContent = `\u2014 ${customTitle.trim()}`;
-    timelineTitle.appendChild(customTitleSpan);
+
+    const contextBar = isMobile ? ensureMobileContextBar() : null;
+    if (contextBar) {
+      // The title row is not rendered on phones, so the study-owner label goes
+      // on its own line in the context bar instead of disappearing.
+      contextBar.querySelector('.context-custom-title')?.remove();
+      customTitleSpan.classList.add('context-custom-title');
+      contextBar.appendChild(customTitleSpan);
+    } else {
+      container.appendChild(document.createTextNode(' '));
+      container.appendChild(customTitleSpan);
+    }
   }
 
   return document.getElementById('currentDayDisplay');
@@ -949,11 +1187,7 @@ function updateButtonStates() {
 
   updateCurrentDayDisplay();
 
-  const removeLastButton = document.getElementById('removeLastBtn');
-  const cleanRowButton = document.getElementById('cleanRowBtn');
-  const nextButtonInTopBar = document.getElementById('nextBtn');
-  const backButton = document.getElementById('backBtn');
-  const lowerNavSubmitBtn = document.getElementById('navSubmitBtn');
+  const clearTimelineButton = document.getElementById('clearTimelineBtn');
 
   const currentData = getCurrentTimelineData();
   const isEmpty = currentData.length === 0;
@@ -968,17 +1202,11 @@ function updateButtonStates() {
 
   //console.log('Has activities DOM:', hasActivities);
 
-  if (removeLastButton) removeLastButton.disabled = isEmpty;
-  if (cleanRowButton) cleanRowButton.disabled = !hasActivities;
+  if (clearTimelineButton) clearTimelineButton.disabled = !hasActivities;
 
-  // Update Back button state - only show when there are multiple timelines
-  if (backButton) {
-    const hasMultipleTimelines = window.timelineManager.keys.length > 1;
-    backButton.style.display = hasMultipleTimelines ? '' : 'none';
-    if (hasMultipleTimelines) {
-      backButton.disabled = window.timelineManager.currentIndex <= 0;
-    }
-  }
+  // Update the timeline switcher: shown whenever the study has more than one
+  // timeline, and on narrow viewports the only way to reach the others.
+  updateTimelineSwitchButton();
 
   // Get current timeline coverage
   const currentKey = getCurrentTimelineKey();
@@ -1001,65 +1229,22 @@ function updateButtonStates() {
 
   console.log('Min coverage:', minCoverage, 'Meets min:', meetsMinCoverage);
 
-  // Check if we're on the last timeline
-  const totalTimelines = window.timelineManager.keys.length;
-  const isLastTimeline =
-    window.timelineManager.currentIndex === totalTimelines - 1;
-
-  //console.log('Total timelines:', totalTimelines);
-  //console.log('Is last timeline:', isLastTimeline);
-
-  // Copy Days feature: Save is always available regardless of min_coverage.
-  // The green/gray day buttons show completion status; the Submit Study
-  // button enforces the final gate.
-  const canProceed = true;
-
   const currentDayIndex =
     parseInt(
       new URLSearchParams(window.location.search).get('day_label_index')
     ) || 0;
-  const totalStudyDays = window.studyConfigManager?.getStudyDaysCount() || 1;
-  const isLastStudyDay = currentDayIndex >= totalStudyDays - 1;
 
-  // Copy Days: all timelines are always visible.  The save button always
-  // says "Save Day" and always triggers the save flow.
+  // Copy Days: all timelines are always visible.
   updateTimelineCoverageIndicators();
-
-  const saveDayText = window.i18n
-    ? window.i18n.t('buttons.saveDay')
-    : 'Save Day';
-
-  if (nextButtonInTopBar) {
-    nextButtonInTopBar.disabled = !canProceed;
-    nextButtonInTopBar.innerHTML = `<i class="fas fa-save"></i> ${saveDayText}`;
-    nextButtonInTopBar.setAttribute('data-mode', 'save-day');
-    nextButtonInTopBar.title = '';
-  }
-
-  // Update navSubmitBtn to mirror nextButton — always "Save Day", and it keeps
-  // the same primary colour as the button in the top bar. No submit-mode class
-  // here: the separate "Submit Study" button in the toolbar is the one that
-  // turns green when every day is complete.
-  if (lowerNavSubmitBtn) {
-    lowerNavSubmitBtn.disabled = !canProceed;
-
-    const navSubmitIcon = lowerNavSubmitBtn.querySelector('i');
-    const navSubmitSpan = lowerNavSubmitBtn.querySelector('span');
-
-    if (navSubmitSpan) {
-      navSubmitSpan.textContent = saveDayText;
-    }
-    if (navSubmitIcon) {
-      navSubmitIcon.className = 'fas fa-save';
-    }
-    lowerNavSubmitBtn.setAttribute('data-mode', 'save-day');
-    lowerNavSubmitBtn.title = '';
-  }
+  // Phone-only: a second timeline is invisible there (its container measures
+  // 0×0), so the rows advertising an untouched one are re-rendered from the
+  // same chokepoint that reports whether it is still untouched.
+  updateEmptyTimelineHints();
 
   // The day-switch buttons in #previousDaysSwitchRow are gated on the same
   // min_coverage check as the Next/Submit buttons above.  Every activity
-  // mutation (create, delete, move, resize, arrow-key time edit,
-  // remove-last, clean-row, load) routes through this function, so
+  // mutation (create, delete, move, resize, arrow-key time edit, clear-timeline,
+  // load) routes through this function, so
   // re-rendering the row here keeps both button groups in sync without
   // touching each individual call site.
   if (typeof window.renderPreviousDaysSwitchRow === 'function') {
@@ -1069,7 +1254,8 @@ function updateButtonStates() {
   // The "Copy this day" button in the timeline title is gated on the same
   // min_coverage check (the copy operation saves the current day first, so
   // the state must be saveable).  Refresh it from the same single chokepoint.
-  if (typeof window.addCopyDayLink === 'function') {
+  // Phones copy from the day menu instead and have no title row.
+  if (!getIsMobile() && typeof window.addCopyDayLink === 'function') {
     const timelineTitle = document.querySelector('.timeline-title');
     if (timelineTitle) {
       window.addCopyDayLink(timelineTitle, currentDayIndex);
@@ -1078,6 +1264,67 @@ function updateButtonStates() {
 
   // Copy Days: update the Submit Study button state
   updateSubmitStudyButton();
+
+  // Keep the context bar and any open menu in sync (both no-ops off phones).
+  refreshMobileContextBar();
+  refreshOpenMenuItems();
+
+  // Autosave trigger. Every mutation path ends here (including the ends of drag
+  // and resize gestures), but so do pure re-renders - the engine compares the
+  // serialised day with the last stored one, so nothing is written unless the
+  // day really changed. See js/autosave.js.
+  window.autosave?.notePossibleChange?.();
+}
+
+/**
+ * Point the timeline switch button at the next timeline in the cycle.
+ *
+ * Shown whenever the study has more than one timeline, at every width. On
+ * narrow viewports it is the only way to reach the others: `styles.css` hides
+ * inactive `.timeline-container`s and the whole past-timeline wrapper, and that
+ * wrapper is not horizontally scrollable. On desktop the inactive timelines are
+ * visible and clickable, but the labelled button is still what makes a second
+ * timeline noticeable at all - an inactive timeline is dimmed to 0.6 opacity
+ * and does not advertise itself as a click target.
+ *
+ * It replaces an earlier one-way "Previous timeline" button, which only went
+ * backwards and was disabled at the first timeline - so every day began with a
+ * dead control on desktop, and phone users could not reach the other timelines
+ * at all.
+ *
+ * The label names the timeline the button switches *to* - with its position in
+ * the set ("Nebenaktivität (2/2)") - so it also tells the participant that a
+ * second timeline exists, what it is called and where it sits.
+ */
+function updateTimelineSwitchButton() {
+  const button = document.getElementById('switchTimelineBtn');
+  if (!button) return;
+
+  const keys = window.timelineManager?.keys || [];
+
+  if (keys.length < 2) {
+    button.hidden = true;
+    return;
+  }
+
+  button.hidden = false;
+
+  const currentIndex = Number.isInteger(window.timelineManager.currentIndex)
+    ? window.timelineManager.currentIndex
+    : 0;
+  const nextKey = keys[(currentIndex + 1) % keys.length];
+  const nextName = getTimelineLabel(nextKey);
+
+  const label = document.getElementById('switchTimelineLabel');
+  if (label) label.textContent = nextName;
+
+  const hint =
+    window.i18n && window.i18n.isReady()
+      ? window.i18n.t('buttons.switchTimeline')
+      : 'Switch timeline';
+  const accessibleName = `${hint}: ${nextName}`;
+  button.title = accessibleName;
+  button.setAttribute('aria-label', accessibleName);
 }
 
 /**
@@ -1228,6 +1475,7 @@ function initSkipReportingButton() {
     skipReportingBtn.style.display = 'none';
     skipReportingBtn.setAttribute('aria-hidden', 'true');
     skipReportingButtonInitialized = true;
+    updateFooterVisibility();
     return;
   }
 
@@ -1236,190 +1484,916 @@ function initSkipReportingButton() {
 
   skipReportingBtn.addEventListener('click', showSkipConfirmationModal);
   skipReportingButtonInitialized = true;
+  updateFooterVisibility();
 }
 
-// Shared debounce variables for both Next button and navigation submit button
-let nextButtonLastClick = 0;
-const NEXT_BUTTON_COOLDOWN = 500; // 1 second cooldown
+/**
+ * Reveal the footer only while it holds a visible action. Studies can switch
+ * "Skip time reporting" off, which leaves the footer empty - a row of dead
+ * vertical space that is worth reclaiming on phones. The footer starts
+ * `hidden` in the markup so it never flashes before the study config lands.
+ */
+function updateFooterVisibility() {
+  const footer = document.getElementById('instructionsFooter');
+  if (!footer) return;
 
-// Debounce variables for Back button
-let backButtonLastClick = 0;
-const BACK_BUTTON_COOLDOWN = 500; // 1 second cooldown (shorter than Next)
+  const skipReportingBtn = document.getElementById('skipReportingBtn');
+  // `style.display` alone would miss the breakpoint rule that hides the button on
+  // phones (styles.css), which would leave the footer as a dead row there.
+  const hasVisibleAction =
+    !!skipReportingBtn &&
+    getComputedStyle(skipReportingBtn).display !== 'none';
 
-// Debounce variables for Remove Last button
-let removeLastButtonLastClick = 0;
-const REMOVE_LAST_BUTTON_COOLDOWN = 300; // 300ms cooldown
+  footer.hidden = !hasVisibleAction;
+  updateFooterHeight();
+}
 
-// Shared function to handle save button logic with debounce.
-// Copy Days: saving is a routine operation — no confirmation modal needed.
-const handleNextButtonAction = async () => {
-  const currentTime = Date.now();
-  if (currentTime - nextButtonLastClick < NEXT_BUTTON_COOLDOWN) {
-    console.log('Save button on cooldown');
-    return;
-  }
-  nextButtonLastClick = currentTime;
+// Debounce variables for the timeline switch button
+let switchTimelineLastClick = 0;
+const SWITCH_TIMELINE_COOLDOWN = 500;
 
-  const nextButton = document.getElementById('nextBtn');
-  const navSubmitButton = document.getElementById('navSubmitBtn');
-
-  if (nextButton) nextButton.disabled = true;
-  if (navSubmitButton) navSubmitButton.disabled = true;
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const currentDayIndex = parseInt(urlParams.get('day_label_index')) || 0;
-
-  const result = await sendData({
-    shouldRedirect: false,
-    isLastDay: false,
-    currentDayIndex,
-  });
-
-  if (result?.success) {
-    // Copy Days: mark this day as saved so templates aren't re-loaded
-    // if the user intentionally saved an empty day.
-    const studyName =
-      window.timelineManager?.study?.study_name_short ||
-      new URLSearchParams(window.location.search).get('study_name');
-    const pid =
-      window.timelineManager?.study?.pid ||
-      new URLSearchParams(window.location.search).get('pid');
-    if (studyName && pid && typeof window.markDaySaved === 'function') {
-      window.markDaySaved(studyName, pid, currentDayIndex);
-    }
-
-    const daySavedMsg = window.i18n
-      ? window.i18n.t('messages.daySavedStayOnPage')
-      : 'Day saved.';
-    if (typeof showToast === 'function') {
-      showToast(daySavedMsg, 'success', 3000);
-    }
-    setTimeout(() => {
-      window.location.reload();
-    }, 1500);
-  } else {
-    const errMsg = window.i18n
-      ? window.i18n.t('messages.submitError')
-      : 'Error saving diary';
-    const details = result?.error ? `: ${result.error}` : '';
-    if (typeof showToast === 'function') {
-      showToast(errMsg + details, 'error', 5000);
-    }
+/**
+ * Bring the day status in line with what a save just persisted - without
+ * reloading the page.
+ *
+ * Two arrays drive the day buttons and the Submit gate, and both are only
+ * otherwise fed by the backend day metadata on load:
+ *   - dayIndicesWithData: the day was just written, so it has data;
+ *   - dayIndicesMeetMinCoverage: getCurrentDayMeetsMinCoverage() mirrors the
+ *     backend rule (including the "no min_coverage -> any activity counts"
+ *     fallback), so a day that no longer meets coverage - activities deleted,
+ *     then saved - turns grey immediately instead of only after a reload.
+ */
+function refreshDayStatusAfterSave() {
+  const manager = window.timelineManager;
+  const dayIndex = getDayIndexFromUrl();
+  if (!manager || !Number.isInteger(dayIndex)) {
     updateButtonStates();
-  }
-};
-
-// Shared function to handle Back button logic with debounce
-const handleBackButtonAction = () => {
-  const currentTime = Date.now();
-  if (currentTime - backButtonLastClick < BACK_BUTTON_COOLDOWN) {
-    console.log('Back button on cooldown');
     return;
   }
-  backButtonLastClick = currentTime;
 
-  if (window.timelineManager.currentIndex > 0) {
-    goToPreviousTimeline();
+  if (Array.isArray(manager.dayIndicesWithData)) {
+    // The saved day now holds exactly what is on screen, so "has data" is
+    // whatever the timelines hold - a cleared-then-saved day is empty again
+    // (the copy picker labels other days from this array).
+    const hasActivities = (manager.keys || []).some(
+      (key) => (manager.activities?.[key] || []).length > 0
+    );
+    const position = manager.dayIndicesWithData.indexOf(dayIndex);
+    if (hasActivities && position === -1) {
+      manager.dayIndicesWithData.push(dayIndex);
+      manager.dayIndicesWithData.sort((a, b) => a - b);
+    } else if (!hasActivities && position !== -1) {
+      manager.dayIndicesWithData.splice(position, 1);
+    }
   }
-};
 
-// Shared function to handle Remove Last button logic with debounce
-const handleRemoveLastButtonAction = () => {
+  if (Array.isArray(manager.dayIndicesMeetMinCoverage)) {
+    const meetsMinCoverage = getCurrentDayMeetsMinCoverage();
+    const position = manager.dayIndicesMeetMinCoverage.indexOf(dayIndex);
+    if (meetsMinCoverage && position === -1) {
+      manager.dayIndicesMeetMinCoverage.push(dayIndex);
+      manager.dayIndicesMeetMinCoverage.sort((a, b) => a - b);
+    } else if (!meetsMinCoverage && position !== -1) {
+      manager.dayIndicesMeetMinCoverage.splice(position, 1);
+    }
+  }
+
+  // The desktop day buttons render from those arrays; the phone context bar, the
+  // coverage indicators and the Submit gate come from updateButtonStates().
+  if (typeof window.renderPreviousDaysSwitchRow === 'function') {
+    window.renderPreviousDaysSwitchRow();
+  }
+  updateButtonStates();
+}
+
+window.refreshDayStatusAfterSave = refreshDayStatusAfterSave;
+
+// Shared function to handle the timeline switch button with debounce.
+// Cycles to the next timeline; the label always names the destination.
+const handleSwitchTimelineAction = async () => {
   const currentTime = Date.now();
-  if (currentTime - removeLastButtonLastClick < REMOVE_LAST_BUTTON_COOLDOWN) {
-    console.log('Remove Last button on cooldown');
+  if (currentTime - switchTimelineLastClick < SWITCH_TIMELINE_COOLDOWN) {
+    console.log('Timeline switch button on cooldown');
     return;
   }
-  removeLastButtonLastClick = currentTime;
+  switchTimelineLastClick = currentTime;
 
-  const currentKey = getCurrentTimelineKey();
-  const currentData = getCurrentTimelineData();
-  if (currentData.length > 0) {
-    if (DEBUG_MODE) {
-      console.log(
-        'Before remove last - timelineData:',
-        window.timelineManager.activities
-      );
-    }
+  const keys = window.timelineManager?.keys || [];
+  if (keys.length < 2) {
+    return;
+  }
 
-    // Work with a copy to avoid modifying the original array until validation passes
-    const currentDataCopy = [...currentData];
-    const lastActivity = currentDataCopy.pop();
+  const currentIndex = Number.isInteger(window.timelineManager.currentIndex)
+    ? window.timelineManager.currentIndex
+    : 0;
+  const nextKey = keys[(currentIndex + 1) % keys.length];
 
-    // Update timeline manager activities and validate
-    window.timelineManager.activities[currentKey] = currentDataCopy;
-    try {
-      window.timelineManager.metadata[currentKey].validate();
-    } catch (error) {
-      console.error('Timeline validation failed:', error);
-      // Revert the change
-      window.timelineManager.activities[currentKey] = currentData;
-      const timeline = window.timelineManager.activeTimeline;
-      const lastBlock = timeline.querySelector(
-        `.activity-block[data-id="${lastActivity.id}"]`
-      );
-      if (lastBlock) {
-        lastBlock.classList.add('invalid');
-        setTimeout(() => lastBlock.classList.remove('invalid'), 400);
-      }
-      return;
-    }
+  const switchButton = document.getElementById('switchTimelineBtn');
+  if (switchButton) switchButton.disabled = true;
 
-    if (DEBUG_MODE) {
-      console.log('Removing activity:', lastActivity);
-    }
-
-    const timeline = window.timelineManager.activeTimeline;
-    const blocks = timeline.querySelectorAll('.activity-block');
-
-    if (DEBUG_MODE) {
-      blocks.forEach((block) => {
-        console.log(
-          'Block id:',
-          block.dataset.id,
-          'Last activity id:',
-          lastActivity.id
-        );
-      });
-    }
-    blocks.forEach((block) => {
-      if (block.dataset.id === lastActivity.id) {
-        if (DEBUG_MODE) {
-          console.log('Removing block with id:', lastActivity.id);
-        }
-        block.remove();
-      }
-    });
-
+  try {
+    await navigateToTimelineByKey(nextKey);
+  } catch (error) {
+    console.error('Failed to switch timeline:', error);
+  } finally {
+    if (switchButton) switchButton.disabled = false;
     updateButtonStates();
-
-    if (DEBUG_MODE) {
-      console.log('Final timelineData:', window.timelineManager.activities);
-    }
   }
 };
 
 let buttonsInitialized = false;
+
+// ── "How do I use this?" ────────────────────────────────────────────────
+// The walk-through that used to be the only way into the study is reachable
+// while working, from the ⋮ menu (it is on both layouts).
+//
+// The content is the instructions page itself in `?embed=1` mode: the same
+// steps, the same GIFs and the same translations, with no study text and no
+// Start button. An iframe rather than a second copy of the markup on purpose -
+// four animated GIFs plus the horizontal/vertical switch are exactly the kind
+// of duplication that rots.
+//
+// Deliberately a modal and not a link to that page: navigating away is safe now
+// that the day autosaves, but it costs a page load, the scroll position, the
+// selected activity and the participant's place in the day - and landing on an
+// error page mid-task is what the pilot's "could not load" report was about.
+const HELP_MODAL_ID = 'helpModal';
+
+function buildHelpModal() {
+  const existing = document.getElementById(HELP_MODAL_ID);
+  if (existing) return existing;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = HELP_MODAL_ID;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', `${HELP_MODAL_ID}Title`);
+
+  const modal = document.createElement('div');
+  modal.className = 'modal help-modal';
+
+  const header = document.createElement('div');
+  header.className = 'modal-header';
+
+  const title = document.createElement('h3');
+  title.id = `${HELP_MODAL_ID}Title`;
+  title.textContent = uiText('buttons.help', 'How to use the diary');
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'modal-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.setAttribute('aria-label', uiText('buttons.close', 'Close'));
+
+  const content = document.createElement('div');
+  content.className = 'modal-content help-modal-content';
+
+  header.append(title, closeBtn);
+  modal.append(header, content);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Same show/hide contract as showConfirmDialog(): an inline display:block is
+  // what the stylesheet turns into a flex overlay, and what the shared focus
+  // manager observes. Escape therefore closes it through .modal-close, which is
+  // in MODAL_CLOSE_SELECTOR, and focus returns to the ⋮ button.
+  const hide = () => {
+    overlay.style.display = 'none';
+  };
+  closeBtn.addEventListener('click', hide);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) hide();
+  });
+
+  return overlay;
+}
+
+function openHelpModal() {
+  // The focus manager (Escape, focus trap, focus restore) is normally armed by
+  // createModal(), i.e. by opening the activity picker. Help must not depend on
+  // the participant having placed an activity first.
+  initModalFocusManagement();
+
+  const overlay = buildHelpModal();
+  const content = overlay.querySelector('.help-modal-content');
+
+  // A fresh frame on every open: the language can change from this same menu,
+  // and a reload plays the walk-through from the beginning.
+  content.textContent = '';
+
+  const frame = document.createElement('iframe');
+  frame.className = 'help-modal-frame';
+  frame.title = uiText('buttons.help', 'How to use the diary');
+
+  const url = new URL('pages/instructions.html', window.location.href);
+  new URLSearchParams(window.location.search).forEach((value, key) => {
+    url.searchParams.set(key, value);
+  });
+  // The diary URL says the instructions are done; that is meaningless here.
+  url.searchParams.delete('instructions');
+  url.searchParams.set('embed', '1');
+  frame.src = url.toString();
+
+  content.appendChild(frame);
+  overlay.style.display = 'block';
+}
+
+// ── Phone ⋮ menu ──────────────────────────────────────────────────────────
+// On phones the toolbar only has room for Clear timeline and Submit Study. Skip
+// time reporting and the language picker move in here instead of taking rows of
+// their own. (Deleting an activity no longer needs an entry: the long-press
+// menu deletes and offers an undo toast, so there is no "remove last" button
+// on any platform.)
+//
+// Every item proxies .click() to the real control, so there is still exactly one
+// implementation of each action (including its confirmation dialog), and the
+// disabled state is mirrored from the control itself. Hidden controls still
+// receive .click() - a disabled one simply does nothing.
+const MORE_MENU_ID = 'moreMenu';
+const MORE_MENU_ACTIONS = [
+  {
+    controlId: 'skipReportingBtn',
+    labelKey: 'buttons.skipReporting',
+    fallback: 'Skip time reporting',
+  },
+];
+
+let openMenuState = null;
+let moreMenuInitialized = false;
+
+function moreMenuLabel(key, fallback, params) {
+  return window.i18n && window.i18n.isReady()
+    ? window.i18n.t(key, params)
+    : fallback;
+}
+
+/**
+ * A control counts as available unless its study-specific inline style turned it
+ * off (initSkipReportingButton hides the skip action for studies that forbid
+ * it). The mobile breakpoint hides controls with CSS, not inline styles, so a
+ * control hidden for layout reasons is still offered in the menu.
+ */
+function isMoreMenuActionAvailable(control) {
+  return !!control && control.style.display !== 'none';
+}
+
+function buildMoreMenu(menu) {
+  MORE_MENU_ACTIONS.forEach((action) => {
+    const control = document.getElementById(action.controlId);
+    if (!isMoreMenuActionAvailable(control)) return;
+
+    addMenuItem(menu, {
+      label: moreMenuLabel(action.labelKey, action.fallback),
+      controlId: action.controlId,
+      disabled: !!control && control.disabled,
+      onSelect: () => {
+        const target = document.getElementById(action.controlId);
+        if (target && !target.disabled) target.click();
+      },
+    });
+  });
+
+  // The walk-through, without leaving the day - see openHelpModal(). It is not
+  // a proxy like the entries above: it opens a dialog itself.
+  addMenuItem(menu, {
+    label: moreMenuLabel('buttons.help', 'How to use the diary'),
+    className: 'more-menu-help',
+    onSelect: openHelpModal,
+  });
+
+  // Language: enumerate the selector the study config already built, and switch
+  // by setting its value and firing `change` - the same path the <select> uses.
+  const languageSelect = document.getElementById('languageSelectMain');
+  if (!languageSelect || languageSelect.options.length <= 1) return;
+
+  addMenuHeader(menu, moreMenuLabel('common.language', 'Language'));
+
+  const languages = document.createElement('div');
+  languages.className = 'more-menu-languages';
+  Array.from(languageSelect.options).forEach((option) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'context-menu-item';
+    item.textContent = option.textContent;
+    item.setAttribute(
+      'aria-pressed',
+      String(option.value === languageSelect.value)
+    );
+    item.addEventListener('click', () => {
+      closeContextMenu();
+      if (option.value === languageSelect.value) return;
+      languageSelect.value = option.value;
+      languageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    languages.appendChild(item);
+  });
+  menu.appendChild(languages);
+}
+
+/**
+ * Mirror the disabled state of every control a menu item proxies: the ⋮ menu
+ * entries and the timeline menu's "Clear this timeline". Called when a menu is
+ * built and again from updateButtonStates(), the chokepoint that disables those
+ * controls.
+ */
+function refreshOpenMenuItems() {
+  const state = openMenuState;
+  if (!state) return;
+
+  state.menu.querySelectorAll('[data-control-id]').forEach((item) => {
+    const control = document.getElementById(item.dataset.controlId);
+    item.disabled = !!control && control.disabled;
+  });
+}
+
+function positionContextMenu(menu, trigger) {
+  const triggerRect = trigger.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const margin = 8;
+
+  // Right-aligned to the trigger, below it - and above it when there is no
+  // room underneath. The phone stylesheet overrides this to a bottom sheet.
+  let top = triggerRect.bottom + margin;
+  if (top + menuRect.height + margin > window.innerHeight) {
+    top = Math.max(margin, triggerRect.top - menuRect.height - margin);
+  }
+  const left = Math.max(
+    margin,
+    Math.min(triggerRect.right - menuRect.width, window.innerWidth - menuRect.width - margin)
+  );
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function closeContextMenu() {
+  const state = openMenuState;
+  openMenuState = null;
+
+  if (!state) return;
+
+  const { menu, trigger } = state;
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+
+  document.removeEventListener('click', handleContextMenuOutsideClick, true);
+  document.removeEventListener('keydown', handleContextMenuKeydown);
+  document.removeEventListener('scroll', handleContextMenuScroll, true);
+  window.removeEventListener('resize', closeContextMenu);
+
+  if (trigger && menu.contains(document.activeElement)) {
+    trigger.focus();
+  }
+  menu.remove();
+}
+
+function handleContextMenuOutsideClick(event) {
+  const state = openMenuState;
+  if (!state || !(event.target instanceof Node)) return;
+  if (
+    state.menu.contains(event.target) ||
+    state.trigger?.contains(event.target)
+  ) {
+    return;
+  }
+  closeContextMenu();
+}
+
+function handleContextMenuKeydown(event) {
+  if (event.key !== 'Escape') return;
+  event.stopPropagation();
+  closeContextMenu();
+}
+
+function handleContextMenuScroll(event) {
+  const state = openMenuState;
+  if (!state) return;
+  // Scrolling the menu itself (a bottom sheet can overflow) must not close it.
+  if (event.target instanceof Node && state.menu.contains(event.target)) return;
+  closeContextMenu();
+}
+
+/**
+ * Open one of the phone popups - the ⋮ menu, the day menu or the timeline
+ * menu. They share one look (`.context-menu`, a bottom sheet on phones), one
+ * open/close path and one ARIA contract; only the items differ.
+ */
+function openContextMenu({ id, trigger, className = '', build }) {
+  if (!trigger) return;
+
+  closeContextMenu();
+
+  const menu = document.createElement('div');
+  menu.id = id;
+  menu.className = `context-menu ${className}`.trim();
+  build(menu);
+
+  document.body.appendChild(menu);
+  positionContextMenu(menu, trigger);
+
+  trigger.setAttribute('aria-expanded', 'true');
+  openMenuState = { menu, trigger };
+  refreshOpenMenuItems();
+
+  const firstItem = menu.querySelector('.context-menu-item:not(:disabled)');
+  if (firstItem) firstItem.focus();
+
+  document.addEventListener('click', handleContextMenuOutsideClick, true);
+  document.addEventListener('keydown', handleContextMenuKeydown);
+  document.addEventListener('scroll', handleContextMenuScroll, true);
+  window.addEventListener('resize', closeContextMenu);
+}
+
+function toggleContextMenu(options) {
+  if (openMenuState && openMenuState.menu.id === options.id) {
+    closeContextMenu();
+  } else {
+    openContextMenu(options);
+  }
+}
+
+function initMoreMenu() {
+  if (moreMenuInitialized) return;
+
+  const trigger = document.getElementById('moreMenuBtn');
+  if (!trigger) return;
+
+  moreMenuInitialized = true;
+  trigger.addEventListener('click', () => {
+    toggleContextMenu({
+      id: MORE_MENU_ID,
+      className: 'more-menu',
+      trigger,
+      build: buildMoreMenu,
+    });
+  });
+}
+
+/** Add a button to an open menu. Items that proxy a control carry its id so
+ * refreshOpenMenuItems() can mirror the control's disabled state. */
+function addMenuItem(
+  menu,
+  { label, detail, controlId, disabled = false, className = '', icon = '', onSelect }
+) {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = `context-menu-item ${className}`.trim();
+  item.disabled = disabled;
+  if (controlId) item.dataset.controlId = controlId;
+
+  if (icon) {
+    const iconEl = document.createElement('i');
+    iconEl.className = `fas ${icon} context-menu-item-icon`;
+    iconEl.setAttribute('aria-hidden', 'true');
+    item.appendChild(iconEl);
+  }
+
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'context-menu-item-label';
+  labelSpan.textContent = label;
+  item.appendChild(labelSpan);
+
+  if (detail) {
+    const detailSpan = document.createElement('span');
+    detailSpan.className = 'context-menu-item-detail';
+    detailSpan.textContent = detail;
+    item.appendChild(detailSpan);
+  }
+
+  item.addEventListener('click', () => {
+    closeContextMenu();
+    onSelect();
+  });
+  menu.appendChild(item);
+  return item;
+}
+
+function addMenuHeader(menu, text) {
+  const header = document.createElement('div');
+  header.className = 'context-menu-header';
+  header.textContent = text;
+  menu.appendChild(header);
+  return header;
+}
+
+// ── Phone context bar ─────────────────────────────────────────────────────
+// The row above the toolbar: which day and which timeline the participant is
+// in, both as pickers. The day menu replaces the desktop day row
+// (#previousDaysSwitchRow) and the timeline menu replaces the cycling switcher
+// button, so a phone no longer spends two extra rows on navigation.
+const DAY_MENU_ID = 'dayMenu';
+const TIMELINE_MENU_ID = 'timelineMenu';
+const TIMELINE_TABS_ID = 'timelineTabs';
+
+let contextBarInitialized = false;
+
+function getDayIndexFromUrl() {
+  return (
+    parseInt(
+      new URLSearchParams(window.location.search).get('day_label_index')
+    ) || 0
+  );
+}
+
+function getStudyDaysCount() {
+  return (
+    window.timelineManager?.studyDaysCount ||
+    window.studyConfigManager?.getStudyDaysCount?.() ||
+    0
+  );
+}
+
+function getDayDisplayName(dayIndex) {
+  return (
+    window.studyConfigManager?.getDayDisplayLabel?.(dayIndex) ||
+    `${moreMenuLabel('common.day', 'Day')} ${dayIndex + 1}`
+  );
+}
+
+/**
+ * Build the context bar once. It is hidden above the desktop breakpoint
+ * (`.context-bar { display: none }`) and sits *before* the toolbar in the DOM,
+ * so a phone gets context first and actions second.
+ */
+function ensureMobileContextBar() {
+  if (!getIsMobile()) return null;
+
+  const existing = document.getElementById('contextBar');
+  if (existing) return existing;
+
+  const controls = document.querySelector('.header-section .controls');
+  if (!controls || !controls.parentElement) return null;
+
+  const bar = document.createElement('div');
+  bar.className = 'context-bar';
+  bar.id = 'contextBar';
+  bar.innerHTML = `
+    <div class="context-day">
+      <button type="button" class="btn context-step-btn" id="prevDayBtn">
+        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="btn context-picker-btn" id="dayPickerBtn"
+              aria-haspopup="true" aria-expanded="false"
+              aria-controls="${DAY_MENU_ID}">
+        <span class="context-day-text" id="contextDayText"></span>
+        <i class="fas fa-caret-down" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="btn context-step-btn" id="nextDayBtn">
+        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="timeline-switcher" id="timelineSwitcher" hidden>
+      <div class="timeline-tabs" id="${TIMELINE_TABS_ID}" role="tablist" hidden></div>
+      <button type="button" class="btn context-picker-btn" id="timelinePickerBtn"
+              aria-haspopup="true" aria-expanded="false"
+              aria-controls="${TIMELINE_MENU_ID}">
+        <span id="contextTimelineName"></span>
+        <i class="fas fa-caret-down" aria-hidden="true"></i>
+      </button>
+    </div>
+  `;
+
+  controls.insertAdjacentElement('beforebegin', bar);
+  return bar;
+}
+
+function buildDayMenu(menu) {
+  const currentDayIndex = getDayIndexFromUrl();
+  const studyDaysCount = getStudyDaysCount();
+  const currentDayName = getDayDisplayName(currentDayIndex);
+  const completeDays = Array.isArray(
+    window.timelineManager?.dayIndicesMeetMinCoverage
+  )
+    ? window.timelineManager.dayIndicesMeetMinCoverage
+    : Array.isArray(window.timelineManager?.dayIndicesWithData)
+      ? window.timelineManager.dayIndicesWithData
+      : [];
+
+  // Copying is a day-pair operation and it acts on the day the participant is
+  // in, not on a day in the list - so it sits on top, above the day list, with
+  // an icon, an accent colour and the day it acts on spelled out. As the last
+  // of eight rows it read as another day: people know their weekday names and
+  // stopped reading after the first two.
+  //
+  // Only a study with another day gets the row at all: with a single day the
+  // concept cannot exist, and a permanently dead row teaches the opposite. On a
+  // day that merely has nothing in it yet the row stays visible but disabled and
+  // says why - seeing it is how a participant learns that copying exists, so it
+  // is never hidden, and the reason is on the row instead of behind a tap (the
+  // same "greyed out, but tell them why" shape Save/Submit use).
+  if (getTargetDayCount() > 0) {
+    const copyLabel = moreMenuLabel(
+      'messages.copyDayToAnother',
+      `Copy ${currentDayName} to another day`,
+      { day: currentDayName }
+    );
+    // Undefined means script.js has not exposed the test (should not happen) -
+    // then keep the row active rather than disabling it wrongly.
+    const sourceHasActivities = window.hasFrontendActivities?.() !== false;
+
+    addMenuItem(menu, {
+      label: copyLabel,
+      detail: sourceHasActivities
+        ? undefined
+        : moreMenuLabel(
+            'messages.copyEmptySource',
+            'Source day has no activities to copy.'
+          ),
+      disabled: !sourceHasActivities,
+      className: 'day-menu-copy',
+      icon: 'fa-copy',
+      onSelect: () => {
+        if (typeof window.showCopyTargetPicker === 'function') {
+          window.showCopyTargetPicker(currentDayIndex, {
+            clientX: window.innerWidth / 2,
+            clientY: window.innerHeight / 2,
+          });
+        }
+      },
+    });
+  }
+
+  addMenuHeader(
+    menu,
+    moreMenuLabel('messages.goBackToEditPreviousDays', 'Switch to day:')
+  );
+
+  for (let dayIndex = 0; dayIndex < studyDaysCount; dayIndex += 1) {
+    const isCurrent = dayIndex === currentDayIndex;
+    const isComplete = completeDays.includes(dayIndex);
+    const dayName = getDayDisplayName(dayIndex);
+
+    // A checkmark rather than a status sentence: language-neutral, and the same
+    // signal the desktop day buttons use.
+    const item = addMenuItem(menu, {
+      label: isComplete ? `${dayName} ✓` : dayName,
+      className: isComplete ? 'day-menu-item is-complete' : 'day-menu-item',
+      disabled: isCurrent,
+      onSelect: () => window.saveAndSwitchToDay?.(dayIndex),
+    });
+
+    if (isCurrent) item.setAttribute('aria-current', 'true');
+    if (isComplete) {
+      const completeHint = moreMenuLabel(
+        'messages.dayCompleteAria',
+        'Day complete (meets minimum coverage)'
+      );
+      item.setAttribute('aria-label', `${dayName}, ${completeHint}`);
+    }
+  }
+}
+
+function buildTimelineMenu(menu) {
+  const keys = window.timelineManager?.keys || [];
+  const currentIndex = Number.isInteger(window.timelineManager?.currentIndex)
+    ? window.timelineManager.currentIndex
+    : 0;
+  addMenuHeader(
+    menu,
+    moreMenuLabel('buttons.switchTimeline', 'Switch timeline')
+  );
+
+  keys.forEach((key, index) => {
+    addMenuItem(menu, {
+      label: getTimelineLabel(key),
+      // Same text as the indicator next to the timeline title, so the menu
+      // cannot claim a coverage state the timeline itself does not show.
+      detail: getTimelineCoverageText(key).text,
+      className: 'timeline-menu-item',
+      disabled: index === currentIndex,
+      onSelect: () => navigateToTimelineByKey(key),
+    });
+  });
+
+  // Clearing is per-timeline (not per-day), so it lives with the timeline list
+  // instead of in the ⋮ menu.
+  addMenuItem(menu, {
+    label: moreMenuLabel('buttons.clearTimeline', 'Clear timeline'),
+    className: 'timeline-menu-clear',
+    controlId: 'clearTimelineBtn',
+    onSelect: () => {
+      const target = document.getElementById('clearTimelineBtn');
+      if (target && !target.disabled) target.click();
+    },
+  });
+}
+
+/** A timeline's plain name. The tabs sit side by side, so the position in the
+ * set that `getTimelineLabel()` appends ("(1/2)") has nothing left to say
+ * there - the pair itself says that there are two. */
+function getTimelineName(timelineKey) {
+  return window.timelineManager?.metadata?.[timelineKey]?.name || timelineKey || '';
+}
+
+/**
+ * Paint the phone's timeline tabs.
+ *
+ * Two timelines are the case this control exists for: with both names on screen
+ * the second one is visible without opening anything, which is what the
+ * participants who "missed the existence of the 2nd timeline entirely" needed -
+ * the picker they never pressed could only hint at it with a "(1/2)" inside its
+ * own label. A study with one timeline has nothing to switch to and a study with
+ * three or more would run off the row; both keep the picker (see
+ * `refreshMobileContextBar`).
+ */
+function renderTimelineTabs(container, keys, currentKey) {
+  // Rebuild only when the set changes, so focus survives a repaint.
+  const signature = keys.join('|');
+  if (container.dataset.signature !== signature) {
+    container.replaceChildren();
+    keys.forEach((key) => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      // role="tab" is what makes `aria-selected`/`aria-controls` legal on the
+      // button and satisfies the tablist's required children. Without it axe
+      // reports `aria-allowed-attr` on both tabs and `aria-required-children`
+      // on `#timelineTabs` (CI-only, because that spec needs @axe-core).
+      tab.setAttribute('role', 'tab');
+      tab.className = 'timeline-tab';
+      tab.dataset.timelineKey = key;
+      // Each timeline's element carries the key as its id - that is the panel
+      // the tab selects.
+      if (document.getElementById(key)) tab.setAttribute('aria-controls', key);
+      container.appendChild(tab);
+    });
+    container.dataset.signature = signature;
+  }
+
+  container.querySelectorAll('.timeline-tab').forEach((tab) => {
+    const isCurrent = tab.dataset.timelineKey === currentKey;
+    tab.textContent = getTimelineName(tab.dataset.timelineKey);
+    tab.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+    // Roving tabindex: the strip is one stop, the arrow keys move within it.
+    tab.tabIndex = isCurrent ? 0 : -1;
+  });
+}
+
+/** Refresh what changes without a page load: the timeline name and the ./.
+ * arrows. The arrows name the day they lead to, like the timeline switcher
+ * names its destination - no new translations and more useful than "next day". */
+function refreshMobileContextBar() {
+  const bar = ensureMobileContextBar();
+  if (!bar) return;
+
+  const keys = window.timelineManager?.keys || [];
+  // Includes the position in the set ("(1/2)"), like the timeline titles and
+  // the day counter - the participant should be able to tell from any of them
+  // that a second timeline exists.
+  const timelineName = getTimelineLabel(getCurrentTimelineKey());
+  const timelineNameLabel = document.getElementById('contextTimelineName');
+  const timelinePicker = document.getElementById('timelinePickerBtn');
+  const switcher = document.getElementById('timelineSwitcher');
+  const tabs = document.getElementById(TIMELINE_TABS_ID);
+  // Exactly two timelines: see `shouldShowTimelineTabs()`.
+  const showTabs = shouldShowTimelineTabs(keys.length);
+
+  if (tabs) {
+    tabs.hidden = !showTabs;
+    tabs.setAttribute(
+      'aria-label',
+      moreMenuLabel('buttons.switchTimeline', 'Switch timeline')
+    );
+    if (showTabs) {
+      renderTimelineTabs(tabs, keys, getCurrentTimelineKey());
+    } else if (tabs.childElementCount) {
+      tabs.replaceChildren();
+      delete tabs.dataset.signature;
+    }
+  }
+
+  if (timelineNameLabel) {
+    timelineNameLabel.textContent = timelineName;
+    // With both names on screen this only repeats a tab, so the button shrinks
+    // to its caret - the way into the timeline sheet, which still carries the
+    // per-timeline coverage and "Clear timeline".
+    timelineNameLabel.hidden = showTabs;
+  }
+
+  if (timelinePicker) {
+    // Pointless with a single timeline, and the day control can use the space.
+    timelinePicker.hidden = keys.length < 2;
+    timelinePicker.classList.toggle('is-icon-only', showTabs);
+    timelinePicker.setAttribute(
+      'aria-label',
+      `${moreMenuLabel('buttons.switchTimeline', 'Switch timeline')}: ${timelineName}`
+    );
+  }
+
+  if (switcher) {
+    switcher.hidden = keys.length < 2;
+    switcher.classList.toggle('has-tabs', showTabs);
+  }
+
+  const currentDayIndex = getDayIndexFromUrl();
+  const studyDaysCount = getStudyDaysCount();
+  const prevBtn = document.getElementById('prevDayBtn');
+  const nextBtn = document.getElementById('nextDayBtn');
+
+  if (prevBtn) {
+    prevBtn.disabled = currentDayIndex <= 0;
+    prevBtn.setAttribute(
+      'aria-label',
+      getDayDisplayName(Math.max(0, currentDayIndex - 1))
+    );
+  }
+  if (nextBtn) {
+    nextBtn.disabled =
+      studyDaysCount <= 1 || currentDayIndex >= studyDaysCount - 1;
+    nextBtn.setAttribute(
+      'aria-label',
+      getDayDisplayName(Math.min(studyDaysCount - 1, currentDayIndex + 1))
+    );
+  }
+}
+
+function initMobileContextBar() {
+  const bar = ensureMobileContextBar();
+  if (!bar || contextBarInitialized) return;
+  contextBarInitialized = true;
+
+  document.getElementById('prevDayBtn')?.addEventListener('click', () => {
+    const currentDayIndex = getDayIndexFromUrl();
+    if (currentDayIndex > 0) window.saveAndSwitchToDay?.(currentDayIndex - 1);
+  });
+
+  document.getElementById('nextDayBtn')?.addEventListener('click', () => {
+    const currentDayIndex = getDayIndexFromUrl();
+    if (currentDayIndex < getStudyDaysCount() - 1) {
+      window.saveAndSwitchToDay?.(currentDayIndex + 1);
+    }
+  });
+
+  const dayTrigger = document.getElementById('dayPickerBtn');
+  dayTrigger?.addEventListener('click', () => {
+    toggleContextMenu({
+      id: DAY_MENU_ID,
+      className: 'day-menu',
+      trigger: dayTrigger,
+      build: buildDayMenu,
+    });
+  });
+
+  const timelineTrigger = document.getElementById('timelinePickerBtn');
+  timelineTrigger?.addEventListener('click', () => {
+    toggleContextMenu({
+      id: TIMELINE_MENU_ID,
+      className: 'timeline-menu',
+      trigger: timelineTrigger,
+      build: buildTimelineMenu,
+    });
+  });
+
+  // The tabs are rebuilt as timelines come and go, so their handlers live on the
+  // strip instead of on the buttons.
+  const timelineTabs = document.getElementById(TIMELINE_TABS_ID);
+  timelineTabs?.addEventListener('click', (event) => {
+    const tab = event.target.closest?.('.timeline-tab');
+    if (!tab) return;
+    navigateToTimelineByKey(tab.dataset.timelineKey);
+  });
+  timelineTabs?.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const tabs = Array.from(timelineTabs.querySelectorAll('.timeline-tab'));
+    const current = tabs.findIndex(
+      (tab) => tab.getAttribute('aria-selected') === 'true'
+    );
+    if (current === -1) return;
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const next = tabs[(current + step + tabs.length) % tabs.length];
+    if (!next) return;
+    event.preventDefault();
+    // Focus lands on the tab the arrow key reached and stays there: the switch
+    // is async, but the strip is only rebuilt when the key set changes.
+    next.focus();
+    navigateToTimelineByKey(next.dataset.timelineKey);
+  });
+
+  refreshMobileContextBar();
+}
+
 function initButtons() {
   if (buttonsInitialized) return;
   buttonsInitialized = true;
 
   initSkipReportingButton();
+  initMoreMenu();
+  initMobileContextBar();
+  // Build the chip (hidden) up front: a live region has to be in the DOM before
+  // its text changes, otherwise the failure it is there for is never announced.
+  ensureSyncStatusChip();
 
-  const cleanRowBtn = document.getElementById('cleanRowBtn');
-  const navSubmitBtn = document.getElementById('navSubmitBtn');
+  const clearTimelineBtn = document.getElementById('clearTimelineBtn');
 
-  // Initialize the navigation submit button — Copy Days: always call save action
-  if (navSubmitBtn) {
-    navSubmitBtn.addEventListener('click', () => {
-      handleNextButtonAction();
-    });
-  }
-
-  const performCleanRow = () => {
+  const performClearTimeline = () => {
     const currentKey = getCurrentTimelineKey();
     const currentData = getCurrentTimelineData();
     if (currentData.length > 0) {
+      // Keep what is about to be deleted. The day is written by autosave a second
+      // later, so undo is the participant's only way back - the button used to be
+      // safe because nothing was stored until Save Day was pressed.
+      const clearedActivities = [...currentData];
+
       // Get the activities container of the active timeline
       const activeTimeline = window.timelineManager.activeTimeline;
       const activitiesContainer = activeTimeline.querySelector('.activities');
@@ -1449,67 +2423,43 @@ function initButtons() {
 
       updateButtonStates();
 
+      window.showUndoClearTimelineToast?.(currentKey, clearedActivities);
+
       if (DEBUG_MODE) {
         console.log(
-          'Timeline data after clean:',
+          'Timeline data after clear:',
           window.timelineManager.activities
         );
       }
     }
   };
 
-  cleanRowBtn.addEventListener('click', () => {
+  clearTimelineBtn.addEventListener('click', () => {
     createModal();
-    const cleanRowConfirmationModal = document.getElementById(
-      'cleanRowConfirmationModal'
+    const clearTimelineConfirmModal = document.getElementById(
+      'clearTimelineConfirmModal'
     );
 
-    if (cleanRowConfirmationModal) {
-      cleanRowConfirmationModal.style.display = 'block';
+    if (clearTimelineConfirmModal) {
+      clearTimelineConfirmModal.style.display = 'block';
       return;
     }
 
     // Fallback if modal is unavailable for any reason.
-    performCleanRow();
+    performClearTimeline();
   });
 
-  const confirmCleanRowOk = document.getElementById('confirmCleanRowOk');
-  if (confirmCleanRowOk) {
-    confirmCleanRowOk.addEventListener('click', performCleanRow);
+  const confirmClearTimelineOk = document.getElementById(
+    'confirmClearTimelineOk'
+  );
+  if (confirmClearTimelineOk) {
+    confirmClearTimelineOk.addEventListener('click', performClearTimeline);
   }
 
-  // Add click handler for Remove Last button using debounced function
-  document
-    .getElementById('removeLastBtn')
-    .addEventListener('click', handleRemoveLastButtonAction);
-
-  // Add click handler for Next button
-  const nextBtn = document.getElementById('nextBtn');
-
-  // Allow pointer events on disabled button to show toast
-  nextBtn.style.pointerEvents = 'auto';
-
-  nextBtn.addEventListener('click', function (e) {
-    // Check if button is disabled
-    if (nextBtn.disabled) {
-      e.preventDefault();
-      e.stopPropagation();
-      // Show toast message when disabled button is clicked
-      const message = window.i18n
-        ? window.i18n.t('messages.timelineMissing')
-        : 'There is information missing from this timeline. Would you like to add anything?';
-      showToast(message, 'warning', 4000);
-      return;
-    }
-
-    // Otherwise proceed with normal action
-    handleNextButtonAction();
-  });
-
-  // Add click handler for Back button using shared debounced function
-  const backButton = document.getElementById('backBtn');
-  if (backButton) {
-    backButton.addEventListener('click', handleBackButtonAction);
+  // Timeline switcher: cycles through the study's timelines.
+  const switchTimelineButton = document.getElementById('switchTimelineBtn');
+  if (switchTimelineButton) {
+    switchTimelineButton.addEventListener('click', handleSwitchTimelineAction);
   }
 
   // Copy Days: Submit Study button — save the current day first, then POST to
@@ -1547,14 +2497,11 @@ function initButtons() {
 
       try {
         // Persist the current day before submitting so the backend validates
-        // the exact visible state.  Submit is a rare explicit action, so the
-        // extra save round-trip is acceptable.
-        const currentDayIndex = getCurrentDayIndex();
-        const saveResult = await sendData({
-          shouldRedirect: false,
-          isLastDay: false,
-          currentDayIndex,
-        });
+        // the exact visible state. Submitting is a rare explicit action, so
+        // waiting for a flush here is acceptable.
+        const saveResult = window.autosave
+          ? await window.autosave.flush()
+          : await sendData();
 
         if (!saveResult?.success) {
           const submitErrorMessage = window.i18n
@@ -1764,32 +2711,19 @@ function updateTimelineCountVariable() {
 
 // Prevent pull-to-refresh on mobile devices
 function preventPullToRefresh() {
-  // Only prevent overscroll on iOS Safari and Chrome
+  // overscroll-behavior is what stops the browser's pull-to-refresh, and every
+  // engine we support honours it. It has to be set on the root element (that is
+  // the viewport) and on the body (Safari reads that one).
+  document.documentElement.style.overscrollBehavior = 'none';
   document.body.style.overscrollBehavior = 'none';
 
-  // For iOS Safari - only prevent default when at the top of the page and pulling down
-  document.addEventListener(
-    'touchstart',
-    function (e) {
-      // Store the initial touch position
-      window.touchStartY = e.touches[0].clientY;
-    },
-    { passive: true }
-  );
-
-  document.addEventListener(
-    'touchmove',
-    function (e) {
-      const touchY = e.touches[0].clientY;
-      const touchYDelta = touchY - window.touchStartY;
-
-      // Only prevent default if we're at the top and trying to pull down
-      if (window.pageYOffset === 0 && touchYDelta > 0) {
-        e.preventDefault();
-      }
-    },
-    { passive: false }
-  );
+  // There used to be a document-level touchmove fallback here that called
+  // preventDefault() whenever window.pageYOffset was 0 and the finger moved
+  // down. On the diary the window never scrolls - the day scrolls inside
+  // .timelines-wrapper - so that condition was permanently true and every
+  // downward drag was cancelled: the day could be scrolled to its end but never
+  // back. overscroll-behavior covers the case on its own, without a non-passive
+  // touchmove listener on the whole document.
 }
 
 function updateFooterHeight() {

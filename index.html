@@ -6,7 +6,14 @@
     <meta http-equiv="Expires" content="0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="common.loading">Loading...</title>
+    <!-- Deliberately NOT data-i18n. applyTranslations() rewrites the text of every
+         element carrying that attribute, <title> included, and ui.js (activities
+         modal) plus maintenance.js run it again *after* the diary is built - so a
+         data-i18n title gets reset and the tab no longer shows the study name.
+         The study's own name is set by applyPageTitle() in js/script.js; "Time Use
+         Diary" below is only the fallback for the moment before the config
+         arrives. -->
+    <title>Time Use Diary</title>
 
     <!-- Favicons -->
     <link rel="shortcut icon" href="favicon/favicon.ico">
@@ -21,8 +28,12 @@
 <body>
     <div id="instructionBanner" class="instruction-banner">
         <div class="banner-content">
+            <!-- One string per layout: desktop selects from the inline activity
+                 list, a phone reaches the picker through the + button - and the
+                 verbs differ ("click" vs "tap"). styles.css shows one of them. -->
             <span class="banner-text">
-                <span data-i18n="banner.dayOneInstructions">Usage Instructions: First select an activity from the list below. Then click on the timeline to place it, and drag its borders to extend. To delete an activity on mobile, long-press it for 2 seconds. On desktop, you can also hover over it and press the 'd' key or the DEL key.</span>
+                <span class="banner-text-mobile" data-i18n="banner.instructionsMobile">Instructions: tap the + button in the bottom right corner to choose an activity, then tap the timeline to place it. Drag its edges to extend it. To delete an activity, long-press it and choose Delete.</span>
+                <span class="banner-text-desktop" data-i18n="banner.instructionsDesktop">Instructions: select an activity below, then click the timeline to place it. Drag its edges to extend it. To delete an activity, right-click it and choose Delete.</span>
             </span>
             <button class="banner-close" type="button" data-i18n-aria-label="buttons.close" aria-label="Close">&times;</button>
         </div>
@@ -31,24 +42,25 @@
     <div class="header-section">
         <div class="controls" style="padding-top: 4px; padding-left: 4px; padding-bottom: 4px; padding-right: 4px;">
 
-        <button class="btn back-btn" id="backBtn" data-is-active="false" style="display: none;">
-            <i class="fas fa-arrow-left" aria-hidden="true"></i>
-            <span data-i18n="buttons.previousTimeline">Previous timeline</span>
+        <!-- The buttons sit in their own group so the autosave status chip can
+             hang beside them without taking part in the row's centring. Inline,
+             the chip re-centred the whole row and pushed the buttons sideways on
+             every save state change (measured: Submit Study moved 86 px). -->
+        <div class="controls-group">
+
+        <!-- Cycles through the study's timelines, at every width. The label
+             always names the timeline this button switches to, so it doubles as
+             the hint that more than one timeline exists - on narrow viewports
+             only the active timeline is rendered, and this button is the only
+             way to the others. Never disabled: it has to work both ways. -->
+        <button class="btn switch-timeline-btn" id="switchTimelineBtn" data-is-active="false" hidden>
+            <i class="fas fa-right-left" aria-hidden="true"></i>
+            <span id="switchTimelineLabel" data-i18n="buttons.switchTimeline">Switch timeline</span>
         </button>
 
-        <button class="btn remove-last-btn" id="removeLastBtn" data-is-active="false" disabled>
-            <i class="fas fa-undo" aria-hidden="true"></i>
-            <span data-i18n="buttons.removeLast">Remove Last</span>
-        </button>
-
-        <button class="btn clean-row-btn" id="cleanRowBtn" data-is-active="false" disabled>
+        <button class="btn clear-timeline-btn" id="clearTimelineBtn" data-is-active="false" disabled>
             <i class="fas fa-trash-alt" aria-hidden="true"></i>
-            <span data-i18n="buttons.cleanRow">Clean Row</span>
-        </button>
-
-        <button class="btn next-btn" id="nextBtn" data-is-active="false" disabled>
-            <i class="fas fa-save" aria-hidden="true"></i>
-            <span data-i18n="buttons.saveDay">Save Day</span>
+            <span data-i18n="buttons.clearTimeline">Clear timeline</span>
         </button>
 
         <button class="btn submit-study-btn" id="submitStudyBtn" data-is-active="false" disabled
@@ -56,6 +68,17 @@
             <i class="fas fa-check-double" aria-hidden="true"></i>
             <span data-i18n="buttons.submitStudy">Submit Study</span>
         </button>
+
+        <!-- Overflow menu, at every width. It holds the two actions that should
+             not compete with the day's own controls: Skip time reporting (a last
+             resort) and the language picker. Each item proxies .click() to the
+             real control, which keeps one implementation of every action. -->
+        <button class="btn more-menu-btn" id="moreMenuBtn" type="button"
+                aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu"
+                data-i18n-aria-label="buttons.moreActions" aria-label="More actions">
+            <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
+        </button>
+        </div>
         </div>
 
         <div class="timeline-header">
@@ -86,6 +109,8 @@
     <!-- Load Bowser and other scripts -->
     <script src="assets/bowser/bundled.js"></script>
     <script src="assets/interactjs/interact.min.js"></script>
+    <!-- Browser/device identification (global `UAParser`), used by js/client_info.js -->
+    <script src="assets/ua-parser-js/ua-parser.min.js"></script>
     <script src="settings/tud_settings.js"></script>
     <script src="js/maintenance.js" type="module"></script>
     <script src="js/study_config_manager.js" type="module"></script>
@@ -112,26 +137,25 @@
     <!-- Attribute Tracker Script -->
     <script src="js/attributeTracker.js"></script>
 
-    <div id="instructionsFooter" class="instructions-footer">
+    <!-- Footer row for optional actions. It starts hidden and stays hidden while
+         "Skip time reporting" lives in the ⋮ menu (ui.js updateFooterVisibility
+         keys off that button's computed display); it remains the container the
+         page's footer-height bookkeeping measures. -->
+    <div id="instructionsFooter" class="instructions-footer" hidden>
         <div class="footer-actions-row">
-            <div class="footer-actions-spacer" aria-hidden="true"></div>
             <button class="btn skip-btn footer-skip-btn" id="skipReportingBtn" data-is-active="true">
                 <i class="fas fa-forward" aria-hidden="true"></i>
                 <span data-i18n="buttons.skipReporting">Skip time reporting</span>
-            </button>
-            <button id="navSubmitBtn" class="nav-submit-btn">
-                <i class="fas fa-save" aria-hidden="true"></i>
-                <span data-i18n="buttons.saveDay">Save Day</span>
             </button>
         </div>
     </div>
     <!-- The footer is re-used by js/footer.js, which keeps this colour for the legal links.
          #ccc on the page background was 1.53:1 (axe: color-contrast) - unreadable. -->
     <div id="footer" style="padding: 20px; border-top: 1px solid #ddd; text-align: center; margin-top: 20px; font-size: small; color: #475569;">
-        <span id="footer_app_title" data-i18n="footer.title">TRAC</span>
+        <!-- Filled by applyPageTitle() (js/script.js) with the study's own name.
+             No data-i18n here for the same reason as <title> above. -->
+        <span id="footer_app_title">Time Use Diary</span>
         <span id="footer_app_version" style="margin-left: 4px;"></span>
-        <br />
-        <span id="footer_backend_status" data-i18n="footer.backend_status_connecting">Connecting to backend...</span>
     </div>
     <script src="js/footer.js"></script>
 </body>

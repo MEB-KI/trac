@@ -80,11 +80,35 @@ body {
     overflow: hidden;
     padding: 0 2px;
     width: 100%;
+    /* `100vh` is the viewport with the browser's own chrome *hidden*, and on a
+       phone that bar never goes away here (the page itself does not scroll, the
+       day scrolls inside it) - so the bottom of the day, and the 20px tail that
+       keeps its last hour line reachable, sat behind the URL bar. `svh` is the
+       smallest viewport, chrome included, so the day always fits; the `vh` line
+       above it is the fallback for engines without viewport units. */
     height: calc(
       100vh - var(--header-height, 80px) - var(--footer-height, 80px)
     );
+    height: calc(
+      100svh - var(--header-height, 80px) - var(--footer-height, 80px)
+    );
     overscroll-behavior: none;
-    touch-action: pan-x pinch-zoom;
+    /* No vertical margin, and the breathing room under the header is padding
+       *inside* this box instead: the height above is the whole space between
+       header and footer, so a 20px margin on top pushed the box (and the day's
+       scroller in it) 20px below the viewport - measured at 412x915 the
+       scroller ended at 935px in a 915px viewport, and the 20px tail that keeps
+       the day's last hour line reachable was exactly the part hanging off
+       screen. That is why the day still looked like it ended flush at 04:00. */
+    margin: 0;
+    padding-top: 20px;
+    box-sizing: border-box;
+    /* Vertical panning is allowed here so it can reach .timelines-wrapper, the
+       element that actually scrolls the day. Chrome already scrolled on
+       without this, but the permission has to be granted along the whole chain
+       for engines that intersect strictly (Safari), otherwise a swipe starting
+       on a block would still be dead there. */
+    touch-action: pan-x pan-y pinch-zoom;
     -webkit-overflow-scrolling: auto;
   }
 
@@ -238,8 +262,16 @@ body {
   display: none;
 }
 
+/* The day title and its copy button sit on one line: as a block, the button was
+   baseline-aligned with the 24 px title text and hung ~5 px below it (and below
+   the title's own box, eating the gap to the timeline). Centring it in a flex row
+   puts it level with the day text and restores the space underneath. */
 .timeline-title {
-  margin: 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 4px 0 6px 0;
   font-size: clamp(18px, 2.5vw, 24px);
   color: var(--text-color);
   font-weight: 400;
@@ -328,6 +360,20 @@ body {
 
 .timeline-coverage-indicator.is-missing {
   color: #c62828;
+}
+
+/* min_coverage 0 with nothing entered: no requirement to report, so no verdict
+   colour either. (This used to be the green ✓, on a timeline nobody touched.) */
+.timeline-coverage-indicator.is-empty {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Phone-only rows that advertise the other timelines - the other containers
+   measure 0×0 below the breakpoint, so nothing else on the page mentions them.
+   Desktop shows both timelines side by side and hides these. */
+.empty-timeline-hint {
+  display: none;
 }
 
 .timeline-container[data-active='false'] .title {
@@ -494,6 +540,61 @@ body {
     top: 0;
     margin: 0 0 10px 0;
     font-size: 10px;
+  }
+
+  /* One tappable row per untouched other timeline, under the active timeline's
+     description. A tap target, not a label: full width, 44px tall. */
+  .empty-timeline-hint {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 6px;
+    margin: 0 0 10px 0;
+  }
+
+  .empty-timeline-hint-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px dashed #9ca3af;
+    border-radius: 8px;
+    background: #fff;
+    color: #374151;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    /* Tapping must not be held back by double-tap zoom, but a drag that starts
+       on the row still scrolls the day like everywhere else. */
+    touch-action: manipulation;
+  }
+
+  .empty-timeline-hint-row:active {
+    background: #f3f4f6;
+  }
+
+  .empty-timeline-hint-row[disabled] {
+    opacity: 0.6;
+  }
+
+  .empty-timeline-hint-name {
+    font-weight: 600;
+  }
+
+  .empty-timeline-hint-state {
+    margin-left: auto;
+    color: #6b7280;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .empty-timeline-hint-row .fa-chevron-right {
+    color: #9ca3af;
+    font-size: 12px;
   }
 
   .timeline-container[data-active='false'] {
@@ -715,9 +816,10 @@ body {
     overflow-y: auto;
     align-items: center;
     justify-content: flex-start;
-    height: calc(
-      100vh - var(--header-height, 80px) - var(--footer-height, 80px)
-    );
+    /* Fill the space the canvas reserves (header/footer are already subtracted
+       there) so the scroller ends where the screen does; `100vh` here as well
+       would overflow by the canvas' padding. */
+    height: 100%;
   }
 
   .past-initialized-timelines-wrapper {
@@ -730,7 +832,11 @@ body {
     min-width: 100%;
     height: 2500px;
     margin: 0;
-    padding: 0;
+    /* The day's last hour line sits at the very end of the content, so without
+       this it lands exactly on the bottom edge of the scroller and cannot be
+       brought into view. The padding is added outside the timeline's own height
+       (content-box), so the hour spacing stays untouched. */
+    padding: 0 0 20px;
   }
 
   .timeline-container {
@@ -995,7 +1101,12 @@ body {
 /* Mobile styles */
 @media (max-width: 1439.98px) {
   .time-label {
-    right: -50px; /* Space from the block */
+    /* Inside the block, not hanging off its right edge. With `right: -50px` the
+       chip needed 50 px of room beside a 48 px wide box, and the phone timeline
+       has none: measured at 390 px width it was clipped to a ~1 px black sliver
+       at the screen edge - which is what made a block look cut off. The block
+       itself now stops 5 % short of the edge, and the chip sits inside it. */
+    right: 4px;
     top: 50%;
     transform: translateY(-50%);
     white-space: normal;
@@ -1030,6 +1141,18 @@ body {
   display: flex;
   justify-content: center;
   margin: 4px 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The toolbar buttons, grouped so the autosave status chip can hang beside them
+   without joining the row that gets centred. Wrapping happens here rather than on
+   .controls, which now has a single in-flow child. */
+.controls-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -1092,8 +1215,12 @@ body {
   font-weight: 700;
 }
 
-/* Copy day context menu */
-.copy-day-context-menu {
+/* Shared look for every "pick something" popup in the diary: the Copy Days
+   picker, the ⋮ menu, the day menu and the timeline menu. All of them become a
+   bottom sheet on phones (see the 768 px block). The semantic class names
+   (`.copy-day-context-menu`, `.more-menu`, ...) stay on the elements for the
+   specs and for behaviour-specific rules. */
+.context-menu {
   position: fixed;
   background: var(--surface, #fff);
   border: 1px solid var(--border-strong, #d1d5db);
@@ -1106,7 +1233,7 @@ body {
   font-size: 0.88rem;
 }
 
-.copy-day-context-menu-item {
+.context-menu-item {
   display: block;
   width: 100%;
   padding: 8px 16px;
@@ -1120,11 +1247,16 @@ body {
   white-space: nowrap;
 }
 
-.copy-day-context-menu-item:hover {
+.context-menu-item:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.06);
 }
 
-.copy-day-context-menu-header {
+.context-menu-item:disabled {
+  color: var(--muted, #6b7280);
+  cursor: not-allowed;
+}
+
+.context-menu-header {
   padding: 6px 16px;
   color: var(--muted, #6b7280);
   font-size: 0.8rem;
@@ -1133,12 +1265,294 @@ body {
   margin-bottom: 4px;
 }
 
+/* Items that carry a second line (the timeline menu shows coverage under the
+   name), so they may wrap instead of overrunning the sheet. */
+.context-menu-item:has(.context-menu-item-detail) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: normal;
+}
+
+.context-menu-item-detail {
+  font-size: 0.78rem;
+  color: var(--muted, #6b7280);
+}
+
+/* Days that meet min_coverage, same palette as the desktop day buttons. */
+.day-menu-item.is-complete {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.day-menu-item[aria-current='true'] {
+  font-weight: 700;
+}
+
+/* The copy action at the top of the day menu. It is not a day, so it must not
+   look like one: accent colour, a copy glyph and its own row above the list,
+   separated by a rule from the day list below it. As the eighth row of the
+   list it was invisible - nobody reads all seven weekdays. */
+.context-menu-item.day-menu-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The shared item style is nowrap; this label carries the day name and wraps
+     to two lines on a phone rather than overflowing the sheet. */
+  white-space: normal;
+  line-height: 1.25;
+  color: var(--primary-color);
+  font-weight: 600;
+  background-color: rgba(37, 99, 235, 0.08);
+  border-bottom: 1px solid var(--border-color);
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.context-menu-item.day-menu-copy:hover:not(:disabled) {
+  background-color: rgba(37, 99, 235, 0.16);
+}
+
+.day-menu-copy .context-menu-item-icon {
+  flex: 0 0 auto;
+  font-size: 0.95em;
+}
+
+/* The copy row when the day has nothing in it yet: disabled and greyed, with the
+   reason shown on the row (`.context-menu-item-detail`). Never hidden - seeing
+   the row is how a participant learns that copying exists - and never needing a
+   tap to explain itself, which is the shape Save/Submit use too. */
+.context-menu-item.day-menu-copy:disabled {
+  color: var(--muted, #6b7280);
+  background-color: rgba(0, 0, 0, 0.03);
+  font-weight: 500;
+}
+
+/* Icon, label and reason on one row: the shared "item with a detail" rule turns
+   the row into a column, which would put the copy glyph on its own line. */
+.context-menu-item.day-menu-copy:has(.context-menu-item-detail) {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+}
+
+.context-menu-item.day-menu-copy .context-menu-item-icon {
+  grid-row: 1 / span 2;
+}
+
+/* Language choices in the ⋮ menu: the same items, side by side. */
+.more-menu-languages {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.more-menu-languages .context-menu-item {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.more-menu-languages .context-menu-item[aria-pressed='true'] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Phone context row: which day and which timeline the participant is in, with
+   ‹ › to step days. Hidden on desktop, where the day row and the timeline
+   switcher button do the same job and stay exactly as they were. */
+.context-bar {
+  display: none;
+}
+
+@media (max-width: 1439.98px) {
+  .context-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 2px 4px;
+  }
+
+  .context-day {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  /* The day moved into the context bar and the timeline name is already in the
+     canvas coverage row, so the title row would only repeat both. */
+  .header-section .timeline-title {
+    display: none;
+  }
+
+  .btn.context-step-btn {
+    min-width: auto;
+    min-height: 28px;
+    padding: 4px 8px;
+    background-color: var(--secondary-color);
+  }
+
+  .btn.context-picker-btn {
+    min-width: auto;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 4px 10px;
+    gap: 6px;
+    font-size: 0.82rem;
+    background-color: var(--secondary-color);
+    overflow: hidden;
+  }
+
+  .btn.context-picker-btn:hover:not(:disabled) {
+    background-color: #334155;
+    transform: none;
+  }
+
+  /* Timeline tabs: the phone's switcher for a study with exactly two timelines.
+     Both tracks are on screen at once - that is the point, a participant who
+     never opened the picker never learned that the second one existed - so the
+     strip takes its own row under the day control. Two study-authored names do
+     not fit beside the day control (measured: ~190 px day control + ~300 px of
+     segments in a 382 px row), which is what the full-width basis is for. */
+  .timeline-switcher {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .timeline-switcher.has-tabs {
+    flex: 1 1 100%;
+  }
+
+  /* `hidden` has to beat the display rules below: an author rule outranks the
+     user-agent `[hidden] { display: none }`, so `hidden` alone does nothing. */
+  .timeline-switcher[hidden],
+  .timeline-tabs[hidden] {
+    display: none !important;
+  }
+
+  .timeline-tabs {
+    display: inline-flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background-color: var(--secondary-color);
+  }
+
+  .timeline-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 28px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: #fff;
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timeline-tab[aria-selected='true'] {
+    background-color: var(--primary-color);
+    font-weight: 600;
+  }
+
+  /* With the names in the tabs this button keeps only its caret - the way into
+     the timeline sheet, which still carries the coverage per timeline and
+     "Clear timeline". */
+  .btn.context-picker-btn.is-icon-only {
+    padding: 4px 8px;
+  }
+
+  .context-day-text,
+  #contextTimelineName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .context-day-text .timeline-header-emphasis {
+    font-weight: 700;
+  }
+
+  .context-day-text .timeline-study-day-meta {
+    opacity: 0.85;
+  }
+
+  /* Study-owner label from ?custom_page_title=: the row it used to live in is
+     not rendered on phones, so it gets its own line here. */
+  .context-custom-title {
+    flex-basis: 100%;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #475569;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Language selector: in the toolbar on desktop, inside the ⋮ menu on phones. */
+.language-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.5rem;
+}
+
+/* The ⋮ trigger exists at every width now: it holds the two actions that should
+   not compete with the day's own controls - "Skip time reporting" (a last resort,
+   not something to offer all day) and the language picker (touched about once).
+   Id selectors so no later `.btn` rule wins. */
+#moreMenuBtn {
+  display: inline-flex;
+  /* Icon-only: the shared `.btn` min-width of 120px would swallow a third of the
+     toolbar row and force the very wrap the menu exists to avoid. */
+  min-width: auto;
+  padding: 0 clamp(10px, 2vw, 14px);
+}
+
+/* Actions that live in the ⋮ menu at every width. They stay in the DOM and keep
+   their handlers - the menu proxies .click() to them - and hiding
+   #skipReportingBtn collapses its footer row (updateFooterVisibility), which is
+   what reclaims the space. */
+#skipReportingBtn,
+.language-select-wrapper {
+  display: none;
+}
+
+@media (max-width: 1439.98px) {
+  /* The cycling switcher is replaced by the context bar's timeline picker,
+     which names the current timeline and lists them all with their coverage. */
+  #switchTimelineBtn {
+    display: none;
+  }
+
+  /* Clear timeline has a menu entry of its own in the context bar's timeline
+     menu. */
+  #clearTimelineBtn {
+    display: none;
+  }
+}
+
 /* "Copy this day" button in the timeline title.
    Styled to match the secondary-slate previous-day switch buttons so the
    enabled/disabled affordance is visually consistent across day actions. */
 .btn.copy-day-link {
   display: inline-flex;
   align-items: center;
+  /* The title is a flex row now, so a gap would also separate the day name from
+     "(Day 1 of 7)" - keep the spacing here instead. */
   margin-left: 10px;
   min-width: auto;
   min-height: 28px;
@@ -1173,7 +1587,9 @@ body {
     margin-left: 6px;
   }
 
-  .copy-day-context-menu {
+  .copy-day-context-menu,
+  .more-menu,
+  .context-menu {
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
@@ -1184,7 +1600,7 @@ body {
     padding: 8px 0;
   }
 
-  .copy-day-context-menu-item {
+  .context-menu-item {
     padding: 14px 20px;
     font-size: 1rem;
   }
@@ -1225,20 +1641,12 @@ body {
   cursor: not-allowed;
 }
 
-.clean-row-btn {
+.clear-timeline-btn {
   background-color: var(--danger-color);
 }
 
-.clean-row-btn:hover:not(:disabled) {
+.clear-timeline-btn:hover:not(:disabled) {
   background-color: #b91c1c;
-}
-
-.remove-last-btn {
-  background-color: var(--secondary-color);
-}
-
-.remove-last-btn:hover:not(:disabled) {
-  background-color: #334155;
 }
 
 .save-btn {
@@ -1276,12 +1684,12 @@ body {
   animation: shake 0.4s linear;
 }
 
-.activity-block.long-press-delete-armed {
+.activity-block.long-press-armed {
   transform: scale(0.98);
-  box-shadow: 0 0 0 2px var(--danger-color);
+  box-shadow: 0 0 0 2px var(--primary-color);
 }
 
-.long-press-delete-indicator {
+.long-press-indicator {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -1294,12 +1702,12 @@ body {
   z-index: 20;
   --long-press-progress: 0;
   background: conic-gradient(
-    var(--danger-color) calc(var(--long-press-progress) * 1turn),
+    var(--primary-color) calc(var(--long-press-progress) * 1turn),
     var(--border-color) 0
   );
 }
 
-.long-press-delete-indicator::after {
+.long-press-indicator::after {
   content: '';
   position: absolute;
   inset: 4px;
@@ -1392,10 +1800,155 @@ body.carrying-activity .modal-close {
   }
 }
 
+/* Inert on desktop, where the block is dragged/resized with a mouse and the
+   `touch-action: none` of the base rule stays in force.
+
+   This has to be declared BEFORE the mobile override below: the two rules have
+   the same specificity, so a `display: none` placed after it silently wins and
+   the reserved ends exist in the DOM but never on screen - which is what
+   happened, and what made the resize depend on a document-level touchmove
+   guard instead. */
+.activity-block-edge-zone {
+  display: none;
+}
+
 /* Mobile resize handle */
 @media (max-width: 1439.98px) {
   .activity-block {
     cursor: ns-resize;
+  }
+
+  /* --- Scrolling vs. resizing on the block's surface ---
+     A finger that lands on a block has to be able to scroll the timeline: on a
+     phone the blocks cover ~75 % of the timeline width, so `touch-action: none`
+     on the whole block made most of the surface a scroll dead zone - reported
+     as "the scrolling doesn't work on the phone". Block swipes may pan now.
+
+     The two ends stay reserved for resizing, because a pannable drag would make
+     the browser scroll and fire pointercancel, killing the resize in progress.
+     Their height is the measured resize band: interact starts a resize 4-20 px
+     from an end, so 16 px keeps the band close to the gesture it protects.
+
+     The 30 % cap is what keeps the middle scrollable on a short block: a
+     10-minute block is only ~17 px tall, and at 40 % the two bands covered all
+     but 3 px of it - measured, that is a scroll dead zone again (the block
+     reported "the scrolling doesn't work on my phone" a second time). At 30 %
+     the middle is always at least 40 % of the block. Re-tune here if that
+     trade-off ever needs to shift - it is the single place that decides it. */
+  .activity-block {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .activity-block-edge-zone {
+    display: block;
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: min(16px, 30%);
+    touch-action: none;
+    z-index: 2; /* above the block text, which is what a middle swipe hits */
+  }
+
+  .activity-block-edge-zone-top {
+    top: 0;
+  }
+
+  .activity-block-edge-zone-bottom {
+    bottom: 0;
+  }
+}
+
+/* --- Visible resize grips (desktop) ---
+   The edges have always been draggable, but the 10 px zones above are
+   invisible and the hover tooltip took over ::before, so nothing on the block
+   announced the gesture - participants reported not knowing that a duration
+   can be adjusted by dragging its edges and asked for a visible marker
+   (participant feedback 2026-10, "like an Excel cell").
+   The grips are decoration: `pointer-events: none` keeps the block the pointer
+   target, so interact.js' edge zones and the ew-resize cursor are unchanged.
+   Hidden by default, shown while the block is targeted (hover), keyboard
+   focused, or being resized. The phone layout re-uses the same spans - see the
+   mobile block at the end of this section. */
+.activity-block-grip {
+  display: none;
+}
+
+@media (min-width: 1440px) {
+  .activity-block-grip {
+    display: block;
+    position: absolute;
+    top: 50%;
+    width: 4px;
+    height: 55%;
+    min-height: 12px;
+    max-height: 36px;
+    transform: translateY(-50%);
+    border-radius: 2px;
+    background-color: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 16; /* above the block text, below the hover tooltip (z-index 1000) */
+  }
+
+  .activity-block-grip-left {
+    left: 2px;
+  }
+
+  .activity-block-grip-right {
+    right: 2px;
+  }
+
+  .activity-block:hover .activity-block-grip,
+  .activity-block:focus-visible .activity-block-grip,
+  .activity-block.resizing .activity-block-grip {
+    opacity: 1;
+  }
+}
+
+/* --- The same grips on the phone ---
+   The markup is shared: `activity-block-grip-left/right` exist on every block.
+   On the vertical layout the block's start and end are its top and bottom edge,
+   so the vertical bars become horizontal ones and move onto those ends - which
+   is where the resize bands above reserve the gesture.
+
+   Two differences from desktop. There is no hover on a touch device, so a grip
+   that waited for it would never appear and the gesture would stay undiscovered
+   (the whole point of the marker); they are therefore visible at a modest
+   opacity and step up while the block is focused or being resized. And they sit
+   flush in the band (`top: 0` / `bottom: 0`) rather than inset, so the marker is
+   inside the band that actually resizes for every block size.
+
+   This block MUST come after the `display: none` above: same specificity, so a
+   rule placed before it would be overridden and the grips would exist but never
+   be rendered - exactly how the resize bands themselves once went missing. */
+@media (max-width: 1439.98px) {
+  .activity-block-grip {
+    display: block;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(36px, 55%);
+    height: 3px;
+    border-radius: 2px;
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
+    pointer-events: none;
+    opacity: 0.7;
+    z-index: 16; /* above the block text, below the hover tooltip */
+  }
+
+  .activity-block-grip-left {
+    top: 0;
+  }
+
+  .activity-block-grip-right {
+    bottom: 0;
+  }
+
+  .activity-block:focus .activity-block-grip,
+  .activity-block.resizing .activity-block-grip {
+    opacity: 1;
   }
 }
 
@@ -1509,21 +2062,117 @@ body.carrying-activity .modal-close {
   }
 }
 
+/* `hidden` has to beat `.btn { display: flex }`: an author rule outranks the
+   user-agent `[hidden] { display: none }`, so `hidden` alone does nothing on
+   our buttons. */
+.btn[hidden] {
+  display: none !important;
+}
+
 /* Navigation buttons */
-.back-btn {
+.switch-timeline-btn {
   background-color: var(--secondary-color);
 }
 
-.back-btn:hover:not(:disabled) {
+.switch-timeline-btn:hover:not(:disabled) {
   background-color: #334155;
 }
 
-.next-btn {
-  background-color: var(--primary-color);
+.switch-timeline-btn #switchTimelineLabel {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.next-btn:hover:not(:disabled) {
-  background-color: #1d4ed8;
+/* Autosave status chip (ui.js renderSyncStatus). It only ever appears when the
+   day could not be stored - a successful save says nothing - and it is the one
+   element that asks for something, so it takes the danger colour. */
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background-color: var(--background-color);
+  color: var(--secondary-color);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* The chip is an inline-flex element, so `hidden` needs the explicit rule. */
+.sync-status[hidden] {
+  display: none;
+}
+
+.sync-status-text {
+  font-weight: 600;
+}
+
+.sync-status-icon {
+  font-size: 0.85rem;
+}
+
+/* The text sits on its own tinted background, not on --background-color, so the
+   --danger-color used for the border and icon is too light as text: axe measured
+   4.41:1 (red on #fef2f2) at this 12.8px, below the 4.5:1 WCAG AA needs. A
+   darker shade of the same hue keeps the meaning: 5.91:1. */
+.sync-status.is-error {
+  border-color: #fecaca;
+  background-color: #fef2f2;
+  color: #b91c1c;
+}
+
+/* The retry is a real button: it must be tappable (24x24 minimum) inside a chip
+   that is otherwise not interactive. */
+.btn.sync-status-retry {
+  min-width: auto;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 8px;
+  border: none;
+  background-color: var(--danger-color);
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.btn.sync-status-retry:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.btn.sync-status-retry[hidden] {
+  display: none;
+}
+
+/* The chip hangs to the right of the button group, out of flow, so the buttons
+   never move when it appears or disappears. */
+@media (min-width: 1440px) {
+  .sync-status {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 10px;
+  }
+}
+
+/* On a phone the toolbar has no spare row: inline, the chip pushes the buttons
+   onto a second line and grows the header by 38 px every time an edit is saved
+   (measured 99 -> 137 px), i.e. the working area would jump while the
+   participant is editing. It floats instead, mirroring the "+" button on the
+   other side, which also keeps it visible while the timeline is scrolled. */
+@media (max-width: 1439.98px) {
+  .sync-status {
+    position: fixed;
+    left: 12px;
+    bottom: max(80px, calc(var(--footer-height, 80px) + 20px));
+    z-index: 900;
+    max-width: calc(100vw - 24px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
 }
 
 /* Two classes so the colour survives the later `.btn { color: white }` rule:
@@ -1537,15 +2186,6 @@ body.carrying-activity .modal-close {
 
 .skip-btn:hover:not(:disabled) {
   background-color: #cbd5e1;
-}
-
-/* When next button shows Submit text, use success color */
-.next-btn:has(i.fa-check) {
-  background-color: var(--success-color);
-}
-
-.next-btn:has(i.fa-check):hover:not(:disabled) {
-  background-color: #047857;
 }
 
 /* Copy Days: Submit Study button — looks like a normal button when inactive
@@ -1698,6 +2338,68 @@ body.carrying-activity .modal-close {
   margin-bottom: clamp(15px, 4vw, 25px);
   color: #666;
   line-height: 1.4;
+}
+
+/* ── "How to use the diary" ────────────────────────────────────────────────
+   The instructions page in an iframe (see openHelpModal in ui.js), so the modal
+   is a frame plus a title bar rather than a message: it owns the whole modal
+   box and scrolls internally. On a phone it is full screen, which leaves the
+   iframe as the only scrollable area - two nested scroll areas fight over a
+   thumb on the way down to the timeline. */
+#helpModal .modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 96vw);
+  height: min(90vh, 900px);
+  max-height: 90vh;
+  padding: 0;
+  overflow: hidden;
+}
+
+#helpModal .modal-header {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  padding: clamp(12px, 2vw, 18px) clamp(14px, 2vw, 20px);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+#helpModal .modal-header h3 {
+  margin: 0;
+  font-size: clamp(16px, 2.5vw, 20px);
+  color: #333;
+}
+
+#helpModal .help-modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.help-modal-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+@media (max-width: 1439.98px) {
+  #helpModal {
+    /* The idle-timeout chip is pinned to the very top and, by design, floats
+       above every dialog so the countdown is never hidden. Measured on a phone:
+       the chip occupies y 0-20, so the sheet starts below that strip instead of
+       running under it (it clipped the sheet's own title otherwise). */
+    align-items: flex-start;
+  }
+
+  #helpModal .modal {
+    width: 100%;
+    height: calc(100% - 24px);
+    max-height: none;
+    margin-top: 24px;
+    border-radius: 0;
+  }
 }
 
 /* Custom activity input with clear button */
@@ -2232,52 +2934,18 @@ body.carrying-activity .modal-close {
   margin-top: 20px;
 }
 
+/* The footer holds at most one action ("Skip time reporting", which studies can
+   disable). It is hidden by ui.js whenever it would be empty, so `hidden` is
+   authoritative here even if another rule sets a display on the footer. */
+.instructions-footer[hidden] {
+  display: none !important;
+}
+
 .footer-actions-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 16px;
-}
-
-.footer-actions-spacer {
-  min-width: 0;
-}
-
-.footer-skip-btn {
-  justify-self: center;
-}
-
-.nav-submit-btn {
-  padding: 12px 24px;
-  background-color: var(--primary-color);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  justify-self: end;
-  transition:
-    transform 0.2s ease,
-    background-color 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.nav-submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  background-color: #1d4ed8;
-}
-
-.nav-submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.nav-submit-btn i {
-  font-size: 16px;
+  justify-content: center;
+  gap: 16px;
 }
 
 /* Mobile adjustments for the footer */
@@ -2287,27 +2955,7 @@ body.carrying-activity .modal-close {
   }
 
   .footer-actions-row {
-    grid-template-columns: 1fr;
-    justify-items: center;
     gap: 12px;
-  }
-
-  .footer-actions-spacer {
-    display: none;
-  }
-
-  .footer-skip-btn,
-  .nav-submit-btn {
-    justify-self: center;
-  }
-
-  .nav-submit-btn {
-    padding: 8px 16px;
-    font-size: 13px;
-  }
-
-  .nav-submit-btn i {
-    font-size: 14px;
   }
 }
 
@@ -2642,13 +3290,6 @@ body.carrying-activity .modal-close {
   letter-spacing: 0.5px;
 }
 
-/* Allow clicks on disabled Next/Submit buttons for toast messages */
-#nextBtn:disabled,
-#navSubmitBtn:disabled {
-  pointer-events: auto !important;
-  cursor: not-allowed;
-}
-
 /* Toast Notifications */
 .toast {
   position: fixed;
@@ -2674,6 +3315,27 @@ body.carrying-activity .modal-close {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Optional action inside a toast (currently only "Undo" after a delete). The
+   toast re-enables pointer events while shown, but the button keeps them for
+   itself so it stays tappable during the fade-out. */
+.toast-action {
+  pointer-events: auto;
+  margin-left: 12px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #93c5fd;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .toast.warning {
@@ -2755,40 +3417,60 @@ body.carrying-activity .modal-close {
   display: none;
 }
 
-/* Desktop hover tooltip for activity blocks */
-@media (min-width: 1440px) {
+/* Activity context menu: the desktop right-click entry point and the phone
+   long-press one. The base look must NOT be width-gated: it used to live only
+   inside the `min-width: 1440px` block below, which left the menu with
+   `position: static` on every smaller width - the JS positions it with left/top,
+   those did nothing, and the menu rendered as an unstyled block at the end of
+   the document, off screen, instead of at the point that was pressed. */
+.activity-context-menu {
+  position: fixed;
+  display: none;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  z-index: 3000;
+  padding: 4px;
+}
+
+.activity-context-menu-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.activity-context-menu-item:hover {
+  background: var(--background-color);
+}
+
+.activity-context-menu-item.danger {
+  color: var(--danger-color);
+}
+
+@media (max-width: 1439.98px) {
+  /* The long-press entry point is a thumb, so give the items a target that size
+     and the sheet-like look the other phone menus have. */
   .activity-context-menu {
-    position: fixed;
-    display: none;
-    min-width: 150px;
-    background: #fff;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
-    z-index: 3000;
-    padding: 4px;
+    min-width: 200px;
   }
 
   .activity-context-menu-item {
-    width: 100%;
-    border: none;
-    background: transparent;
-    text-align: left;
-    padding: 8px 10px;
-    font-size: 14px;
-    color: var(--text-color);
-    border-radius: 4px;
-    cursor: pointer;
+    padding: 12px 14px;
+    min-height: 44px;
+    font-size: 1rem;
   }
+}
 
-  .activity-context-menu-item:hover {
-    background: var(--background-color);
-  }
-
-  .activity-context-menu-item.danger {
-    color: var(--danger-color);
-  }
-
+/* Desktop hover tooltip for activity blocks */
+@media (min-width: 1440px) {
   .activity-block:hover::before {
     content: attr(data-tooltip-text);
     position: absolute;
@@ -2950,6 +3632,22 @@ body.carrying-activity .modal-close {
 .banner-text {
   font-size: 16px;
   font-weight: 500;
+}
+
+/* The banner explains a different entry point per layout, so index.html carries
+   one string for each and only one of them is rendered. */
+.banner-text-mobile {
+  display: none;
+}
+
+@media (max-width: 1439.98px) {
+  .banner-text-mobile {
+    display: inline;
+  }
+
+  .banner-text-desktop {
+    display: none;
+  }
 }
 
 .banner-close {

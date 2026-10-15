@@ -1,12 +1,22 @@
 import { getIsMobile, updateIsMobile } from '../js/globals.js';
 import i18n from '../js/i18n.js';
 import { loadActivitiesConfig } from '../js/activities_config.js';
-import { renderMarkdown } from '../js/markdown.js';
+import { renderMarkdown, renderInlineMarkdown } from '../js/markdown.js';
 import { hasPendingExternalTasks } from '../js/utils.js';
 
 function getUrlParams() {
   return new URLSearchParams(window.location.search);
 }
+
+/**
+ * `?embed=1` renders this page as the walk-through only - no page heading, no
+ * study text, no language pill, no Start button - for the diary's help modal,
+ * which loads it in an iframe so the GIFs, the layout switching and the
+ * translations stay in one place. The walk-through is open, and the Start
+ * button's job (marking the instructions as completed) is unreachable from
+ * there.
+ */
+const IS_EMBED = getUrlParams().get('embed') === '1';
 
 function getCurrentLanguageFromUrl() {
   return getUrlParams().get('lang');
@@ -171,14 +181,22 @@ function renderLanguageSelector(studyConfig, selectedLanguage) {
   }
 
   const selectorContainer = document.createElement('div');
-  selectorContainer.className = 'language-selector-container';
+  selectorContainer.className = 'language-pill language-selector-container';
   selectorContainer.style.marginBottom = '1rem';
+
+  // Globe + language code, the same control as on the consent page
+  // (styles/language-pill.css). The word "Language" stays for screen readers: a
+  // visible label in the page's own language is no help to someone who cannot
+  // read that language, which is exactly who needs this control.
+  const globe = document.createElement('i');
+  globe.className = 'fas fa-globe language-pill-globe';
+  globe.setAttribute('aria-hidden', 'true');
 
   const label = document.createElement('label');
   label.setAttribute('for', 'languageSelect');
+  label.className = 'language-pill-label';
   label.textContent = 'Language';
   label.setAttribute('data-i18n', 'common.language');
-  label.style.marginRight = '0.5rem';
 
   const select = document.createElement('select');
   select.id = 'languageSelect';
@@ -202,8 +220,14 @@ function renderLanguageSelector(studyConfig, selectedLanguage) {
     window.location.href = url.toString();
   });
 
+  const caret = document.createElement('i');
+  caret.className = 'fas fa-caret-down language-pill-caret';
+  caret.setAttribute('aria-hidden', 'true');
+
+  selectorContainer.appendChild(globe);
   selectorContainer.appendChild(label);
   selectorContainer.appendChild(select);
+  selectorContainer.appendChild(caret);
 
   const bodyFirstDiv = document.body.querySelector('div');
   if (bodyFirstDiv) {
@@ -262,6 +286,36 @@ function applyStudyInstructionsText(studyConfig) {
   instructionsElement.innerHTML = renderMarkdown(
     fallbackText === fallbackKey ? '' : fallbackText
   );
+}
+
+/**
+ * Override the big page title with the study's own title when it defines one.
+ * Without a study title the localized default (`instructions.welcomeTitle`)
+ * that i18n already applied stays in place.
+ */
+function applyStudyTitleText(studyConfig) {
+  const titleElement = document.getElementById('study-custom-message-title');
+  if (!titleElement) {
+    return;
+  }
+
+  const selectedLanguage =
+    studyConfig?.selected_language || getCurrentLanguageFromUrl() || 'en';
+  const defaultLanguage = studyConfig?.default_language || 'en';
+
+  const resolvedText = resolveLocalizedStudyText(
+    studyConfig?.study_text_instructions_title,
+    selectedLanguage,
+    defaultLanguage
+  );
+
+  if (typeof resolvedText === 'string' && resolvedText.trim() !== '') {
+    // Inline markdown only: this element already is the page <h1>, so a heading
+    // marker in the study text would nest a heading inside a heading.
+    titleElement.innerHTML = renderInlineMarkdown(resolvedText);
+    // Detached from i18n so a later translation pass cannot overwrite it.
+    titleElement.removeAttribute('data-i18n');
+  }
 }
 
 function buildPostDiaryLandingUrlWithCurrentParams(studyConfig) {
@@ -328,10 +382,10 @@ function updateLayout() {
 }
 
 /**
- * The "Copy a Day" step only makes sense when there is another day to copy
- * to. The diary page shows the copy button under the same condition
- * (addCopyDayLink() in ui.js), so hide the step for single-day studies and
- * keep the visible steps numbered consecutively.
+ * The "Copy a Day" step only makes sense when there is another day to copy to.
+ * The diary page shows the copy button under the same condition
+ * (addCopyDayLink() in ui.js), so hide the step for single-day studies.
+ * (The steps carry no numbers any more, so hiding one leaves no gap to fix up.)
  */
 function applyCopyDayStepVisibility(studyConfig) {
   const copyDayStep = document.getElementById('instruction-step-copy-day');
@@ -347,23 +401,17 @@ function applyCopyDayStepVisibility(studyConfig) {
   if (copyDayStep && daysCount !== null) {
     copyDayStep.hidden = daysCount <= 1;
   }
-
-  // Number only the visible steps, so a hidden step does not leave a gap.
-  let visibleStepCount = 0;
-  document.querySelectorAll('.instruction-step').forEach((step) => {
-    if (!step.hidden) {
-      visibleStepCount += 1;
-    }
-    const badge = step.querySelector('.step-number');
-    if (badge) {
-      badge.textContent = String(visibleStepCount);
-    }
-  });
 }
 
 // Initialize i18n when the module loads
 (async () => {
   try {
+    if (IS_EMBED) {
+      document.body.classList.add('is-embedded');
+      const howToSection = document.getElementById('howToSection');
+      if (howToSection) howToSection.open = true;
+    }
+
     let studyConfig = null;
     const requestedLanguage =
       getCurrentLanguageFromUrl() || getPreferredLanguage();
@@ -376,9 +424,12 @@ function applyCopyDayStepVisibility(studyConfig) {
       window.TUD_STUDY_CONFIG = studyConfig;
       window.dispatchEvent(new CustomEvent('tud:studyConfigReady'));
     } catch (studyConfigError) {
+      // Inside the help modal a dead study config must not navigate the iframe
+      // to the diary - the generic walk-through is still worth showing.
       if (
-        studyConfigError?.code === 'STUDY_UNAVAILABLE' ||
-        studyConfigError?.status === 403
+        !IS_EMBED &&
+        (studyConfigError?.code === 'STUDY_UNAVAILABLE' ||
+          studyConfigError?.status === 403)
       ) {
         const currentUrl = new URL(window.location.href);
         const redirectUrl = new URL('../index.html', currentUrl.href);
@@ -405,7 +456,7 @@ function applyCopyDayStepVisibility(studyConfig) {
       setLanguageInUrl(selectedLanguage);
     }
 
-    if (studyConfig) {
+    if (studyConfig && !IS_EMBED) {
       if (studyConfig.participant_has_completed_study === true) {
         window.location.href =
           buildPostDiaryLandingUrlWithCurrentParams(studyConfig);
@@ -426,10 +477,12 @@ function applyCopyDayStepVisibility(studyConfig) {
     console.log('Loading language:', language);
     await i18n.init(language);
     i18n.applyTranslations();
-    if (studyConfig) {
+    if (studyConfig && !IS_EMBED) {
       applyStudyIntroText(studyConfig);
+      applyStudyTitleText(studyConfig);
       applyStudyInstructionsText(studyConfig);
     }
+    // Applies in the modal too: a single-day study has no day to copy to.
     applyCopyDayStepVisibility(studyConfig);
     console.log('i18n initialized successfully');
   } catch (error) {
