@@ -37,7 +37,8 @@ http {
         server_name localhost;
 
         location = /favicon.ico {
-            alias FRONTENDREPOPATH/favicon.ico;
+            # The file lives inside src/ (which /report/ is an alias of).
+            alias FRONTENDREPOPATH/src/favicon.ico;
         }
 
         location /report/ {

@@ -97,6 +97,15 @@ Current WIP -- Version 0.23.0 -- Make instructions title configurable
   row) and the button - a flex item with the default `align-items: stretch` -
   grew with it into a square (140x131). Rows are content-sized now and the row
   centers its button, so the page simply ends where its content ends.
+- DEV: the local dev server now supports phone testing on the same wifi without
+  storing any address in the repo. The dev frontend settings call the API
+  same-origin (`/tud_backend/api`, like production), and `run_dev_nginx_both.bash`
+  derives this machine's LAN address on every start, adds it to
+  `TUD_ALLOWED_ORIGINS` and points `TUD_FRONTEND_URL` at it in the generated
+  `backend/.env` (the committed template stays localhost-only, so another machine
+  or the same one on another network needs no edits; `TUD_DEV_LAN_IP=…` overrides
+  the detection). The dev nginx `/favicon.ico` alias was also fixed - it pointed
+  outside `src/`, so every page load logged a 404 and showed no tab icon.
 - NEW: "How to use the diary" in the ⋮ menu (both layouts) opens the walk-
   through in a modal instead of leaving the day. It is the instructions page in
   `?embed=1` mode - same steps, GIFs and translations, without the study text,

@@ -11,8 +11,6 @@
 ## save current directory to return to it later
 CURRENT_DIR=$(pwd)
 
-echo "yo yo"
-
 # ── Pre-flight: clean up leftover processes from previous runs ──
 # Kill old nginx started by this script (user-level, no root needed)
 if [ -f "$HOME/nginx-dev.pid" ]; then
@@ -73,6 +71,30 @@ cp "$CURRENT_DIR/dev_tools/local_nginx/frontend_settings/tud_settings.dev-nginx.
 # Copy backend config .env file
 cp "$CURRENT_DIR/dev_tools/local_nginx/backend_settings/.env.dev-nginx" "$CURRENT_DIR/backend/.env" || { echo -e "ERROR: Failed to copy backend config file"; exit 1; }
 
+# ── Same-wifi testing: derive this machine's address into the backend config ──
+# Two values cannot be host-agnostic. CORS has to allow the origin the phone
+# uses, and the redirects the backend sends (thank-you page, inactivity timeout,
+# tasks) have to lead somewhere the phone can reach - 'localhost' there means
+# the phone itself. Both are derived here rather than committed, so the repo
+# carries no address and another machine, or this one on another network, needs
+# no edits. Override the detection with:
+#   TUD_DEV_LAN_IP=10.0.0.5 ./run_dev_nginx_both.bash
+LAN_IP="${TUD_DEV_LAN_IP:-$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}')}"
+if [ -z "$LAN_IP" ]; then
+    # No default route (offline machine): take the first global address instead.
+    LAN_IP=$(ip -4 -o addr show scope global 2>/dev/null | awk '{split($4, a, "/"); print a[1]}' | head -1)
+fi
+
+if [ -n "$LAN_IP" ]; then
+    sed -i \
+        -e "s|^TUD_ALLOWED_ORIGINS=.*|TUD_ALLOWED_ORIGINS='[\"http://localhost:3000\", \"http://127.0.0.1:3000\", \"http://$LAN_IP:3000\", \"http://$LAN_IP\"]'|" \
+        -e "s|^TUD_FRONTEND_URL=.*|TUD_FRONTEND_URL=http://$LAN_IP:3000/report/|" \
+        "$CURRENT_DIR/backend/.env" || { echo -e "ERROR: Failed to write the LAN address into backend/.env"; exit 1; }
+    PHONE_URL="http://$LAN_IP:3000/report/index.html?study_name=default&lang=de"
+else
+    PHONE_URL=""
+fi
+
 # Prepare backend DB state explicitly before starting the API server.
 cd "$CURRENT_DIR/backend/" || { echo -e "ERROR: Failed to change to backend directory"; exit 1; }
 uv run tud db upgrade || { echo -e "ERROR: Failed to apply DB migrations"; exit 1; }
@@ -92,6 +114,11 @@ nginx -c "$FULL_NGINX_CONF_PATH"
 if [ $? -eq 0 ]; then
     echo -e "Started nginx successfully, frontend available at http://localhost:3000/report/"
     echo -e "Backend API available at http://localhost:3000/tud_backend/api"
+    if [ -n "$PHONE_URL" ]; then
+        echo -e "INFO Testing from a phone on the same wifi: $PHONE_URL"
+    else
+        echo -e "INFO No LAN address detected - this machine's address only (http://localhost:3000/report/)."
+    fi
     echo -e "INFO nginx is running in the background with configuration from $FULL_NGINX_CONF_PATH"
     echo -e "INFO Press CTRL+C to stop the FastAPI backend, and then run 'kill -QUIT \$(cat \$HOME/nginx-dev.pid)' to stop nginx"
 else
